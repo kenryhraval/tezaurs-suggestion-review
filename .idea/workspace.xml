@@ -1,0 +1,340 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="c89384d2-ef65-4ebb-ab24-5f0e96c0a571" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/.github/dependabot.yml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.github/workflows/ci.yml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/.env.example" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/.gitattributes" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/.gitignore" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/.mvn/wrapper/maven-wrapper.properties" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/dev/keycloak/tezaurs-realm.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/mvnw" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/mvnw.cmd" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/pom.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/TezaursSuggestionReviewApplication.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/common/config/ClockConfiguration.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/common/error/ApiError.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/common/error/ApiExceptionHandler.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/common/error/ConflictException.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/common/error/ForbiddenException.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/common/error/NotFoundException.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/corpus/adapter/UnconfiguredCorpusSearchAdapter.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/corpus/controller/CorpusEvidenceController.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/corpus/dto/AttachEvidenceRequest.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/corpus/dto/CorpusEvidenceResponse.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/corpus/dto/EvidenceEvaluationRequest.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/corpus/dto/RecordCorpusEvidenceRequest.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/corpus/entity/CorpusEvidence.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/corpus/entity/EvidenceStatus.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/corpus/port/CorpusSearchPort.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/corpus/repository/CorpusEvidenceRepository.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/corpus/service/CorpusEvidenceService.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/dictionary/adapter/UnconfiguredTezaursDictionaryAdapter.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/dictionary/controller/TezaursDictionaryController.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/dictionary/dto/DictionaryEntryResponse.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/dictionary/port/TezaursDictionaryPort.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/dictionary/service/TezaursDictionaryService.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/export/controller/SuggestionExportController.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/export/dto/ExportReadySuggestionResponse.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/export/service/SuggestionExportService.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/meaning/controller/MeaningController.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/meaning/dto/CreateMeaningRequest.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/meaning/dto/CreateMeaningRevisionRequest.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/meaning/dto/MeaningEvaluationRequest.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/meaning/dto/MeaningResponse.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/meaning/entity/Meaning.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/meaning/entity/MeaningOrigin.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/meaning/entity/MeaningStatus.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/meaning/repository/MeaningRepository.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/meaning/service/MeaningService.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/review/dto/ReviewEventResponse.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/review/entity/ReviewEvent.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/review/entity/ReviewEventType.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/review/repository/ReviewEventRepository.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/reviewer/controller/ReviewerController.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/reviewer/dto/ReviewerResponse.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/reviewer/entity/Reviewer.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/reviewer/repository/ReviewerRepository.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/reviewer/service/DevelopmentReviewerSeeder.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/reviewer/service/ReviewerService.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/security/config/ApiSecurityErrorWriter.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/security/config/SecurityConfiguration.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/security/config/SecurityProperties.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/security/service/AuthenticatedReviewerService.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/suggestion/controller/SuggestionController.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/suggestion/dto/CorrectTermRequest.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/suggestion/dto/CreateSuggestionRequest.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/suggestion/dto/RecordMatchRequest.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/suggestion/dto/ResolveSuggestionRequest.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/suggestion/dto/SuggestionResponse.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/suggestion/dto/WorkflowTransitionRequest.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/suggestion/entity/EntryMatchStatus.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/suggestion/entity/MatchKind.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/suggestion/entity/Suggestion.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/suggestion/entity/SuggestionResolution.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/suggestion/entity/WorkflowStatus.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/suggestion/repository/SuggestionRepository.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/suggestion/service/SuggestionService.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/resources/application-dev.yml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/resources/application.yml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/resources/db/migration/V1__initial_review_schema.sql" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/resources/db/migration/V2__realistic_review_domain.sql" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/test/java/lv/tezaurs/suggestions/acceptance/CucumberAcceptanceIT.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/test/java/lv/tezaurs/suggestions/acceptance/CucumberSpringConfiguration.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/test/java/lv/tezaurs/suggestions/acceptance/steps/AuthenticationSteps.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/test/java/lv/tezaurs/suggestions/acceptance/steps/HistorySteps.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/test/java/lv/tezaurs/suggestions/acceptance/steps/ResponseSteps.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/test/java/lv/tezaurs/suggestions/acceptance/steps/ReviewActionSteps.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/test/java/lv/tezaurs/suggestions/acceptance/steps/SubmissionSteps.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/test/java/lv/tezaurs/suggestions/acceptance/support/AcceptanceApiClient.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/test/java/lv/tezaurs/suggestions/acceptance/support/AcceptanceTestConfiguration.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/test/java/lv/tezaurs/suggestions/acceptance/support/ApiResponse.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/test/java/lv/tezaurs/suggestions/acceptance/support/ScenarioHooks.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/test/java/lv/tezaurs/suggestions/acceptance/support/ScenarioWorld.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/test/java/lv/tezaurs/suggestions/acceptance/support/TestDataManager.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/test/java/lv/tezaurs/suggestions/integration/DomainConstraintsIT.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/test/java/lv/tezaurs/suggestions/integration/OptimisticLockingIT.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/test/java/lv/tezaurs/suggestions/integration/PostgresIntegrationSupport.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/test/java/lv/tezaurs/suggestions/integration/ReviewTransactionIT.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/test/java/lv/tezaurs/suggestions/security/AuthenticatedReviewerServiceTest.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/test/java/lv/tezaurs/suggestions/security/PublicSubmissionSecurityTest.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/test/java/lv/tezaurs/suggestions/security/SecurityEndpointTest.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/test/java/lv/tezaurs/suggestions/suggestion/CreateSuggestionRequestValidationTest.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/test/java/lv/tezaurs/suggestions/suggestion/SuggestionServiceTest.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/test/java/lv/tezaurs/suggestions/suggestion/SuggestionWorkflowTest.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/test/resources/features/authentication_authorization.feature" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/test/resources/features/corpus_evidence.feature" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/test/resources/features/matching.feature" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/test/resources/features/meanings.feature" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/test/resources/features/resolution_and_export.feature" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/test/resources/features/submitting_suggestion.feature" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/test/resources/features/viewing_review_history.feature" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/test/resources/features/workflow.feature" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/compose.yml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/docs/architecture.md" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="EmbeddingIndexingInfo">
+    <option name="cachedIndexableFilesCount" value="17" />
+    <option name="fileBasedEmbeddingIndicesEnabled" value="true" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="GitHubPullRequestSearchHistory"><![CDATA[{
+  "lastFilter": {
+    "state": "OPEN",
+    "assignee": "kenryhraval"
+  }
+}]]></component>
+  <component name="GithubPullRequestsUISettings"><![CDATA[{
+  "selectedUrlAndAccountId": {
+    "url": "https://github.com/kenryhraval/tezaurs-suggestion-review.git",
+    "accountId": "5697ab5f-869b-4b97-a101-653acc96624b"
+  }
+}]]></component>
+  <component name="MavenImportPreferences">
+    <option name="generalSettings">
+      <MavenGeneralSettings>
+        <option name="mavenHomeTypeForPersistence" value="WRAPPER" />
+      </MavenGeneralSettings>
+    </option>
+  </component>
+  <component name="McpProjectServerCommands">
+    <commands />
+    <urls />
+  </component>
+  <component name="NextEditCompletionFeaturesState">
+    <decayedCancelled>
+      <entry key="MS100" value="1.0" />
+      <entry key="MS500" value="1.0" />
+      <entry key="S2" value="1.0" />
+      <entry key="S5" value="1.0" />
+      <entry key="S10" value="1.0" />
+      <entry key="S30" value="1.0" />
+      <entry key="S60" value="1.0" />
+      <entry key="M2" value="1.0" />
+      <entry key="M5" value="1.0" />
+      <entry key="M10" value="1.0000000000000593" />
+      <entry key="M15" value="1.0000000015197463" />
+      <entry key="M30" value="1.0000389839253037" />
+      <entry key="H1" value="1.0062437108600304" />
+      <entry key="H2" value="1.07901715547924" />
+      <entry key="H4" value="1.2810999030224663" />
+      <entry key="D1" value="1.8093631911029169" />
+      <entry key="W1" value="1.970236560299314" />
+    </decayedCancelled>
+    <decayedSelected>
+      <entry key="MS100" value="0.0" />
+      <entry key="MS500" value="0.0" />
+      <entry key="S2" value="0.0" />
+      <entry key="S5" value="0.0" />
+      <entry key="S10" value="0.0" />
+      <entry key="S30" value="0.0" />
+      <entry key="S60" value="0.0" />
+      <entry key="M2" value="0.0" />
+      <entry key="M5" value="0.0" />
+      <entry key="M10" value="0.0" />
+      <entry key="M15" value="0.0" />
+      <entry key="M30" value="0.0" />
+      <entry key="H1" value="0.0" />
+      <entry key="H2" value="0.0" />
+      <entry key="H4" value="0.0" />
+      <entry key="D1" value="0.0" />
+      <entry key="W1" value="0.0" />
+    </decayedSelected>
+    <decayedShown>
+      <entry key="MS100" value="0.6029039138453802" />
+      <entry key="MS500" value="0.9037527267510859" />
+      <entry key="S2" value="0.9750174876533334" />
+      <entry key="S5" value="0.9899310855458512" />
+      <entry key="S10" value="0.9949528056877126" />
+      <entry key="S30" value="0.9983147634691089" />
+      <entry key="S60" value="0.9991570264323365" />
+      <entry key="M2" value="0.9995784243531552" />
+      <entry key="M5" value="0.9998313484093425" />
+      <entry key="M10" value="0.9999156706490108" />
+      <entry key="M15" value="0.9999437811618987" />
+      <entry key="M30" value="1.0000108695986047" />
+      <entry key="H1" value="1.0062293549391454" />
+      <entry key="H2" value="1.0790082260304565" />
+      <entry key="H4" value="1.28109300647639" />
+      <entry key="D1" value="1.8093609821730303" />
+      <entry key="W1" value="1.9702361986443833" />
+    </decayedShown>
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 5,
+  &quot;fromUser&quot;: false
+}</component>
+  <component name="ProjectId" id="3JFHtrWCwGqv8YBDCTd8bviirsW" />
+  <component name="ProjectLevelVcsManager">
+    <ConfirmationsSetting value="2" id="Add" />
+  </component>
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "Cucumber Java.All Features in: test.executor": "Run",
+    "JUnit.java in suggestions.executor": "Run",
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.MCP Project settings loaded": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
+    "codeWithMe.voiceChat.enabledByDefault": "false",
+    "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1": "true",
+    "junie.onboarding.icon.badge.shown": "true",
+    "kotlin-language-version-configured": "true",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "settings.editor.selected.configurable": "preferences.pluginManager",
+    "to.speed.mode.migration.done": "true",
+    "vue.rearranger.settings.migration": "true"
+  }
+}]]></component>
+  <component name="RecentsManager">
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="\\wsl.localhost\Ubuntu-26.04\home\henrijskravals\tezaurs-suggestion-review" />
+      <recent name="\\wsl.localhost\Ubuntu-26.04\home\henrijskravals\tezaurs-suggestion-review\backend" />
+    </key>
+  </component>
+  <component name="RunManager" selected="JUnit.java in suggestions">
+    <configuration name="All Features in: test" type="CucumberJavaRunConfigurationType" factoryName="Cucumber java" temporary="true" nameIsGenerated="true">
+      <option name="CUCUMBER_CORE_VERSION" value="7" />
+      <option name="FILE_PATH" value="$PROJECT_DIR$/src/test" />
+      <option name="MAIN_CLASS_NAME" value="io.cucumber.core.cli.Main" />
+      <module name="suggestions" />
+      <option name="PROGRAM_PARAMETERS" value=" --plugin teamcity" />
+      <option name="SUGGESTED_NAME" value="All Features in: test" />
+      <option name="WORKING_DIRECTORY" value="$MODULE_WORKING_DIR$" />
+      <extension name="coverage">
+        <pattern>
+          <option name="PATTERN" value="io.cucumber.core.cli.*" />
+          <option name="ENABLED" value="true" />
+        </pattern>
+      </extension>
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="java in suggestions" type="JUnit" factoryName="JUnit" temporary="true" nameIsGenerated="true">
+      <module name="suggestions" />
+      <option name="TEST_OBJECT" value="directory" />
+      <dir value="$PROJECT_DIR$/src/test/java" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration default="true" type="KotlinStandaloneScriptRunConfigurationType">
+      <module name="tezaurs-suggestion-review" />
+      <option name="filePath" />
+      <method v="2" />
+    </configuration>
+    <configuration name="TezaursSuggestionReviewApplication" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot" nameIsGenerated="true">
+      <option name="ENABLE_JMX_AUTH" value="true" />
+      <option name="FRAME_DEACTIVATION_UPDATE_POLICY" value="UpdateClassesAndResources" />
+      <module name="suggestions" />
+      <option name="SPRING_BOOT_MAIN_CLASS" value="lv.tezaurs.suggestions.TezaursSuggestionReviewApplication" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <recent_temporary>
+      <list>
+        <item itemvalue="JUnit.java in suggestions" />
+        <item itemvalue="Cucumber Java.All Features in: test" />
+      </list>
+    </recent_temporary>
+  </component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-jdk-30f59d01ecdd-37e91769500f-intellij.indexing.shared.core-IU-261.24374.151" />
+        <option value="bundled-js-predefined-d6986cc7102b-31caf2ab9e3c-JavaScript-IU-261.24374.151" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="c89384d2-ef65-4ebb-ab24-5f0e96c0a571" name="Changes" comment="" />
+      <created>1789250115718</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1789250115718</updated>
+      <workItem from="1789250119147" duration="105000" />
+      <workItem from="1789250246000" duration="12092000" />
+    </task>
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+</project>

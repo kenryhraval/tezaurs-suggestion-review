@@ -1,0 +1,82 @@
+name: Deploy to Hetzner
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build image and deploy
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      IMAGE: ghcr.io/${{ github.repository_owner }}/tezaurs-suggestion-review-backend:${{ github.event.workflow_run.head_sha }}
+
+    steps:
+      - name: Check out the verified revision
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and publish backend image
+        uses: docker/build-push-action@f2a1d5e99d037542a71f64918e516c093c6f3fc4 # v6
+        with:
+          context: backend
+          push: true
+          tags: |
+            ${{ env.IMAGE }}
+            ghcr.io/${{ github.repository_owner }}/tezaurs-suggestion-review-backend:latest
+          labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
+
+      - name: Configure SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.HETZNER_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+
+      - name: Copy deployment configuration
+        env:
+          DEPLOY_HOST: ${{ secrets.HETZNER_HOST }}
+          DEPLOY_USER: ${{ secrets.HETZNER_USER }}
+        run: |
+          scp deploy/compose.yml deploy/Caddyfile \
+            "$DEPLOY_USER@$DEPLOY_HOST:/opt/tezaurs/"
+
+      - name: Deploy verified image
+        env:
+          DEPLOY_HOST: ${{ secrets.HETZNER_HOST }}
+          DEPLOY_USER: ${{ secrets.HETZNER_USER }}
+        run: |
+          ssh "$DEPLOY_USER@$DEPLOY_HOST" sh -s -- "$IMAGE" <<'REMOTE_SCRIPT'
+          set -eu
+          BACKEND_IMAGE="$1"
+          cd /opt/tezaurs
+          BACKEND_IMAGE="$BACKEND_IMAGE" docker compose pull
+          BACKEND_IMAGE="$BACKEND_IMAGE" docker compose up -d --remove-orphans --wait --wait-timeout 120
+          docker compose ps
+          REMOTE_SCRIPT

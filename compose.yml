@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: tezaurs_suggestions
+      POSTGRES_USER: tezaurs
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:?Set DATABASE_PASSWORD in your environment}
+    ports:
+      - "5432:5432"
+    volumes:
+      - tezaurs-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tezaurs -d tezaurs_suggestions"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+
+volumes:
+  tezaurs-postgres:
