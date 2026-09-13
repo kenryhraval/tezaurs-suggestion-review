@@ -32,12 +32,15 @@ jobs:
           cache: maven
           cache-dependency-path: backend/pom.xml
 
-      - name: Build, test and analyze
+      - name: Build and test
+        run: ./mvnw --batch-mode verify
+
+      - name: Analyze with SonarCloud
+        if: github.event_name == 'push'
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: >
-          ./mvnw --batch-mode verify
-          org.sonarsource.scanner.maven:sonar-maven-plugin:sonar
+          ./mvnw --batch-mode sonar:sonar
           -Dsonar.qualitygate.wait=true
 
 #  frontend:

@@ -20,6 +20,7 @@
         <java.version>21</java.version>
         <jacoco.version>0.8.15</jacoco.version>
         <lombok.version>1.18.44</lombok.version>
+        <sonar-maven-plugin.version>5.8.0.7211</sonar-maven-plugin.version>
         <sonar.organization>kenryhraval</sonar.organization>
         <sonar.projectKey>kenryhraval_tezaurs-suggestion-review</sonar.projectKey>
         <sonar.coverage.jacoco.xmlReportPaths>
@@ -115,6 +116,18 @@
                         </goals>
                     </execution>
                 </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.sonarsource.scanner.maven</groupId>
+                <artifactId>sonar-maven-plugin</artifactId>
+                <version>${sonar-maven-plugin.version}</version>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <argLine>@{argLine} -javaagent:${settings.localRepository}/org/mockito/mockito-core/${mockito.version}/mockito-core-${mockito.version}.jar</argLine>
+                </configuration>
             </plugin>
         </plugins>
     </build>

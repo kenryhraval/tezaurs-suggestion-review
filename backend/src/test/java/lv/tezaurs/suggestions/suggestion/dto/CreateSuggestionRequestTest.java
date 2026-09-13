@@ -1,13 +1,12 @@
-package lv.tezaurs.suggestions.suggestion;
+package lv.tezaurs.suggestions.suggestion.dto;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
-import lv.tezaurs.suggestions.suggestion.dto.CreateSuggestionRequest;
 import org.junit.jupiter.api.Test;
 
-class CreateSuggestionRequestValidationTest {
+class CreateSuggestionRequestTest {
     private final Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
 
     @Test
