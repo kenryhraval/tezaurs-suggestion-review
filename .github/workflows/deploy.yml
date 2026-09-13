@@ -32,7 +32,7 @@ jobs:
           ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Log in to GitHub Container Registry
-        uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1 # v3
+        uses: docker/login-action@0a596b2e7a325f0cedf8e9bd21ab002cbd3c9241 # v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
