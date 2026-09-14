@@ -5,119 +5,31 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="c89384d2-ef65-4ebb-ab24-5f0e96c0a571" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/.github/dependabot.yml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.github/workflows/ci.yml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/.env.example" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/.gitattributes" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/.gitignore" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/.mvn/wrapper/maven-wrapper.properties" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/dev/keycloak/tezaurs-realm.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/mvnw" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/mvnw.cmd" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/pom.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/TezaursSuggestionReviewApplication.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/common/config/ClockConfiguration.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/common/error/ApiError.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/common/error/ApiExceptionHandler.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/common/error/ConflictException.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/common/error/ForbiddenException.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/common/error/NotFoundException.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/corpus/adapter/UnconfiguredCorpusSearchAdapter.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/corpus/controller/CorpusEvidenceController.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/corpus/dto/AttachEvidenceRequest.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/corpus/dto/CorpusEvidenceResponse.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/corpus/dto/EvidenceEvaluationRequest.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/corpus/dto/RecordCorpusEvidenceRequest.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/corpus/entity/CorpusEvidence.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/corpus/entity/EvidenceStatus.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/corpus/port/CorpusSearchPort.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/corpus/repository/CorpusEvidenceRepository.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/corpus/service/CorpusEvidenceService.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/dictionary/adapter/UnconfiguredTezaursDictionaryAdapter.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/dictionary/controller/TezaursDictionaryController.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/dictionary/dto/DictionaryEntryResponse.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/dictionary/port/TezaursDictionaryPort.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/dictionary/service/TezaursDictionaryService.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/export/controller/SuggestionExportController.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/export/dto/ExportReadySuggestionResponse.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/export/service/SuggestionExportService.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
       <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/meaning/controller/MeaningController.java" afterDir="false" />
       <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/meaning/dto/CreateMeaningRequest.java" afterDir="false" />
       <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/meaning/dto/CreateMeaningRevisionRequest.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/meaning/dto/MeaningEvaluationRequest.java" afterDir="false" />
       <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/meaning/dto/MeaningResponse.java" afterDir="false" />
       <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/meaning/entity/Meaning.java" afterDir="false" />
       <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/meaning/entity/MeaningOrigin.java" afterDir="false" />
       <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/meaning/entity/MeaningStatus.java" afterDir="false" />
       <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/meaning/repository/MeaningRepository.java" afterDir="false" />
       <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/meaning/service/MeaningService.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/review/dto/ReviewEventResponse.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/review/entity/ReviewEvent.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/review/entity/ReviewEventType.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/review/repository/ReviewEventRepository.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/reviewer/controller/ReviewerController.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/reviewer/dto/ReviewerResponse.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/reviewer/entity/Reviewer.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/reviewer/repository/ReviewerRepository.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/reviewer/service/DevelopmentReviewerSeeder.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/reviewer/service/ReviewerService.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/security/config/ApiSecurityErrorWriter.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/security/config/SecurityConfiguration.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/security/config/SecurityProperties.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/security/service/AuthenticatedReviewerService.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/suggestion/controller/SuggestionController.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/suggestion/dto/CorrectTermRequest.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/suggestion/dto/CreateSuggestionRequest.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/suggestion/dto/RecordMatchRequest.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/suggestion/dto/ResolveSuggestionRequest.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/suggestion/dto/SuggestionResponse.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/suggestion/dto/WorkflowTransitionRequest.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/suggestion/entity/EntryMatchStatus.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/suggestion/entity/MatchKind.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/suggestion/entity/Suggestion.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/suggestion/entity/SuggestionResolution.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/suggestion/entity/WorkflowStatus.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/suggestion/repository/SuggestionRepository.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/suggestion/service/SuggestionService.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/resources/application-dev.yml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/resources/application.yml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/resources/db/migration/V1__initial_review_schema.sql" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/main/resources/db/migration/V2__realistic_review_domain.sql" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/test/java/lv/tezaurs/suggestions/acceptance/CucumberAcceptanceIT.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/test/java/lv/tezaurs/suggestions/acceptance/CucumberSpringConfiguration.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/test/java/lv/tezaurs/suggestions/acceptance/steps/AuthenticationSteps.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/test/java/lv/tezaurs/suggestions/acceptance/steps/HistorySteps.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/test/java/lv/tezaurs/suggestions/acceptance/steps/ResponseSteps.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/test/java/lv/tezaurs/suggestions/acceptance/steps/ReviewActionSteps.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/test/java/lv/tezaurs/suggestions/acceptance/steps/SubmissionSteps.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/test/java/lv/tezaurs/suggestions/acceptance/support/AcceptanceApiClient.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/test/java/lv/tezaurs/suggestions/acceptance/support/AcceptanceTestConfiguration.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/test/java/lv/tezaurs/suggestions/acceptance/support/ApiResponse.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/test/java/lv/tezaurs/suggestions/acceptance/support/ScenarioHooks.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/test/java/lv/tezaurs/suggestions/acceptance/support/ScenarioWorld.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/test/java/lv/tezaurs/suggestions/acceptance/support/TestDataManager.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/test/java/lv/tezaurs/suggestions/integration/DomainConstraintsIT.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/test/java/lv/tezaurs/suggestions/integration/OptimisticLockingIT.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/test/java/lv/tezaurs/suggestions/integration/PostgresIntegrationSupport.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/test/java/lv/tezaurs/suggestions/integration/ReviewTransactionIT.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/test/java/lv/tezaurs/suggestions/security/AuthenticatedReviewerServiceTest.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/test/java/lv/tezaurs/suggestions/security/PublicSubmissionSecurityTest.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/test/java/lv/tezaurs/suggestions/security/SecurityEndpointTest.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/test/java/lv/tezaurs/suggestions/suggestion/CreateSuggestionRequestValidationTest.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/test/java/lv/tezaurs/suggestions/suggestion/SuggestionServiceTest.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/test/java/lv/tezaurs/suggestions/suggestion/SuggestionWorkflowTest.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/test/resources/features/authentication_authorization.feature" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/test/resources/features/corpus_evidence.feature" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/test/resources/features/matching.feature" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/test/resources/features/meanings.feature" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/test/resources/features/resolution_and_export.feature" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/test/resources/features/submitting_suggestion.feature" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/test/resources/features/viewing_review_history.feature" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend/src/test/resources/features/workflow.feature" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/compose.yml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/docs/architecture.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/main/resources/db/migration/V2__add_meanings.sql" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/test/java/lv/tezaurs/suggestions/meaning/controller/MeaningControllerTest.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/src/test/java/lv/tezaurs/suggestions/meaning/service/MeaningServiceTest.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/inspectionProfiles/Project_Default.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/Project_Default.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/backend/pom.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/TezaursSuggestionReviewApplication.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/TezaursSuggestionReviewApplication.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/common/error/ApiExceptionHandler.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/common/error/ApiExceptionHandler.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/suggestion/dto/SuggestionResponse.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/suggestion/dto/SuggestionResponse.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/suggestion/entity/Suggestion.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/suggestion/entity/Suggestion.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/suggestion/service/SuggestionService.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/main/java/lv/tezaurs/suggestions/suggestion/service/SuggestionService.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/test/java/lv/tezaurs/suggestions/suggestion/controller/SuggestionControllerTest.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/test/java/lv/tezaurs/suggestions/suggestion/controller/SuggestionControllerTest.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/test/java/lv/tezaurs/suggestions/suggestion/entity/SuggestionTest.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/test/java/lv/tezaurs/suggestions/suggestion/entity/SuggestionTest.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/test/java/lv/tezaurs/suggestions/suggestion/service/SuggestionServiceTest.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/test/java/lv/tezaurs/suggestions/suggestion/service/SuggestionServiceTest.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -237,6 +149,7 @@
     "RunOnceActivity.typescript.service.memoryLimit.init": "true",
     "codeWithMe.voiceChat.enabledByDefault": "false",
     "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1": "true",
+    "git-widget-placeholder": "main",
     "junie.onboarding.icon.badge.shown": "true",
     "kotlin-language-version-configured": "true",
     "node.js.detected.package.eslint": "true",
@@ -244,7 +157,7 @@
     "node.js.selected.package.eslint": "(autodetect)",
     "node.js.selected.package.tslint": "(autodetect)",
     "nodejs_package_manager_path": "npm",
-    "settings.editor.selected.configurable": "preferences.pluginManager",
+    "settings.editor.selected.configurable": "project.propVCSSupport.DirectoryMappings",
     "to.speed.mode.migration.done": "true",
     "vue.rearranger.settings.migration": "true"
   }

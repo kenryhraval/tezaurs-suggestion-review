@@ -13,6 +13,9 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import lv.tezaurs.suggestions.common.error.NotFoundException;
+import lv.tezaurs.suggestions.meaning.entity.Meaning;
+import lv.tezaurs.suggestions.meaning.entity.MeaningOrigin;
+import lv.tezaurs.suggestions.meaning.repository.MeaningRepository;
 import lv.tezaurs.suggestions.suggestion.dto.CorrectTermRequest;
 import lv.tezaurs.suggestions.suggestion.dto.CreateSuggestionRequest;
 import lv.tezaurs.suggestions.suggestion.dto.RecordCorpusCheckRequest;
@@ -30,12 +33,14 @@ import org.mockito.MockMakers;
 
 class SuggestionServiceTest {
     private SuggestionRepository repository;
+    private MeaningRepository meaningRepository;
     private SuggestionService service;
 
     @BeforeEach
     void setUp() {
         repository = mock(SuggestionRepository.class, withSettings().mockMaker(MockMakers.PROXY));
-        service = new SuggestionService(repository);
+        meaningRepository = mock(MeaningRepository.class, withSettings().mockMaker(MockMakers.PROXY));
+        service = new SuggestionService(repository, meaningRepository);
         when(repository.saveAndFlush(any(Suggestion.class))).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
@@ -51,11 +56,15 @@ class SuggestionServiceTest {
         Suggestion saved = captor.getValue();
         assertThat(response.id()).isEqualTo(saved.getId()).isNotNull();
         assertThat(response.submittedTerm()).isEqualTo("term");
-        assertThat(response.submittedDefinition()).isEqualTo("definition");
         assertThat(response.usageExample()).isEqualTo("example");
         assertThat(response.notes()).isEqualTo("notes");
         assertThat(response.submitterName()).isEqualTo("name");
         assertThat(response.submitterEmail()).isEqualTo("email@example.test");
+        ArgumentCaptor<Meaning> meaningCaptor = ArgumentCaptor.forClass(Meaning.class);
+        verify(meaningRepository).save(meaningCaptor.capture());
+        assertThat(meaningCaptor.getValue().getSuggestionId()).isEqualTo(saved.getId());
+        assertThat(meaningCaptor.getValue().getOrigin()).isEqualTo(MeaningOrigin.SUBMITTER);
+        assertThat(meaningCaptor.getValue().getGloss()).isEqualTo("definition");
     }
 
     @Test
@@ -111,6 +120,6 @@ class SuggestionServiceTest {
     }
 
     private static Suggestion suggestion() {
-        return new Suggestion(UUID.randomUUID(), "term", "definition", null, null, null, null);
+        return new Suggestion("term", null, null, null, null);
     }
 }

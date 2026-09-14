@@ -7,11 +7,25 @@ The current increment deliberately supports only:
 - submitting, listing and viewing suggestions;
 - changing a human-selected review status;
 - recording whether an entry was found in Tēzaurs;
-- recording whether usage was found in corpus data.
+- recording whether usage was found in corpus data;
+- reviewing candidate meanings for a suggestion.
 
 The review statuses are `NEW`, `IN_PROGRESS`, `POSTPONED`, `NEEDS_EXPERT`, `COMPLETED` and `GARBAGE`. Tēzaurs and corpus checks are separate fields with `NOT_CHECKED`, `FOUND` and `NOT_FOUND` values. Status changes are intentionally unrestricted in this first increment.
 
-There is currently no authentication, reviewer management, review history, external Tēzaurs or corpus connection, multiple-meaning model, evidence storage or export process. These can be introduced later as separate, understandable increments.
+Each submitted definition is preserved as a `SUBMITTER` meaning. A reviewer can add
+a separate meaning, arrange meanings hierarchically with an optional parent, or
+create a revision. Revising creates new `REVIEWER` text and marks the source as
+`SUPERSEDED`; it never overwrites the source. Meanings can be `PROPOSED`,
+`APPROVED`, `REJECTED` or `SUPERSEDED`. Imported Tēzaurs meanings use the
+`EXISTING` origin and start as `APPROVED`; they may later be revised or rejected.
+A reviewer revision points back to the meaning it supersedes, while the optional
+parent ID represents the meaning hierarchy rather than revision history. The
+`GENERATED` and `EXISTING` origins are reserved for later integrations and are not
+currently created through the public API.
+
+There is currently no authentication, reviewer management, review history,
+external Tēzaurs or corpus connection, evidence storage or export process. These
+can be introduced later as separate, understandable increments.
 
 ## Run locally
 
@@ -42,6 +56,10 @@ set +a
 
 The backend is available at `http://localhost:8080`.
 
+Interactive Swagger documentation is available at
+`http://localhost:8080/swagger-ui.html`. The generated OpenAPI document is
+available at `http://localhost:8080/v3/api-docs`.
+
 To inspect PostgreSQL logs or stop it later, run these commands from the repository
 root:
 
@@ -70,17 +88,14 @@ PostgreSQL and automatic HTTPS, and a GitHub Actions deployment workflow. See
 - `POST /api/suggestions/{id}/term-correction`
 - `POST /api/suggestions/{id}/tezaurs-check`
 - `POST /api/suggestions/{id}/corpus-check`
+- `GET /api/suggestions/{id}/meanings`
+- `POST /api/suggestions/{id}/meanings`
+- `POST /api/suggestions/{id}/meanings/{meaningId}/revision`
+- `POST /api/suggestions/{id}/meanings/{meaningId}/approve`
+- `POST /api/suggestions/{id}/meanings/{meaningId}/reject`
 - `GET /actuator/health`
-
-Example submission:
-
-```json
-{
-  "term": "jaunvārds",
-  "definition": "Iesniedzēja piedāvātais skaidrojums",
-  "usageExample": "Iesniedzēja piemērs"
-}
-```
+- `GET /swagger-ui.html`
+- `GET /v3/api-docs`
 
 ## Tests
 

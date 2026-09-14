@@ -4,6 +4,9 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lv.tezaurs.suggestions.common.error.NotFoundException;
+import lv.tezaurs.suggestions.meaning.entity.Meaning;
+import lv.tezaurs.suggestions.meaning.entity.MeaningOrigin;
+import lv.tezaurs.suggestions.meaning.repository.MeaningRepository;
 import lv.tezaurs.suggestions.suggestion.dto.CorrectTermRequest;
 import lv.tezaurs.suggestions.suggestion.dto.CreateSuggestionRequest;
 import lv.tezaurs.suggestions.suggestion.dto.RecordCorpusCheckRequest;
@@ -19,19 +22,26 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class SuggestionService {
-    private final SuggestionRepository repository;
+    private final SuggestionRepository suggestionRepository;
+    private final MeaningRepository meaningRepository;
 
     @Transactional
     public SuggestionResponse create(CreateSuggestionRequest request) {
-        Suggestion suggestion = new Suggestion(UUID.randomUUID(), request.term().trim(), request.definition().trim(),
+        Suggestion suggestion = new Suggestion(request.term().trim(),
                 trimToNull(request.usageExample()), trimToNull(request.notes()), trimToNull(request.submitterName()),
                 trimToNull(request.submitterEmail()));
-        return SuggestionResponse.from(repository.saveAndFlush(suggestion));
+        Suggestion saved = suggestionRepository.saveAndFlush(suggestion);
+        Meaning submittedMeaning = new Meaning(saved.getId(), null, MeaningOrigin.SUBMITTER,
+                request.definition().trim());
+        meaningRepository.save(submittedMeaning);
+        return SuggestionResponse.from(saved);
     }
 
     @Transactional(readOnly = true)
     public List<SuggestionResponse> list() {
-        return repository.findAllByOrderByCreatedAtAscIdAsc().stream().map(SuggestionResponse::from).toList();
+        return suggestionRepository.findAllByOrderByCreatedAtAscIdAsc().stream()
+                .map(SuggestionResponse::from)
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -43,7 +53,7 @@ public class SuggestionService {
     public SuggestionResponse changeStatus(UUID id, UpdateStatusRequest request) {
         Suggestion suggestion = requireSuggestion(id);
         suggestion.changeStatus(request.status());
-        repository.flush();
+        suggestionRepository.flush();
         return SuggestionResponse.from(suggestion);
     }
 
@@ -51,7 +61,7 @@ public class SuggestionService {
     public SuggestionResponse correctTerm(UUID id, CorrectTermRequest request) {
         Suggestion suggestion = requireSuggestion(id);
         suggestion.correctTerm(request.reviewedTerm().trim());
-        repository.flush();
+        suggestionRepository.flush();
         return SuggestionResponse.from(suggestion);
     }
 
@@ -59,7 +69,7 @@ public class SuggestionService {
     public SuggestionResponse recordTezaursCheck(UUID id, RecordTezaursCheckRequest request) {
         Suggestion suggestion = requireSuggestion(id);
         suggestion.recordTezaursCheck(request.status(), request.matchedEntryId());
-        repository.flush();
+        suggestionRepository.flush();
         return SuggestionResponse.from(suggestion);
     }
 
@@ -67,12 +77,12 @@ public class SuggestionService {
     public SuggestionResponse recordCorpusCheck(UUID id, RecordCorpusCheckRequest request) {
         Suggestion suggestion = requireSuggestion(id);
         suggestion.recordCorpusCheck(request.status());
-        repository.flush();
+        suggestionRepository.flush();
         return SuggestionResponse.from(suggestion);
     }
 
     private Suggestion requireSuggestion(UUID id) {
-        return repository.findById(id)
+        return suggestionRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Suggestion " + id + " was not found"));
     }
 

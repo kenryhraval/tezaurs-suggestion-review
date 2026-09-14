@@ -6,7 +6,6 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import jakarta.persistence.Version;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.AccessLevel;
@@ -29,9 +28,6 @@ public class Suggestion {
 
     @Column(name = "reviewed_term")
     private String reviewedTerm;
-
-    @Column(name = "submitted_definition", nullable = false, updatable = false, columnDefinition = "text")
-    private String submittedDefinition;
 
     @Column(name = "usage_example", columnDefinition = "text")
     private String usageExample;
@@ -60,10 +56,6 @@ public class Suggestion {
     @Column(name = "corpus_status", nullable = false, length = 32)
     private CheckStatus corpusStatus;
 
-    @Version
-    @Column(nullable = false)
-    private long version;
-
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -72,11 +64,10 @@ public class Suggestion {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    public Suggestion(UUID id, String submittedTerm, String submittedDefinition, String usageExample,
-                      String notes, String submitterName, String submitterEmail) {
-        this.id = id;
+    public Suggestion(String submittedTerm, String usageExample, String notes,
+                      String submitterName, String submitterEmail) {
+        this.id = UUID.randomUUID();
         this.submittedTerm = submittedTerm;
-        this.submittedDefinition = submittedDefinition;
         this.usageExample = usageExample;
         this.notes = notes;
         this.submitterName = submitterName;

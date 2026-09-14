@@ -10,7 +10,6 @@ public record SuggestionResponse(
         UUID id,
         String submittedTerm,
         String reviewedTerm,
-        String submittedDefinition,
         String usageExample,
         String notes,
         String submitterName,
@@ -19,16 +18,14 @@ public record SuggestionResponse(
         CheckStatus tezaursStatus,
         Long matchedEntryId,
         CheckStatus corpusStatus,
-        long version,
         Instant createdAt,
         Instant updatedAt) {
 
     public static SuggestionResponse from(Suggestion suggestion) {
         return new SuggestionResponse(suggestion.getId(), suggestion.getSubmittedTerm(),
-                suggestion.getReviewedTerm(), suggestion.getSubmittedDefinition(), suggestion.getUsageExample(),
-                suggestion.getNotes(), suggestion.getSubmitterName(), suggestion.getSubmitterEmail(),
+                suggestion.getReviewedTerm(), suggestion.getUsageExample(), suggestion.getNotes(),
+                suggestion.getSubmitterName(), suggestion.getSubmitterEmail(),
                 suggestion.getStatus(), suggestion.getTezaursStatus(), suggestion.getMatchedEntryId(),
-                suggestion.getCorpusStatus(), suggestion.getVersion(), suggestion.getCreatedAt(),
-                suggestion.getUpdatedAt());
+                suggestion.getCorpusStatus(), suggestion.getCreatedAt(), suggestion.getUpdatedAt());
     }
 }

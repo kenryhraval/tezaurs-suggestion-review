@@ -3,7 +3,6 @@ package lv.tezaurs.suggestions.common.error;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Instant;
 import java.util.List;
-import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -18,12 +17,9 @@ public class ApiExceptionHandler {
         return error(HttpStatus.NOT_FOUND, "NOT_FOUND", exception.getMessage(), request, List.of());
     }
 
-    @ExceptionHandler({ConflictException.class, OptimisticLockingFailureException.class})
-    ResponseEntity<ApiError> conflict(RuntimeException exception, HttpServletRequest request) {
-        String message = exception instanceof OptimisticLockingFailureException
-                ? "The suggestion was changed by another request"
-                : exception.getMessage();
-        return error(HttpStatus.CONFLICT, "CONFLICT", message, request, List.of());
+    @ExceptionHandler(ConflictException.class)
+    ResponseEntity<ApiError> conflict(ConflictException exception, HttpServletRequest request) {
+        return error(HttpStatus.CONFLICT, "CONFLICT", exception.getMessage(), request, List.of());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

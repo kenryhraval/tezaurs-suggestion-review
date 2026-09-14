@@ -3,7 +3,6 @@ package lv.tezaurs.suggestions.suggestion.entity;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.util.UUID;
 import lv.tezaurs.suggestions.common.error.ConflictException;
 import org.junit.jupiter.api.Test;
 
@@ -59,6 +58,6 @@ class SuggestionTest {
     }
 
     private static Suggestion suggestion() {
-        return new Suggestion(UUID.randomUUID(), "submitted", "definition", null, null, null, null);
+        return new Suggestion("submitted", null, null, null, null);
     }
 }

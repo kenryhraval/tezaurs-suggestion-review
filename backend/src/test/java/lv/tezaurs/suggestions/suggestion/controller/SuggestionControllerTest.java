@@ -71,8 +71,8 @@ class SuggestionControllerTest {
     }
 
     private static SuggestionResponse response() {
-        return new SuggestionResponse(UUID.randomUUID(), "term", null, "definition", null, null, null, null,
-                SuggestionStatus.NEW, CheckStatus.NOT_CHECKED, null, CheckStatus.NOT_CHECKED, 0L,
+        return new SuggestionResponse(UUID.randomUUID(), "term", null, null, null, null, null,
+                SuggestionStatus.NEW, CheckStatus.NOT_CHECKED, null, CheckStatus.NOT_CHECKED,
                 Instant.EPOCH, Instant.EPOCH);
     }
 }
