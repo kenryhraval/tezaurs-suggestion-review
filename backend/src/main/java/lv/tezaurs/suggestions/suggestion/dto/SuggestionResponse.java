@@ -3,8 +3,10 @@ package lv.tezaurs.suggestions.suggestion.dto;
 import java.time.Instant;
 import java.util.UUID;
 import lv.tezaurs.suggestions.suggestion.entity.CheckStatus;
+import lv.tezaurs.suggestions.suggestion.entity.CompletionBlockReason;
 import lv.tezaurs.suggestions.suggestion.entity.Suggestion;
 import lv.tezaurs.suggestions.suggestion.entity.SuggestionStatus;
+import lv.tezaurs.suggestions.suggestion.entity.TezaursStatus;
 
 public record SuggestionResponse(
         UUID id,
@@ -15,9 +17,11 @@ public record SuggestionResponse(
         String submitterName,
         String submitterEmail,
         SuggestionStatus status,
-        CheckStatus tezaursStatus,
+        TezaursStatus tezaursStatus,
         Long matchedEntryId,
         CheckStatus corpusStatus,
+        boolean canComplete,
+        CompletionBlockReason completionBlockReason,
         Instant createdAt,
         Instant updatedAt) {
 
@@ -26,6 +30,7 @@ public record SuggestionResponse(
                 suggestion.getReviewedTerm(), suggestion.getUsageExample(), suggestion.getNotes(),
                 suggestion.getSubmitterName(), suggestion.getSubmitterEmail(),
                 suggestion.getStatus(), suggestion.getTezaursStatus(), suggestion.getMatchedEntryId(),
-                suggestion.getCorpusStatus(), suggestion.getCreatedAt(), suggestion.getUpdatedAt());
+                suggestion.getCorpusStatus(), suggestion.canComplete(), suggestion.completionBlockReason(),
+                suggestion.getCreatedAt(), suggestion.getUpdatedAt());
     }
 }

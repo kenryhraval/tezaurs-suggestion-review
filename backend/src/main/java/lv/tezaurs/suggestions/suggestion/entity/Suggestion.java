@@ -47,7 +47,7 @@ public class Suggestion {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "tezaurs_status", nullable = false, length = 32)
-    private CheckStatus tezaursStatus;
+    private TezaursStatus tezaursStatus;
 
     @Column(name = "matched_entry_id")
     private Long matchedEntryId;
@@ -73,30 +73,63 @@ public class Suggestion {
         this.submitterName = submitterName;
         this.submitterEmail = submitterEmail;
         this.status = SuggestionStatus.NEW;
-        this.tezaursStatus = CheckStatus.NOT_CHECKED;
+        this.tezaursStatus = TezaursStatus.NOT_CHECKED;
         this.corpusStatus = CheckStatus.NOT_CHECKED;
     }
 
     public void changeStatus(SuggestionStatus newStatus) {
+        if (newStatus == SuggestionStatus.COMPLETED && !canComplete()) {
+            throw new ConflictException("All required review steps must be completed first");
+        }
         status = newStatus;
+    }
+
+    public boolean canComplete() {
+        return completionBlockReason() == null;
+    }
+
+    public CompletionBlockReason completionBlockReason() {
+        return switch (tezaursStatus) {
+            case NOT_CHECKED -> CompletionBlockReason.TEZAURS_CHECK_REQUIRED;
+            case FOUND -> CompletionBlockReason.MEANING_CHECK_REQUIRED;
+            case MEANING_FOUND -> null;
+            case MEANING_NOT_FOUND, NOT_FOUND -> corpusStatus == CheckStatus.NOT_CHECKED
+                    ? CompletionBlockReason.CORPUS_CHECK_REQUIRED
+                    : null;
+        };
     }
 
     public void correctTerm(String term) {
         reviewedTerm = term;
     }
 
-    public void recordTezaursCheck(CheckStatus checkStatus, Long entryId) {
-        if (checkStatus == CheckStatus.FOUND && entryId == null) {
-            throw new ConflictException("A found Tēzaurs entry requires its ID");
-        }
-        if (checkStatus != CheckStatus.FOUND && entryId != null) {
+    public void recordTezaursCheck(TezaursStatus checkStatus, Long entryId) {
+        if (!checkStatus.entryExists() && entryId != null) {
             throw new ConflictException("An entry ID is only allowed when a Tēzaurs entry was found");
         }
+        TezaursStatus previousStatus = tezaursStatus;
         tezaursStatus = checkStatus;
         matchedEntryId = entryId;
+
+        if ((checkStatus == TezaursStatus.MEANING_NOT_FOUND
+                || checkStatus == TezaursStatus.NOT_FOUND)
+                && corpusStatus == CheckStatus.NOT_CHECKED) {
+            corpusStatus = CheckStatus.NOT_FOUND;
+        }
+
+        if (checkStatus == TezaursStatus.MEANING_FOUND) {
+            status = SuggestionStatus.COMPLETED;
+        } else if (previousStatus == TezaursStatus.MEANING_FOUND
+                && status == SuggestionStatus.COMPLETED) {
+            status = SuggestionStatus.IN_PROGRESS;
+        }
     }
 
-    public void recordCorpusCheck(CheckStatus checkStatus) {
-        corpusStatus = checkStatus;
+    public void recordCorpusExample() {
+        if (tezaursStatus != TezaursStatus.MEANING_NOT_FOUND
+                && tezaursStatus != TezaursStatus.NOT_FOUND) {
+            throw new ConflictException("Corpus evidence is only applicable when the submitted meaning is absent");
+        }
+        corpusStatus = CheckStatus.FOUND;
     }
 }

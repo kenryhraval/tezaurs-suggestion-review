@@ -3,17 +3,21 @@ package lv.tezaurs.suggestions.suggestion.service;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lv.tezaurs.suggestions.common.error.ConflictException;
 import lv.tezaurs.suggestions.common.error.NotFoundException;
 import lv.tezaurs.suggestions.meaning.entity.Meaning;
 import lv.tezaurs.suggestions.meaning.entity.MeaningOrigin;
 import lv.tezaurs.suggestions.meaning.repository.MeaningRepository;
+import lv.tezaurs.suggestions.suggestion.dto.AddCorpusExampleRequest;
+import lv.tezaurs.suggestions.suggestion.dto.CorpusExampleResponse;
 import lv.tezaurs.suggestions.suggestion.dto.CorrectTermRequest;
 import lv.tezaurs.suggestions.suggestion.dto.CreateSuggestionRequest;
-import lv.tezaurs.suggestions.suggestion.dto.RecordCorpusCheckRequest;
 import lv.tezaurs.suggestions.suggestion.dto.RecordTezaursCheckRequest;
 import lv.tezaurs.suggestions.suggestion.dto.SuggestionResponse;
 import lv.tezaurs.suggestions.suggestion.dto.UpdateStatusRequest;
+import lv.tezaurs.suggestions.suggestion.entity.CorpusExample;
 import lv.tezaurs.suggestions.suggestion.entity.Suggestion;
+import lv.tezaurs.suggestions.suggestion.repository.CorpusExampleRepository;
 import lv.tezaurs.suggestions.suggestion.repository.SuggestionRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class SuggestionService {
     private final SuggestionRepository suggestionRepository;
     private final MeaningRepository meaningRepository;
+    private final CorpusExampleRepository corpusExampleRepository;
 
     @Transactional
     public SuggestionResponse create(CreateSuggestionRequest request) {
@@ -31,7 +36,7 @@ public class SuggestionService {
                 trimToNull(request.usageExample()), trimToNull(request.notes()), trimToNull(request.submitterName()),
                 trimToNull(request.submitterEmail()));
         Suggestion saved = suggestionRepository.saveAndFlush(suggestion);
-        Meaning submittedMeaning = new Meaning(saved.getId(), null, MeaningOrigin.SUBMITTER,
+        Meaning submittedMeaning = new Meaning(saved.getId(), MeaningOrigin.SUBMITTER,
                 request.definition().trim());
         meaningRepository.save(submittedMeaning);
         return SuggestionResponse.from(saved);
@@ -73,12 +78,25 @@ public class SuggestionService {
         return SuggestionResponse.from(suggestion);
     }
 
+    @Transactional(readOnly = true)
+    public List<CorpusExampleResponse> listCorpusExamples(UUID id) {
+        requireSuggestion(id);
+        return corpusExampleRepository.findAllBySuggestionIdOrderByCreatedAtAscIdAsc(id).stream()
+                .map(CorpusExampleResponse::from)
+                .toList();
+    }
+
     @Transactional
-    public SuggestionResponse recordCorpusCheck(UUID id, RecordCorpusCheckRequest request) {
+    public CorpusExampleResponse addCorpusExample(UUID id, AddCorpusExampleRequest request) {
         Suggestion suggestion = requireSuggestion(id);
-        suggestion.recordCorpusCheck(request.status());
-        suggestionRepository.flush();
-        return SuggestionResponse.from(suggestion);
+        String url = request.url();
+        if (corpusExampleRepository.existsBySuggestionIdAndUrl(id, url)) {
+            throw new ConflictException("This corpus example link has already been added");
+        }
+
+        suggestion.recordCorpusExample();
+        CorpusExample example = new CorpusExample(id, url);
+        return CorpusExampleResponse.from(corpusExampleRepository.saveAndFlush(example));
     }
 
     private Suggestion requireSuggestion(UUID id) {

@@ -9,7 +9,6 @@ import lv.tezaurs.suggestions.meaning.entity.MeaningStatus;
 public record MeaningResponse(
         UUID id,
         UUID suggestionId,
-        UUID parentMeaningId,
         UUID supersedesMeaningId,
         MeaningOrigin origin,
         String gloss,
@@ -18,7 +17,7 @@ public record MeaningResponse(
         Instant updatedAt) {
 
     public static MeaningResponse from(Meaning meaning) {
-        return new MeaningResponse(meaning.getId(), meaning.getSuggestionId(), meaning.getParentMeaningId(),
+        return new MeaningResponse(meaning.getId(), meaning.getSuggestionId(),
                 meaning.getSupersedesMeaningId(), meaning.getOrigin(), meaning.getGloss(), meaning.getStatus(),
                 meaning.getCreatedAt(), meaning.getUpdatedAt());
     }

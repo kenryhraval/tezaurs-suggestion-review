@@ -18,9 +18,37 @@ h3 {
   margin-bottom: 10px;
 }
 
+.title-form {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+  min-width: 0;
+  width: 100%;
+  margin: 0;
+}
+
+.title-form label {
+  min-width: 0;
+}
+
+.title-form input {
+  min-width: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-bottom: 1px solid #aaa;
+  padding: 0 2px;
+  font-size: 1.5em;
+  font-weight: bold;
+}
+
+.tezaurs-check {
+  display: grid;
+  gap: 12px;
+}
+
 .layout {
   display: grid;
-  grid-template-columns: 280px 1fr;
+  grid-template-columns: 280px minmax(0, 1fr);
   gap: 24px;
 }
 
@@ -31,34 +59,111 @@ aside,
   padding: 16px;
 }
 
-.suggestion-list,
-.meanings {
+.details {
+  min-width: 0;
+}
+
+.details p {
+  overflow-wrap: anywhere;
+}
+
+.suggestion-title {
+  overflow-wrap: anywhere;
+}
+
+.suggestion-list {
   list-style: none;
   padding: 0;
 }
 
-.suggestion-list button {
-  width: 100%;
+.suggestion-groups {
+  display: grid;
+  gap: 20px;
+}
+
+.suggestion-group {
+  border-top: 1px solid #ddd;
+  padding-top: 12px;
+}
+
+.suggestion-group-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.suggestion-group-heading h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.suggestion-group-heading button {
+  padding: 3px 7px;
+  font-size: 0.8rem;
+}
+
+.suggestion-count {
+  display: inline-block;
+  min-width: 1.2rem;
+  margin-left: 6px;
+  border-radius: 999px;
+  background: #eee;
+  color: #555;
+  font-size: 0.75rem;
+  line-height: 1.2rem;
+  text-align: center;
+}
+
+.empty-group {
+  margin: 0;
+  color: #777;
+  font-size: 0.85rem;
+}
+
+.suggestion-list {
+  margin: 0;
+}
+
+.suggestion-list li {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
   margin-bottom: 6px;
+}
+
+.suggestion-list .suggestion-select {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
   border: 1px solid #ccc;
   background: white;
   text-align: left;
 }
 
-.suggestion-list button.selected {
+.suggestion-list .suggestion-select.selected {
   border-color: #333;
   background: #eee;
 }
 
-.suggestion-list strong,
-.suggestion-list span {
+.suggestion-list strong {
   display: block;
+  overflow-wrap: anywhere;
 }
 
-.suggestion-list span,
 .muted,
 small {
   color: #666;
+}
+
+.suggestion-quick-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.suggestion-quick-actions button {
+  padding: 4px 7px;
 }
 
 form,
@@ -93,17 +198,70 @@ button:disabled {
   cursor: default;
 }
 
-.review-fields,
 .checks {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 24px;
   margin: 28px 0;
 }
 
-.term-form {
-  grid-template-columns: 1fr auto;
-  align-items: end;
+.existing-entry-message {
+  border-top: 1px solid #ccc;
+  padding-top: 16px;
+  color: #666;
+}
+
+.corpus-examples {
+  min-width: 0;
+}
+
+.corpus-examples h3 {
+  margin-bottom: 10px;
+}
+
+.corpus-examples form {
+  grid-template-columns: minmax(130px, 0.35fr) minmax(0, 1fr);
+  gap: 8px;
+}
+
+.corpus-examples ul {
+  margin: 8px 0 12px;
+  padding-left: 20px;
+}
+
+.corpus-examples a {
+  overflow-wrap: anywhere;
+}
+
+.corpus-examples li small {
+  display: block;
+}
+
+.corpus-examples input {
+  width: 100%;
+}
+
+.initial-review {
+  margin-top: 24px;
+  border-top: 1px solid #ccc;
+  padding-top: 16px;
+}
+
+.initial-review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.trash-message {
+  margin-top: 24px;
+  border: 1px solid #ccc;
+  padding: 12px;
+  color: #666;
+}
+
+.trash-message p {
+  margin-top: 0;
 }
 
 .meaning-section {
@@ -111,81 +269,41 @@ button:disabled {
   padding-top: 16px;
 }
 
-.meaning-heading {
+.review-completion {
   display: flex;
-  align-items: baseline;
-  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 20px;
+  border-top: 1px solid #ccc;
+  padding-top: 16px;
 }
 
-.meaning-heading h3 {
-  margin-bottom: 6px;
+.review-completion button {
+  min-width: 160px;
 }
 
-.meaning-groups {
-  display: grid;
-  gap: 14px;
-  margin: 10px 0 16px;
-}
-
-.meaning-group h4 {
+.review-completion p {
   margin: 0;
 }
 
-.meaning-group .meanings {
-  margin: 4px 0 0;
+.review-return {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 20px;
+  border-top: 1px solid #ccc;
+  padding-top: 16px;
 }
 
 .meaning-item {
-  border-top: 1px solid #ddd;
-  padding: 10px 0;
-}
-
-.meaning-row {
-  display: flex;
-  align-items: start;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.meanings p {
-  margin: 0 0 3px;
-}
-
-.meaning-copy {
   min-width: 0;
-}
-
-.meaning-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 6px;
-}
-
-.meaning-actions details {
-  position: relative;
-}
-
-.meaning-actions form {
-  position: absolute;
-  z-index: 1;
-  right: 0;
-  width: min(360px, 70vw);
-  padding: 10px;
-  border: 1px solid #ccc;
-  background: white;
-}
-
-.add-meaning {
-  border-top: 1px solid #ccc;
-  padding-top: 10px;
 }
 
 .meaning-history {
   margin-top: 8px;
 }
 
-.meaning-history ul {
+.meaning-history ol {
   margin: 6px 0 0;
   padding-left: 16px;
   list-style: none;
@@ -195,11 +313,6 @@ button:disabled {
   border-left: 2px solid #ddd;
   padding: 4px 0 4px 10px;
   margin-top: 4px;
-}
-
-.add-meaning form {
-  max-width: 520px;
-  margin-top: 10px;
 }
 
 .visually-hidden {
@@ -238,19 +351,11 @@ button:disabled {
 }
 
 @media (max-width: 700px) {
-  .layout,
-  .review-fields,
-  .checks,
-  .term-form {
+  .layout {
     grid-template-columns: 1fr;
   }
 
-  .meaning-row {
-    display: block;
-  }
-
-  .meaning-actions {
-    justify-content: flex-start;
-    margin-top: 8px;
+  .corpus-examples form {
+    grid-template-columns: 1fr;
   }
 }

@@ -4,7 +4,6 @@ import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import lv.tezaurs.suggestions.meaning.dto.CreateMeaningRequest;
 import lv.tezaurs.suggestions.meaning.dto.CreateMeaningRevisionRequest;
 import lv.tezaurs.suggestions.meaning.dto.MeaningResponse;
 import lv.tezaurs.suggestions.meaning.service.MeaningService;
@@ -28,27 +27,10 @@ public class MeaningController {
         return service.list(suggestionId);
     }
 
-    @PostMapping
-    ResponseEntity<MeaningResponse> create(@PathVariable UUID suggestionId,
-                                            @Valid @RequestBody CreateMeaningRequest request) {
-        MeaningResponse response = service.create(suggestionId, request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
-    }
-
     @PostMapping("/{meaningId}/revision")
     ResponseEntity<MeaningResponse> revise(@PathVariable UUID suggestionId, @PathVariable UUID meaningId,
                                             @Valid @RequestBody CreateMeaningRevisionRequest request) {
         MeaningResponse response = service.revise(suggestionId, meaningId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
-    }
-
-    @PostMapping("/{meaningId}/approve")
-    MeaningResponse approve(@PathVariable UUID suggestionId, @PathVariable UUID meaningId) {
-        return service.approve(suggestionId, meaningId);
-    }
-
-    @PostMapping("/{meaningId}/reject")
-    MeaningResponse reject(@PathVariable UUID suggestionId, @PathVariable UUID meaningId) {
-        return service.reject(suggestionId, meaningId);
     }
 }

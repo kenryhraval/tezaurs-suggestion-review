@@ -26,9 +26,6 @@ public class Meaning {
     @Column(name = "suggestion_id", nullable = false, updatable = false)
     private UUID suggestionId;
 
-    @Column(name = "parent_meaning_id", updatable = false)
-    private UUID parentMeaningId;
-
     @Column(name = "supersedes_meaning_id", updatable = false)
     private UUID supersedesMeaningId;
 
@@ -51,41 +48,29 @@ public class Meaning {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    public Meaning(UUID suggestionId, UUID parentMeaningId, MeaningOrigin origin, String gloss) {
-        this(UUID.randomUUID(), suggestionId, parentMeaningId, null, origin, gloss,
-                origin == MeaningOrigin.EXISTING ? MeaningStatus.APPROVED : MeaningStatus.PROPOSED);
+    public Meaning(UUID suggestionId, MeaningOrigin origin, String gloss) {
+        this(UUID.randomUUID(), suggestionId, null, origin, gloss, MeaningStatus.CURRENT);
     }
 
-    private Meaning(UUID id, UUID suggestionId, UUID parentMeaningId, UUID supersedesMeaningId,
+    private Meaning(UUID id, UUID suggestionId, UUID supersedesMeaningId,
                     MeaningOrigin origin, String gloss, MeaningStatus status) {
         this.id = id;
         this.suggestionId = suggestionId;
-        this.parentMeaningId = parentMeaningId;
         this.supersedesMeaningId = supersedesMeaningId;
         this.origin = origin;
         this.gloss = gloss;
         this.status = status;
     }
 
-    public void approve() {
-        ensureEditable();
-        status = MeaningStatus.APPROVED;
-    }
-
-    public void reject() {
-        ensureEditable();
-        status = MeaningStatus.REJECTED;
-    }
-
-    public void supersede() {
+    private void supersede() {
         ensureEditable();
         status = MeaningStatus.SUPERSEDED;
     }
 
     public Meaning revise(String revisedGloss) {
         supersede();
-        return new Meaning(UUID.randomUUID(), suggestionId, parentMeaningId, id, MeaningOrigin.REVIEWER,
-                revisedGloss, MeaningStatus.PROPOSED);
+        return new Meaning(UUID.randomUUID(), suggestionId, id, MeaningOrigin.REVIEWER,
+                revisedGloss, MeaningStatus.CURRENT);
     }
 
     private void ensureEditable() {

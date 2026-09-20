@@ -16,15 +16,18 @@ import lv.tezaurs.suggestions.common.error.NotFoundException;
 import lv.tezaurs.suggestions.meaning.entity.Meaning;
 import lv.tezaurs.suggestions.meaning.entity.MeaningOrigin;
 import lv.tezaurs.suggestions.meaning.repository.MeaningRepository;
+import lv.tezaurs.suggestions.suggestion.dto.AddCorpusExampleRequest;
 import lv.tezaurs.suggestions.suggestion.dto.CorrectTermRequest;
 import lv.tezaurs.suggestions.suggestion.dto.CreateSuggestionRequest;
-import lv.tezaurs.suggestions.suggestion.dto.RecordCorpusCheckRequest;
 import lv.tezaurs.suggestions.suggestion.dto.RecordTezaursCheckRequest;
 import lv.tezaurs.suggestions.suggestion.dto.SuggestionResponse;
 import lv.tezaurs.suggestions.suggestion.dto.UpdateStatusRequest;
 import lv.tezaurs.suggestions.suggestion.entity.CheckStatus;
+import lv.tezaurs.suggestions.suggestion.entity.CorpusExample;
 import lv.tezaurs.suggestions.suggestion.entity.Suggestion;
 import lv.tezaurs.suggestions.suggestion.entity.SuggestionStatus;
+import lv.tezaurs.suggestions.suggestion.entity.TezaursStatus;
+import lv.tezaurs.suggestions.suggestion.repository.CorpusExampleRepository;
 import lv.tezaurs.suggestions.suggestion.repository.SuggestionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,14 +37,19 @@ import org.mockito.MockMakers;
 class SuggestionServiceTest {
     private SuggestionRepository repository;
     private MeaningRepository meaningRepository;
+    private CorpusExampleRepository corpusExampleRepository;
     private SuggestionService service;
 
     @BeforeEach
     void setUp() {
         repository = mock(SuggestionRepository.class, withSettings().mockMaker(MockMakers.PROXY));
         meaningRepository = mock(MeaningRepository.class, withSettings().mockMaker(MockMakers.PROXY));
-        service = new SuggestionService(repository, meaningRepository);
+        corpusExampleRepository = mock(CorpusExampleRepository.class,
+                withSettings().mockMaker(MockMakers.PROXY));
+        service = new SuggestionService(repository, meaningRepository, corpusExampleRepository);
         when(repository.saveAndFlush(any(Suggestion.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(corpusExampleRepository.saveAndFlush(any(CorpusExample.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
     }
 
     @Test
@@ -108,15 +116,46 @@ class SuggestionServiceTest {
 
         service.changeStatus(suggestion.getId(), new UpdateStatusRequest(SuggestionStatus.IN_PROGRESS));
         service.correctTerm(suggestion.getId(), new CorrectTermRequest(" corrected "));
-        service.recordTezaursCheck(suggestion.getId(), new RecordTezaursCheckRequest(CheckStatus.FOUND, 42L));
-        service.recordCorpusCheck(suggestion.getId(), new RecordCorpusCheckRequest(CheckStatus.NOT_FOUND));
+        service.recordTezaursCheck(suggestion.getId(),
+                new RecordTezaursCheckRequest(TezaursStatus.MEANING_NOT_FOUND, 42L));
 
         assertThat(suggestion.getStatus()).isEqualTo(SuggestionStatus.IN_PROGRESS);
         assertThat(suggestion.getReviewedTerm()).isEqualTo("corrected");
-        assertThat(suggestion.getTezaursStatus()).isEqualTo(CheckStatus.FOUND);
+        assertThat(suggestion.getTezaursStatus()).isEqualTo(TezaursStatus.MEANING_NOT_FOUND);
         assertThat(suggestion.getMatchedEntryId()).isEqualTo(42L);
         assertThat(suggestion.getCorpusStatus()).isEqualTo(CheckStatus.NOT_FOUND);
-        verify(repository, times(4)).flush();
+        verify(repository, times(3)).flush();
+    }
+
+    @Test
+    void storesCorpusExampleLinksAndMarksEvidenceAsFound() {
+        Suggestion suggestion = suggestion();
+        suggestion.recordTezaursCheck(TezaursStatus.NOT_FOUND, null);
+        when(repository.findById(suggestion.getId())).thenReturn(Optional.of(suggestion));
+
+        var response = service.addCorpusExample(suggestion.getId(),
+                new AddCorpusExampleRequest(" https://korpuss.lv/id/42 "));
+
+        assertThat(response.suggestionId()).isEqualTo(suggestion.getId());
+        assertThat(response.url()).isEqualTo("https://korpuss.lv/id/42");
+        assertThat(suggestion.getCorpusStatus()).isEqualTo(CheckStatus.FOUND);
+        ArgumentCaptor<CorpusExample> captor = ArgumentCaptor.forClass(CorpusExample.class);
+        verify(corpusExampleRepository).saveAndFlush(captor.capture());
+        assertThat(captor.getValue().getUrl()).isEqualTo("https://korpuss.lv/id/42");
+    }
+
+    @Test
+    void completesTheSuggestionWhenTheMeaningAlreadyExistsInTezaurs() {
+        Suggestion suggestion = suggestion();
+        suggestion.changeStatus(SuggestionStatus.IN_PROGRESS);
+        when(repository.findById(suggestion.getId())).thenReturn(Optional.of(suggestion));
+
+        SuggestionResponse response = service.recordTezaursCheck(suggestion.getId(),
+                new RecordTezaursCheckRequest(TezaursStatus.MEANING_FOUND, 42L));
+
+        assertThat(response.status()).isEqualTo(SuggestionStatus.COMPLETED);
+        assertThat(response.tezaursStatus()).isEqualTo(TezaursStatus.MEANING_FOUND);
+        verify(repository).flush();
     }
 
     private static Suggestion suggestion() {

@@ -1,9 +1,10 @@
 import type {
-  CheckStatus,
+  CorpusExample,
   CreateSuggestionInput,
   Meaning,
   Suggestion,
   SuggestionStatus,
+  TezaursStatus,
 } from './types'
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
@@ -55,7 +56,7 @@ export function correctSuggestionTerm(id: string, reviewedTerm: string) {
 
 export function saveTezaursCheck(
   id: string,
-  status: CheckStatus,
+  status: TezaursStatus,
   matchedEntryId: number | null,
 ) {
   return request<Suggestion>(`/api/suggestions/${id}/tezaurs-check`, {
@@ -64,10 +65,14 @@ export function saveTezaursCheck(
   })
 }
 
-export function saveCorpusCheck(id: string, status: CheckStatus) {
-  return request<Suggestion>(`/api/suggestions/${id}/corpus-check`, {
+export function getCorpusExamples(suggestionId: string) {
+  return request<CorpusExample[]>(`/api/suggestions/${suggestionId}/corpus-examples`)
+}
+
+export function addCorpusExample(suggestionId: string, url: string) {
+  return request<CorpusExample>(`/api/suggestions/${suggestionId}/corpus-examples`, {
     method: 'POST',
-    body: JSON.stringify({ status }),
+    body: JSON.stringify({ url }),
   })
 }
 
@@ -75,30 +80,9 @@ export function getMeanings(suggestionId: string) {
   return request<Meaning[]>(`/api/suggestions/${suggestionId}/meanings`)
 }
 
-export function createMeaning(
-  suggestionId: string,
-  gloss: string,
-) {
-  return request<Meaning>(`/api/suggestions/${suggestionId}/meanings`, {
-    method: 'POST',
-    body: JSON.stringify({ gloss }),
-  })
-}
-
 export function reviseMeaning(suggestionId: string, meaningId: string, gloss: string) {
   return request<Meaning>(
     `/api/suggestions/${suggestionId}/meanings/${meaningId}/revision`,
     { method: 'POST', body: JSON.stringify({ gloss }) },
-  )
-}
-
-export function decideMeaning(
-  suggestionId: string,
-  meaningId: string,
-  decision: 'approve' | 'reject',
-) {
-  return request<Meaning>(
-    `/api/suggestions/${suggestionId}/meanings/${meaningId}/${decision}`,
-    { method: 'POST' },
   )
 }

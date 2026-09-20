@@ -29,32 +29,94 @@ class SuggestionTest {
     }
 
     @Test
-    void recordsManualDictionaryAndCorpusChecks() {
+    void recordsDictionaryChecksAndCorpusEvidence() {
         Suggestion suggestion = suggestion();
 
-        suggestion.recordTezaursCheck(CheckStatus.FOUND, 42L);
-        suggestion.recordCorpusCheck(CheckStatus.NOT_FOUND);
+        suggestion.recordTezaursCheck(TezaursStatus.MEANING_NOT_FOUND, 42L);
+        suggestion.recordCorpusExample();
 
-        assertThat(suggestion.getTezaursStatus()).isEqualTo(CheckStatus.FOUND);
+        assertThat(suggestion.getTezaursStatus()).isEqualTo(TezaursStatus.MEANING_NOT_FOUND);
         assertThat(suggestion.getMatchedEntryId()).isEqualTo(42L);
-        assertThat(suggestion.getCorpusStatus()).isEqualTo(CheckStatus.NOT_FOUND);
+        assertThat(suggestion.getCorpusStatus()).isEqualTo(CheckStatus.FOUND);
 
-        suggestion.recordTezaursCheck(CheckStatus.NOT_FOUND, null);
+        suggestion.recordTezaursCheck(TezaursStatus.NOT_FOUND, null);
 
-        assertThat(suggestion.getTezaursStatus()).isEqualTo(CheckStatus.NOT_FOUND);
+        assertThat(suggestion.getTezaursStatus()).isEqualTo(TezaursStatus.NOT_FOUND);
         assertThat(suggestion.getMatchedEntryId()).isNull();
+        assertThat(suggestion.getCorpusStatus()).isEqualTo(CheckStatus.FOUND);
     }
 
     @Test
-    void requiresAnEntryIdOnlyForAFoundDictionaryEntry() {
+    void rejectsCorpusEvidenceBeforeAnAbsentMeaningIsConfirmed() {
         Suggestion suggestion = suggestion();
 
-        assertThatThrownBy(() -> suggestion.recordTezaursCheck(CheckStatus.FOUND, null))
+        assertThatThrownBy(suggestion::recordCorpusExample)
                 .isInstanceOf(ConflictException.class)
-                .hasMessage("A found Tēzaurs entry requires its ID");
-        assertThatThrownBy(() -> suggestion.recordTezaursCheck(CheckStatus.NOT_CHECKED, 42L))
+                .hasMessage("Corpus evidence is only applicable when the submitted meaning is absent");
+    }
+
+    @Test
+    void allowsAnOptionalEntryIdOnlyForAFoundDictionaryEntry() {
+        Suggestion suggestion = suggestion();
+
+        suggestion.recordTezaursCheck(TezaursStatus.MEANING_FOUND, null);
+
+        assertThat(suggestion.getMatchedEntryId()).isNull();
+        assertThatThrownBy(() -> suggestion.recordTezaursCheck(TezaursStatus.NOT_CHECKED, 42L))
                 .isInstanceOf(ConflictException.class)
                 .hasMessage("An entry ID is only allowed when a Tēzaurs entry was found");
+    }
+
+    @Test
+    void completesAnExistingMeaningAndReopensItWhenTheCheckChanges() {
+        Suggestion suggestion = suggestion();
+        suggestion.changeStatus(SuggestionStatus.IN_PROGRESS);
+
+        suggestion.recordTezaursCheck(TezaursStatus.MEANING_FOUND, 42L);
+
+        assertThat(suggestion.getStatus()).isEqualTo(SuggestionStatus.COMPLETED);
+
+        suggestion.recordTezaursCheck(TezaursStatus.MEANING_NOT_FOUND, 42L);
+
+        assertThat(suggestion.getStatus()).isEqualTo(SuggestionStatus.IN_PROGRESS);
+    }
+
+    @Test
+    void requiresAllApplicableChecksBeforeManualCompletion() {
+        Suggestion suggestion = suggestion();
+        suggestion.changeStatus(SuggestionStatus.IN_PROGRESS);
+
+        assertThatThrownBy(() -> suggestion.changeStatus(SuggestionStatus.COMPLETED))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("All required review steps must be completed first");
+        assertThat(suggestion.canComplete()).isFalse();
+        assertThat(suggestion.completionBlockReason())
+                .isEqualTo(CompletionBlockReason.TEZAURS_CHECK_REQUIRED);
+
+        suggestion.recordTezaursCheck(TezaursStatus.FOUND, 42L);
+        assertThatThrownBy(() -> suggestion.changeStatus(SuggestionStatus.COMPLETED))
+                .isInstanceOf(ConflictException.class);
+        assertThat(suggestion.completionBlockReason())
+                .isEqualTo(CompletionBlockReason.MEANING_CHECK_REQUIRED);
+
+        suggestion.recordTezaursCheck(TezaursStatus.NOT_FOUND, null);
+        suggestion.changeStatus(SuggestionStatus.COMPLETED);
+
+        assertThat(suggestion.getStatus()).isEqualTo(SuggestionStatus.COMPLETED);
+        assertThat(suggestion.canComplete()).isTrue();
+        assertThat(suggestion.completionBlockReason()).isNull();
+    }
+
+    @Test
+    void defaultsTheCorpusResultWhenAnExistingEntryLacksTheMeaning() {
+        Suggestion suggestion = suggestion();
+        suggestion.changeStatus(SuggestionStatus.IN_PROGRESS);
+        suggestion.recordTezaursCheck(TezaursStatus.MEANING_NOT_FOUND, 42L);
+
+        assertThat(suggestion.getCorpusStatus()).isEqualTo(CheckStatus.NOT_FOUND);
+        suggestion.changeStatus(SuggestionStatus.COMPLETED);
+
+        assertThat(suggestion.getStatus()).isEqualTo(SuggestionStatus.COMPLETED);
     }
 
     private static Suggestion suggestion() {

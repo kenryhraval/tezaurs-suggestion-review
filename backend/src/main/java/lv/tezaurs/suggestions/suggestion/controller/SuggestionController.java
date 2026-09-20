@@ -5,9 +5,10 @@ import java.net.URI;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lv.tezaurs.suggestions.suggestion.dto.AddCorpusExampleRequest;
+import lv.tezaurs.suggestions.suggestion.dto.CorpusExampleResponse;
 import lv.tezaurs.suggestions.suggestion.dto.CorrectTermRequest;
 import lv.tezaurs.suggestions.suggestion.dto.CreateSuggestionRequest;
-import lv.tezaurs.suggestions.suggestion.dto.RecordCorpusCheckRequest;
 import lv.tezaurs.suggestions.suggestion.dto.RecordTezaursCheckRequest;
 import lv.tezaurs.suggestions.suggestion.dto.SuggestionResponse;
 import lv.tezaurs.suggestions.suggestion.dto.UpdateStatusRequest;
@@ -58,9 +59,16 @@ public class SuggestionController {
         return service.recordTezaursCheck(id, request);
     }
 
-    @PostMapping("/{id}/corpus-check")
-    SuggestionResponse recordCorpusCheck(@PathVariable UUID id,
-                                         @Valid @RequestBody RecordCorpusCheckRequest request) {
-        return service.recordCorpusCheck(id, request);
+    @GetMapping("/{id}/corpus-examples")
+    List<CorpusExampleResponse> listCorpusExamples(@PathVariable UUID id) {
+        return service.listCorpusExamples(id);
+    }
+
+    @PostMapping("/{id}/corpus-examples")
+    ResponseEntity<CorpusExampleResponse> addCorpusExample(
+            @PathVariable UUID id, @Valid @RequestBody AddCorpusExampleRequest request) {
+        CorpusExampleResponse response = service.addCorpusExample(id, request);
+        return ResponseEntity.created(URI.create("/api/suggestions/" + id
+                + "/corpus-examples/" + response.id())).body(response);
     }
 }
