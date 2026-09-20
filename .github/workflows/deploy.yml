@@ -24,6 +24,7 @@ jobs:
     environment: production
     env:
       IMAGE: ghcr.io/${{ github.repository_owner }}/tezaurs-suggestion-review-backend:${{ github.event.workflow_run.head_sha }}
+      FRONTEND_IMAGE: ghcr.io/${{ github.repository_owner }}/tezaurs-suggestion-review-frontend:${{ github.event.workflow_run.head_sha }}
 
     steps:
       - name: Check out the verified revision
@@ -46,6 +47,16 @@ jobs:
           tags: |
             ${{ env.IMAGE }}
             ghcr.io/${{ github.repository_owner }}/tezaurs-suggestion-review-backend:latest
+          labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
+
+      - name: Build and publish frontend image
+        uses: docker/build-push-action@f2a1d5e99d037542a71f64918e516c093c6f3fc4 # v6
+        with:
+          context: frontend
+          push: true
+          tags: |
+            ${{ env.FRONTEND_IMAGE }}
+            ghcr.io/${{ github.repository_owner }}/tezaurs-suggestion-review-frontend:latest
           labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
 
       - name: Configure SSH
@@ -72,11 +83,12 @@ jobs:
           DEPLOY_HOST: ${{ secrets.HETZNER_HOST }}
           DEPLOY_USER: ${{ secrets.HETZNER_USER }}
         run: |
-          ssh "$DEPLOY_USER@$DEPLOY_HOST" sh -s -- "$IMAGE" <<'REMOTE_SCRIPT'
+          ssh "$DEPLOY_USER@$DEPLOY_HOST" sh -s -- "$IMAGE" "$FRONTEND_IMAGE" <<'REMOTE_SCRIPT'
           set -eu
           BACKEND_IMAGE="$1"
+          FRONTEND_IMAGE="$2"
           cd /opt/tezaurs
-          BACKEND_IMAGE="$BACKEND_IMAGE" docker compose pull
-          BACKEND_IMAGE="$BACKEND_IMAGE" docker compose up -d --remove-orphans --wait --wait-timeout 120
+          BACKEND_IMAGE="$BACKEND_IMAGE" FRONTEND_IMAGE="$FRONTEND_IMAGE" docker compose pull
+          BACKEND_IMAGE="$BACKEND_IMAGE" FRONTEND_IMAGE="$FRONTEND_IMAGE" docker compose up -d --remove-orphans --wait --wait-timeout 120
           docker compose ps
           REMOTE_SCRIPT

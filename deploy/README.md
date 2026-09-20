@@ -1,11 +1,13 @@
 # Hetzner deployment
 
 After CI succeeds for a push to `main`, `.github/workflows/deploy.yml` builds the
-backend image, publishes it to GHCR and updates the application on a Hetzner Cloud
-server over SSH.
+backend and frontend images, publishes them to GHCR and updates the application
+on a Hetzner Cloud server over SSH.
 
-The production stack in `compose.yml` contains the Spring Boot backend,
-PostgreSQL and Caddy. Caddy terminates HTTPS; PostgreSQL is not exposed publicly.
+The production stack in `compose.yml` contains the React frontend, Spring Boot
+backend, PostgreSQL and Caddy. Caddy terminates HTTPS, serves the frontend on the
+application domain, and forwards backend paths such as `/api/*` to Spring Boot.
+PostgreSQL is not exposed publicly.
 
 ## Infrastructure
 
@@ -85,7 +87,7 @@ must remain limited.
 Create `/opt/tezaurs/.env` on the server:
 
 ```dotenv
-APP_DOMAIN=api.example.lv
+APP_DOMAIN=app.example.lv
 DATABASE_PASSWORD=replace-with-a-long-random-password
 ```
 
@@ -96,8 +98,8 @@ chown deploy:deploy /opt/tezaurs/.env
 chmod 600 /opt/tezaurs/.env
 ```
 
-If the GHCR package is private, authenticate once as `deploy` with a GitHub token
-that has `read:packages` permission. This is unnecessary for a public package.
+If the GHCR packages are private, authenticate once as `deploy` with a GitHub token
+that has `read:packages` permission. This is unnecessary for public packages.
 
 ## Verify the server host key
 
@@ -154,7 +156,9 @@ Useful server commands:
 cd /opt/tezaurs
 docker compose ps
 docker compose logs --tail=100 backend
-curl --fail https://api.example.lv/actuator/health
+docker compose logs --tail=100 frontend
+curl --fail https://app.example.lv/actuator/health
+curl --fail https://app.example.lv/
 ```
 
 Application data and Caddy certificates are stored in Docker named volumes and

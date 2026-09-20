@@ -20,6 +20,17 @@ services:
     logging:
       driver: local
 
+  frontend:
+    image: ${FRONTEND_IMAGE:-ghcr.io/kenryhraval/tezaurs-suggestion-review-frontend:latest}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--spider", "http://localhost/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: local
+
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
@@ -52,6 +63,8 @@ services:
       - caddy-config:/config
     depends_on:
       backend:
+        condition: service_healthy
+      frontend:
         condition: service_healthy
     logging:
       driver: local

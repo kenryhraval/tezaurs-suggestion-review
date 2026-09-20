@@ -1,0 +1,256 @@
+main {
+  max-width: 1050px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+header {
+  margin-bottom: 24px;
+}
+
+h1,
+h2,
+h3 {
+  margin-top: 0;
+}
+
+h3 {
+  margin-bottom: 10px;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 24px;
+}
+
+aside,
+.details,
+.import-page form {
+  border: 1px solid #ccc;
+  padding: 16px;
+}
+
+.suggestion-list,
+.meanings {
+  list-style: none;
+  padding: 0;
+}
+
+.suggestion-list button {
+  width: 100%;
+  margin-bottom: 6px;
+  border: 1px solid #ccc;
+  background: white;
+  text-align: left;
+}
+
+.suggestion-list button.selected {
+  border-color: #333;
+  background: #eee;
+}
+
+.suggestion-list strong,
+.suggestion-list span {
+  display: block;
+}
+
+.suggestion-list span,
+.muted,
+small {
+  color: #666;
+}
+
+form,
+label {
+  display: grid;
+  gap: 6px;
+}
+
+form {
+  gap: 12px;
+}
+
+input,
+textarea,
+select,
+button {
+  box-sizing: border-box;
+  font: inherit;
+  padding: 6px;
+}
+
+textarea {
+  min-height: 75px;
+  resize: vertical;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: default;
+}
+
+.review-fields,
+.checks {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin: 28px 0;
+}
+
+.term-form {
+  grid-template-columns: 1fr auto;
+  align-items: end;
+}
+
+.meaning-section {
+  border-top: 1px solid #ccc;
+  padding-top: 16px;
+}
+
+.meaning-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.meaning-heading h3 {
+  margin-bottom: 6px;
+}
+
+.meaning-groups {
+  display: grid;
+  gap: 14px;
+  margin: 10px 0 16px;
+}
+
+.meaning-group h4 {
+  margin: 0;
+}
+
+.meaning-group .meanings {
+  margin: 4px 0 0;
+}
+
+.meaning-item {
+  border-top: 1px solid #ddd;
+  padding: 10px 0;
+}
+
+.meaning-row {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.meanings p {
+  margin: 0 0 3px;
+}
+
+.meaning-copy {
+  min-width: 0;
+}
+
+.meaning-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.meaning-actions details {
+  position: relative;
+}
+
+.meaning-actions form {
+  position: absolute;
+  z-index: 1;
+  right: 0;
+  width: min(360px, 70vw);
+  padding: 10px;
+  border: 1px solid #ccc;
+  background: white;
+}
+
+.add-meaning {
+  border-top: 1px solid #ccc;
+  padding-top: 10px;
+}
+
+.meaning-history {
+  margin-top: 8px;
+}
+
+.meaning-history ul {
+  margin: 6px 0 0;
+  padding-left: 16px;
+  list-style: none;
+}
+
+.meaning-history li {
+  border-left: 2px solid #ddd;
+  padding: 4px 0 4px 10px;
+  margin-top: 4px;
+}
+
+.add-meaning form {
+  max-width: 520px;
+  margin-top: 10px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.error,
+.success {
+  padding: 10px;
+}
+
+.error {
+  border: 1px solid #b00020;
+  color: #b00020;
+}
+
+.success {
+  border: 1px solid #267326;
+  color: #1d5c1d;
+}
+
+.import-page {
+  max-width: 620px;
+}
+
+.import-page > p:last-child {
+  margin-top: 24px;
+}
+
+@media (max-width: 700px) {
+  .layout,
+  .review-fields,
+  .checks,
+  .term-form {
+    grid-template-columns: 1fr;
+  }
+
+  .meaning-row {
+    display: block;
+  }
+
+  .meaning-actions {
+    justify-content: flex-start;
+    margin-top: 8px;
+  }
+}
