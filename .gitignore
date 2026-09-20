@@ -1,0 +1,6 @@
+# IDE settings
+.idea/
+*.iml
+
+# OS metadata
+.DS_Store
