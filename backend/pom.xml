@@ -21,7 +21,7 @@
         <jacoco.version>0.8.15</jacoco.version>
         <lombok.version>1.18.44</lombok.version>
         <sonar-maven-plugin.version>5.8.0.7211</sonar-maven-plugin.version>
-        <springdoc.version>3.1.0</springdoc.version>
+        <springdoc.version>3.1.1</springdoc.version>
         <sonar.organization>kenryhraval</sonar.organization>
         <sonar.projectKey>kenryhraval_tezaurs-suggestion-review</sonar.projectKey>
         <sonar.coverage.jacoco.xmlReportPaths>
