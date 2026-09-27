@@ -28,7 +28,7 @@ jobs:
 
     steps:
       - name: Check out the verified revision
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
 
