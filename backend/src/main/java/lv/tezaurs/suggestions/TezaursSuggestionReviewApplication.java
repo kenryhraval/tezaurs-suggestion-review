@@ -2,6 +2,7 @@ package lv.tezaurs.suggestions;
 
 import io.swagger.v3.oas.annotations.OpenAPIDefinition;
 import io.swagger.v3.oas.annotations.info.Info;
+import lv.tezaurs.suggestions.common.config.DatabaseUrlInitializer;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
@@ -13,7 +14,9 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 public class TezaursSuggestionReviewApplication {
 
     public static void main(String[] args) {
-        SpringApplication.run(TezaursSuggestionReviewApplication.class, args);
+        SpringApplication application = new SpringApplication(TezaursSuggestionReviewApplication.class);
+        application.addInitializers(new DatabaseUrlInitializer());
+        application.run(args);
     }
 
 }
