@@ -181,3 +181,9 @@ curl --fail https://app.example.lv/
 Application data and Caddy certificates are stored in Docker named volumes and
 survive normal deployments. They are not a backup; PostgreSQL backups must be
 configured separately.
+
+## Restore the Tēzaurs reference schemas
+
+The `dict` and `incubator` schemas are restored manually from database dumps.
+Keep the dumps outside this repository; the `incubator` schema must be created
+before restoring its dump.
