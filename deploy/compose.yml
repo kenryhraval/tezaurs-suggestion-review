@@ -53,6 +53,10 @@ services:
     restart: unless-stopped
     environment:
       APP_DOMAIN: ${APP_DOMAIN:?Set APP_DOMAIN in /opt/tezaurs/.env}
+      BASIC_AUTH_USER_1: ${BASIC_AUTH_USER_1:?Set BASIC_AUTH_USER_1 in /opt/tezaurs/.env}
+      BASIC_AUTH_PASSWORD_HASH_1: ${BASIC_AUTH_PASSWORD_HASH_1:?Set BASIC_AUTH_PASSWORD_HASH_1 in /opt/tezaurs/.env}
+      BASIC_AUTH_USER_2: ${BASIC_AUTH_USER_2:?Set BASIC_AUTH_USER_2 in /opt/tezaurs/.env}
+      BASIC_AUTH_PASSWORD_HASH_2: ${BASIC_AUTH_PASSWORD_HASH_2:?Set BASIC_AUTH_PASSWORD_HASH_2 in /opt/tezaurs/.env}
     ports:
       - "80:80"
       - "443:443"

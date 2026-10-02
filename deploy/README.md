@@ -5,9 +5,12 @@ backend and frontend images, publishes them to GHCR and updates the application
 on a Hetzner Cloud server over SSH.
 
 The production stack in `compose.yml` contains the React frontend, Spring Boot
-backend, PostgreSQL and Caddy. Caddy terminates HTTPS, serves the frontend on the
-application domain, and forwards backend paths such as `/api/*` to Spring Boot.
-PostgreSQL is not exposed publicly.
+backend, PostgreSQL and Caddy. Caddy terminates HTTPS, requires one of two named
+HTTP Basic Auth accounts and forwards requests to the frontend container. The
+frontend container serves React and forwards backend paths such as `/api/*` to
+Spring Boot. PostgreSQL and the backend are not exposed publicly. The backend reads
+the proxy-validated Basic Auth username for `GET /api/me`; it does not validate
+passwords itself.
 
 ## Infrastructure
 
@@ -89,7 +92,21 @@ Create `/opt/tezaurs/.env` on the server:
 ```dotenv
 APP_DOMAIN=app.example.lv
 DATABASE_PASSWORD=replace-with-a-long-random-password
+BASIC_AUTH_USER_1=first-reviewer
+BASIC_AUTH_PASSWORD_HASH_1='$2a$14$replace-with-a-bcrypt-hash'
+BASIC_AUTH_USER_2=second-reviewer
+BASIC_AUTH_PASSWORD_HASH_2='$2a$14$replace-with-a-bcrypt-hash'
 ```
+
+Generate each password hash interactively so the plaintext password is not saved
+in shell history:
+
+```bash
+docker run --rm -it caddy:2-alpine caddy hash-password
+```
+
+Keep the single quotes around hashes in `.env`; bcrypt hashes contain `$`
+characters that must remain literal.
 
 Protect it:
 

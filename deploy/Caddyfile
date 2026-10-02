@@ -1,23 +1,9 @@
 {$APP_DOMAIN} {
 	encode zstd gzip
-
-	handle /api/* {
-		reverse_proxy backend:8080
+	basic_auth {
+		{env.BASIC_AUTH_USER_1} {env.BASIC_AUTH_PASSWORD_HASH_1}
+		{env.BASIC_AUTH_USER_2} {env.BASIC_AUTH_PASSWORD_HASH_2}
 	}
 
-	handle /actuator/* {
-		reverse_proxy backend:8080
-	}
-
-	handle /swagger-ui* {
-		reverse_proxy backend:8080
-	}
-
-	handle /v3/api-docs* {
-		reverse_proxy backend:8080
-	}
-
-	handle {
-		reverse_proxy frontend:80
-	}
+	reverse_proxy frontend:80
 }

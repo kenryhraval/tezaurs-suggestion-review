@@ -18,9 +18,12 @@ creates a new `REVIEWER` version, marks the previous version as `SUPERSEDED` and
 links the new version to the one it replaced; text is never overwritten. There
 are no submeanings, additional meaning branches or meaning-level approval states.
 
-There is currently no authentication, reviewer management, review history,
-external Tēzaurs or corpus connection, evidence source classification or export process. These
-can be introduced later as separate, understandable increments.
+Credential validation is performed by the deployment's reverse proxy. `GET /api/me`
+returns the username from the proxy-validated HTTP Basic Authorization header. The
+backend must therefore not be exposed directly. There is currently no reviewer
+management, review history, external Tēzaurs or corpus connection, evidence source
+classification or export process. These can be introduced later as separate,
+understandable increments.
 
 ## Run locally
 
@@ -76,6 +79,7 @@ PostgreSQL and automatic HTTPS, and a GitHub Actions deployment workflow. See
 
 ## API
 
+- `GET /api/me`
 - `POST /api/suggestions`
 - `GET /api/suggestions`
 - `GET /api/suggestions/{id}`
