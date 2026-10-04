@@ -1,7 +1,7 @@
 import type {
   CorpusExample,
-  CreateSuggestionInput,
   Meaning,
+  Review,
   Suggestion,
   SuggestionStatus,
   TezaursStatus,
@@ -33,56 +33,58 @@ export function getSuggestions() {
   return request<Suggestion[]>('/api/suggestions')
 }
 
-export function createSuggestion(input: CreateSuggestionInput) {
-  return request<Suggestion>('/api/suggestions', {
-    method: 'POST',
-    body: JSON.stringify(input),
-  })
-}
-
-export function changeSuggestionStatus(id: string, status: SuggestionStatus) {
+export function changeSuggestionStatus(id: number, status: SuggestionStatus) {
   return request<Suggestion>(`/api/suggestions/${id}/status`, {
     method: 'POST',
     body: JSON.stringify({ status }),
   })
 }
 
-export function correctSuggestionTerm(id: string, reviewedTerm: string) {
-  return request<Suggestion>(`/api/suggestions/${id}/term-correction`, {
+export async function getReview(sourceSuggestionId: number) {
+  const response = await fetch(`/api/reviews/by-source-suggestion/${sourceSuggestionId}`, {
+    headers: { 'Content-Type': 'application/json' },
+  })
+  if (response.status === 204) return null
+  if (!response.ok) throw new Error('Pārskatu neizdevās ielādēt.')
+  return response.json() as Promise<Review>
+}
+
+export function correctReviewTerm(reviewId: string, reviewedTerm: string) {
+  return request<Review>(`/api/reviews/${reviewId}/term-correction`, {
     method: 'POST',
     body: JSON.stringify({ reviewedTerm }),
   })
 }
 
 export function saveTezaursCheck(
-  id: string,
+  reviewId: string,
   status: TezaursStatus,
   matchedEntryId: number | null,
 ) {
-  return request<Suggestion>(`/api/suggestions/${id}/tezaurs-check`, {
+  return request<Review>(`/api/reviews/${reviewId}/tezaurs-check`, {
     method: 'POST',
     body: JSON.stringify({ status, matchedEntryId }),
   })
 }
 
-export function getCorpusExamples(suggestionId: string) {
-  return request<CorpusExample[]>(`/api/suggestions/${suggestionId}/corpus-examples`)
+export function getCorpusExamples(reviewId: string) {
+  return request<CorpusExample[]>(`/api/reviews/${reviewId}/corpus-examples`)
 }
 
-export function addCorpusExample(suggestionId: string, url: string) {
-  return request<CorpusExample>(`/api/suggestions/${suggestionId}/corpus-examples`, {
+export function addCorpusExample(reviewId: string, url: string) {
+  return request<CorpusExample>(`/api/reviews/${reviewId}/corpus-examples`, {
     method: 'POST',
     body: JSON.stringify({ url }),
   })
 }
 
-export function getMeanings(suggestionId: string) {
-  return request<Meaning[]>(`/api/suggestions/${suggestionId}/meanings`)
+export function getMeanings(reviewId: string) {
+  return request<Meaning[]>(`/api/reviews/${reviewId}/meanings`)
 }
 
-export function reviseMeaning(suggestionId: string, meaningId: string, gloss: string) {
+export function reviseMeaning(reviewId: string, meaningId: string, gloss: string) {
   return request<Meaning>(
-    `/api/suggestions/${suggestionId}/meanings/${meaningId}/revision`,
+    `/api/reviews/${reviewId}/meanings/${meaningId}/revision`,
     { method: 'POST', body: JSON.stringify({ gloss }) },
   )
 }

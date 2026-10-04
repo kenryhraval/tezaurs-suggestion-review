@@ -3,123 +3,109 @@ package lv.tezaurs.suggestions.suggestion.entity;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.util.Map;
+import java.util.Set;
 import lv.tezaurs.suggestions.common.error.ConflictException;
 import org.junit.jupiter.api.Test;
 
 class SuggestionTest {
 
     @Test
-    void changesStatusWithoutAComplexTransitionGraph() {
-        Suggestion suggestion = suggestion();
+    void enforcesTheIncubatorStatusGraph() {
+        Map<SuggestionStatus, Set<SuggestionStatus>> expected = Map.of(
+                SuggestionStatus.NEW, Set.of(SuggestionStatus.READY_FOR_REVIEW,
+                        SuggestionStatus.IN_PROGRESS, SuggestionStatus.GARBAGE),
+                SuggestionStatus.READY_FOR_REVIEW, Set.of(SuggestionStatus.IN_PROGRESS,
+                        SuggestionStatus.COMPLETED, SuggestionStatus.NEW),
+                SuggestionStatus.GARBAGE, Set.of(SuggestionStatus.NEW),
+                SuggestionStatus.IN_PROGRESS, Set.of(SuggestionStatus.INVENTED,
+                        SuggestionStatus.ALREADY_EXISTS, SuggestionStatus.INSUFFICIENT_DATA,
+                        SuggestionStatus.NEEDS_EXPERT, SuggestionStatus.COMPLETED,
+                        SuggestionStatus.READY_FOR_REVIEW, SuggestionStatus.GARBAGE),
+                SuggestionStatus.INVENTED, Set.of(SuggestionStatus.IN_PROGRESS, SuggestionStatus.GARBAGE),
+                SuggestionStatus.ALREADY_EXISTS, Set.of(),
+                SuggestionStatus.INSUFFICIENT_DATA,
+                        Set.of(SuggestionStatus.IN_PROGRESS, SuggestionStatus.GARBAGE),
+                SuggestionStatus.NEEDS_EXPERT, Set.of(SuggestionStatus.IN_PROGRESS),
+                SuggestionStatus.COMPLETED, Set.of());
 
-        suggestion.changeStatus(SuggestionStatus.NEEDS_EXPERT);
-        suggestion.changeStatus(SuggestionStatus.IN_PROGRESS);
-
-        assertThat(suggestion.getStatus()).isEqualTo(SuggestionStatus.IN_PROGRESS);
+        for (SuggestionStatus source : SuggestionStatus.values()) {
+            for (SuggestionStatus target : SuggestionStatus.values()) {
+                assertThat(source.canTransitionTo(target))
+                        .as("transition %s -> %s", source, target)
+                        .isEqualTo(expected.get(source).contains(target));
+            }
+        }
     }
 
     @Test
-    void preservesTheSubmittedTermWhenItIsCorrected() {
-        Suggestion suggestion = suggestion();
+    void rejectsAStatusJumpThatIsNotInTheWorkflow() {
+        IncubatorSuggestion source = source(SuggestionStatus.READY_FOR_REVIEW);
 
-        suggestion.correctTerm("corrected");
-
-        assertThat(suggestion.getSubmittedTerm()).isEqualTo("submitted");
-        assertThat(suggestion.getReviewedTerm()).isEqualTo("corrected");
+        assertThatThrownBy(() -> source.changeStatus(SuggestionStatus.GARBAGE))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("Suggestion status cannot change from READY_FOR_REVIEW to GARBAGE");
     }
 
     @Test
-    void recordsDictionaryChecksAndCorpusEvidence() {
-        Suggestion suggestion = suggestion();
+    void identifiesStatusesThatNeedReviewData() {
+        assertThat(SuggestionStatus.NEW.requiresReviewRecord()).isFalse();
+        assertThat(SuggestionStatus.GARBAGE.requiresReviewRecord()).isFalse();
+        assertThat(SuggestionStatus.READY_FOR_REVIEW.requiresReviewRecord()).isTrue();
+        assertThat(SuggestionStatus.COMPLETED.requiresReviewRecord()).isTrue();
+    }
 
-        suggestion.recordTezaursCheck(TezaursStatus.MEANING_NOT_FOUND, 42L);
-        suggestion.recordCorpusExample();
+    @Test
+    void mapsAllLegacyDatabaseValues() {
+        for (SuggestionStatus status : SuggestionStatus.values()) {
+            assertThat(SuggestionStatus.fromDatabaseValue(status.databaseValue())).isEqualTo(status);
+        }
+        assertThat(SuggestionStatus.fromDatabaseValue(83)).isEqualTo(SuggestionStatus.NEEDS_EXPERT);
+        assertThatThrownBy(() -> SuggestionStatus.fromDatabaseValue(99))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
 
-        assertThat(suggestion.getTezaursStatus()).isEqualTo(TezaursStatus.MEANING_NOT_FOUND);
-        assertThat(suggestion.getMatchedEntryId()).isEqualTo(42L);
-        assertThat(suggestion.getCorpusStatus()).isEqualTo(CheckStatus.FOUND);
+    @Test
+    void recordsReviewDataWithoutChangingTheSourceStatus() {
+        Suggestion review = review();
 
-        suggestion.recordTezaursCheck(TezaursStatus.NOT_FOUND, null);
+        review.correctTerm("corrected");
+        review.recordTezaursCheck(TezaursStatus.MEANING_NOT_FOUND, 42L);
+        review.recordCorpusExample();
 
-        assertThat(suggestion.getTezaursStatus()).isEqualTo(TezaursStatus.NOT_FOUND);
-        assertThat(suggestion.getMatchedEntryId()).isNull();
-        assertThat(suggestion.getCorpusStatus()).isEqualTo(CheckStatus.FOUND);
+        assertThat(review.getReviewedTerm()).isEqualTo("corrected");
+        assertThat(review.getTezaursStatus()).isEqualTo(TezaursStatus.MEANING_NOT_FOUND);
+        assertThat(review.getMatchedEntryId()).isEqualTo(42L);
+        assertThat(review.getCorpusStatus()).isEqualTo(CheckStatus.FOUND);
+        assertThat(review.canComplete()).isTrue();
     }
 
     @Test
     void rejectsCorpusEvidenceBeforeAnAbsentMeaningIsConfirmed() {
-        Suggestion suggestion = suggestion();
+        Suggestion review = review();
 
-        assertThatThrownBy(suggestion::recordCorpusExample)
+        assertThatThrownBy(review::recordCorpusExample)
                 .isInstanceOf(ConflictException.class)
                 .hasMessage("Corpus evidence is only applicable when the submitted meaning is absent");
     }
 
     @Test
-    void allowsAnOptionalEntryIdOnlyForAFoundDictionaryEntry() {
-        Suggestion suggestion = suggestion();
+    void allowsAnEntryIdOnlyForAFoundDictionaryEntry() {
+        Suggestion review = review();
 
-        suggestion.recordTezaursCheck(TezaursStatus.MEANING_FOUND, null);
+        review.recordTezaursCheck(TezaursStatus.MEANING_FOUND, null);
 
-        assertThat(suggestion.getMatchedEntryId()).isNull();
-        assertThatThrownBy(() -> suggestion.recordTezaursCheck(TezaursStatus.NOT_CHECKED, 42L))
+        assertThat(review.getMatchedEntryId()).isNull();
+        assertThatThrownBy(() -> review.recordTezaursCheck(TezaursStatus.NOT_CHECKED, 42L))
                 .isInstanceOf(ConflictException.class)
                 .hasMessage("An entry ID is only allowed when a Tēzaurs entry was found");
     }
 
-    @Test
-    void completesAnExistingMeaningAndReopensItWhenTheCheckChanges() {
-        Suggestion suggestion = suggestion();
-        suggestion.changeStatus(SuggestionStatus.IN_PROGRESS);
-
-        suggestion.recordTezaursCheck(TezaursStatus.MEANING_FOUND, 42L);
-
-        assertThat(suggestion.getStatus()).isEqualTo(SuggestionStatus.COMPLETED);
-
-        suggestion.recordTezaursCheck(TezaursStatus.MEANING_NOT_FOUND, 42L);
-
-        assertThat(suggestion.getStatus()).isEqualTo(SuggestionStatus.IN_PROGRESS);
+    private static IncubatorSuggestion source(SuggestionStatus status) {
+        return new IncubatorSuggestion(42, "submitted", "definition", status);
     }
 
-    @Test
-    void requiresAllApplicableChecksBeforeManualCompletion() {
-        Suggestion suggestion = suggestion();
-        suggestion.changeStatus(SuggestionStatus.IN_PROGRESS);
-
-        assertThatThrownBy(() -> suggestion.changeStatus(SuggestionStatus.COMPLETED))
-                .isInstanceOf(ConflictException.class)
-                .hasMessage("All required review steps must be completed first");
-        assertThat(suggestion.canComplete()).isFalse();
-        assertThat(suggestion.completionBlockReason())
-                .isEqualTo(CompletionBlockReason.TEZAURS_CHECK_REQUIRED);
-
-        suggestion.recordTezaursCheck(TezaursStatus.FOUND, 42L);
-        assertThatThrownBy(() -> suggestion.changeStatus(SuggestionStatus.COMPLETED))
-                .isInstanceOf(ConflictException.class);
-        assertThat(suggestion.completionBlockReason())
-                .isEqualTo(CompletionBlockReason.MEANING_CHECK_REQUIRED);
-
-        suggestion.recordTezaursCheck(TezaursStatus.NOT_FOUND, null);
-        suggestion.changeStatus(SuggestionStatus.COMPLETED);
-
-        assertThat(suggestion.getStatus()).isEqualTo(SuggestionStatus.COMPLETED);
-        assertThat(suggestion.canComplete()).isTrue();
-        assertThat(suggestion.completionBlockReason()).isNull();
-    }
-
-    @Test
-    void defaultsTheCorpusResultWhenAnExistingEntryLacksTheMeaning() {
-        Suggestion suggestion = suggestion();
-        suggestion.changeStatus(SuggestionStatus.IN_PROGRESS);
-        suggestion.recordTezaursCheck(TezaursStatus.MEANING_NOT_FOUND, 42L);
-
-        assertThat(suggestion.getCorpusStatus()).isEqualTo(CheckStatus.NOT_FOUND);
-        suggestion.changeStatus(SuggestionStatus.COMPLETED);
-
-        assertThat(suggestion.getStatus()).isEqualTo(SuggestionStatus.COMPLETED);
-    }
-
-    private static Suggestion suggestion() {
-        return new Suggestion("submitted", null, null, null, null);
+    private static Suggestion review() {
+        return new Suggestion(42);
     }
 }

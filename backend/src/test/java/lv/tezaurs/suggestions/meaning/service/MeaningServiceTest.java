@@ -15,6 +15,7 @@ import lv.tezaurs.suggestions.meaning.entity.Meaning;
 import lv.tezaurs.suggestions.meaning.entity.MeaningOrigin;
 import lv.tezaurs.suggestions.meaning.entity.MeaningStatus;
 import lv.tezaurs.suggestions.meaning.repository.MeaningRepository;
+import lv.tezaurs.suggestions.suggestion.entity.Suggestion;
 import lv.tezaurs.suggestions.suggestion.repository.SuggestionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -36,11 +37,13 @@ class MeaningServiceTest {
 
     @Test
     void revisesWithoutOverwritingTheSource() {
-        UUID suggestionId = UUID.randomUUID();
-        Meaning source = meaning(suggestionId, MeaningOrigin.GENERATED, "original text");
-        when(meaningRepository.findByIdAndSuggestionId(source.getId(), suggestionId)).thenReturn(Optional.of(source));
+        Suggestion review = new Suggestion(42);
+        Meaning source = meaning(review.getId(), MeaningOrigin.GENERATED, "original text");
+        when(suggestionRepository.findById(review.getId())).thenReturn(Optional.of(review));
+        when(meaningRepository.findByIdAndReviewId(source.getId(), review.getId()))
+                .thenReturn(Optional.of(source));
 
-        var revision = service.revise(suggestionId, source.getId(),
+        var revision = service.revise(review.getId(), source.getId(),
                 new CreateMeaningRevisionRequest("corrected text"));
 
         assertThat(source.getGloss()).isEqualTo("original text");
@@ -56,13 +59,15 @@ class MeaningServiceTest {
 
     @Test
     void rejectsUnknownSuggestionsAndMeanings() {
-        UUID suggestionId = UUID.randomUUID();
+        UUID reviewId = UUID.randomUUID();
         UUID meaningId = UUID.randomUUID();
 
-        assertThatThrownBy(() -> service.list(suggestionId))
+        assertThatThrownBy(() -> service.list(reviewId))
                 .isInstanceOf(NotFoundException.class)
-                .hasMessage("Suggestion " + suggestionId + " was not found");
-        assertThatThrownBy(() -> service.revise(suggestionId, meaningId,
+                .hasMessage("Review " + reviewId + " was not found");
+        Suggestion review = new Suggestion(42);
+        when(suggestionRepository.findById(review.getId())).thenReturn(Optional.of(review));
+        assertThatThrownBy(() -> service.revise(review.getId(), meaningId,
                 new CreateMeaningRevisionRequest("revision")))
                 .isInstanceOf(NotFoundException.class)
                 .hasMessage("Meaning " + meaningId + " was not found");

@@ -19,15 +19,15 @@ class MeaningControllerTest {
     void delegatesMeaningActions() {
         MeaningService service = mock(MeaningService.class);
         MeaningController controller = new MeaningController(service);
-        UUID suggestionId = UUID.randomUUID();
+        UUID reviewId = UUID.randomUUID();
         UUID meaningId = UUID.randomUUID();
-        MeaningResponse response = new MeaningResponse(meaningId, suggestionId, null, MeaningOrigin.REVIEWER,
+        MeaningResponse response = new MeaningResponse(meaningId, reviewId, null, MeaningOrigin.REVIEWER,
                 "gloss", MeaningStatus.CURRENT, Instant.EPOCH, Instant.EPOCH);
         CreateMeaningRevisionRequest revisionRequest = new CreateMeaningRevisionRequest("revision");
-        when(service.list(suggestionId)).thenReturn(List.of(response));
-        when(service.revise(suggestionId, meaningId, revisionRequest)).thenReturn(response);
+        when(service.list(reviewId)).thenReturn(List.of(response));
+        when(service.revise(reviewId, meaningId, revisionRequest)).thenReturn(response);
 
-        assertThat(controller.list(suggestionId)).containsExactly(response);
-        assertThat(controller.revise(suggestionId, meaningId, revisionRequest).getStatusCode().value()).isEqualTo(201);
+        assertThat(controller.list(reviewId)).containsExactly(response);
+        assertThat(controller.revise(reviewId, meaningId, revisionRequest).getStatusCode().value()).isEqualTo(201);
     }
 }

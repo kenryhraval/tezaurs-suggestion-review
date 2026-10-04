@@ -17,20 +17,20 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/suggestions/{suggestionId}/meanings")
+@RequestMapping("/api/reviews/{reviewId}/meanings")
 @RequiredArgsConstructor
 public class MeaningController {
     private final MeaningService service;
 
     @GetMapping
-    List<MeaningResponse> list(@PathVariable UUID suggestionId) {
-        return service.list(suggestionId);
+    List<MeaningResponse> list(@PathVariable UUID reviewId) {
+        return service.list(reviewId);
     }
 
     @PostMapping("/{meaningId}/revision")
-    ResponseEntity<MeaningResponse> revise(@PathVariable UUID suggestionId, @PathVariable UUID meaningId,
+    ResponseEntity<MeaningResponse> revise(@PathVariable UUID reviewId, @PathVariable UUID meaningId,
                                             @Valid @RequestBody CreateMeaningRevisionRequest request) {
-        MeaningResponse response = service.revise(suggestionId, meaningId, request);
+        MeaningResponse response = service.revise(reviewId, meaningId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 }

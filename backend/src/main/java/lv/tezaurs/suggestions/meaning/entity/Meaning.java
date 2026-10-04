@@ -24,7 +24,7 @@ public class Meaning {
     private UUID id;
 
     @Column(name = "suggestion_id", nullable = false, updatable = false)
-    private UUID suggestionId;
+    private UUID reviewId;
 
     @Column(name = "supersedes_meaning_id", updatable = false)
     private UUID supersedesMeaningId;
@@ -48,14 +48,14 @@ public class Meaning {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    public Meaning(UUID suggestionId, MeaningOrigin origin, String gloss) {
-        this(UUID.randomUUID(), suggestionId, null, origin, gloss, MeaningStatus.CURRENT);
+    public Meaning(UUID reviewId, MeaningOrigin origin, String gloss) {
+        this(UUID.randomUUID(), reviewId, null, origin, gloss, MeaningStatus.CURRENT);
     }
 
-    private Meaning(UUID id, UUID suggestionId, UUID supersedesMeaningId,
+    private Meaning(UUID id, UUID reviewId, UUID supersedesMeaningId,
                     MeaningOrigin origin, String gloss, MeaningStatus status) {
         this.id = id;
-        this.suggestionId = suggestionId;
+        this.reviewId = reviewId;
         this.supersedesMeaningId = supersedesMeaningId;
         this.origin = origin;
         this.gloss = gloss;
@@ -69,7 +69,7 @@ public class Meaning {
 
     public Meaning revise(String revisedGloss) {
         supersede();
-        return new Meaning(UUID.randomUUID(), suggestionId, id, MeaningOrigin.REVIEWER,
+        return new Meaning(UUID.randomUUID(), reviewId, id, MeaningOrigin.REVIEWER,
                 revisedGloss, MeaningStatus.CURRENT);
     }
 

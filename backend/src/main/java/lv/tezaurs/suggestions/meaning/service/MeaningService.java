@@ -8,11 +8,12 @@ import lv.tezaurs.suggestions.meaning.dto.CreateMeaningRevisionRequest;
 import lv.tezaurs.suggestions.meaning.dto.MeaningResponse;
 import lv.tezaurs.suggestions.meaning.entity.Meaning;
 import lv.tezaurs.suggestions.meaning.repository.MeaningRepository;
+import lv.tezaurs.suggestions.suggestion.entity.Suggestion;
 import lv.tezaurs.suggestions.suggestion.repository.SuggestionRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Manages the single meaning revision chain for each suggestion. */
+/** Manages the single meaning revision chain for each review. */
 @Service
 @RequiredArgsConstructor
 public class MeaningService {
@@ -20,29 +21,31 @@ public class MeaningService {
     private final SuggestionRepository suggestionRepository;
 
     @Transactional(readOnly = true)
-    public List<MeaningResponse> list(UUID suggestionId) {
-        requireSuggestion(suggestionId);
-        return meaningRepository.findAllBySuggestionIdOrderByCreatedAtAscIdAsc(suggestionId).stream()
+    public List<MeaningResponse> list(UUID reviewId) {
+        requireReview(reviewId);
+        return meaningRepository.findAllByReviewIdOrderByCreatedAtAscIdAsc(reviewId).stream()
                 .map(MeaningResponse::from)
                 .toList();
     }
 
     @Transactional
-    public MeaningResponse revise(UUID suggestionId, UUID meaningId, CreateMeaningRevisionRequest request) {
-        Meaning source = requireMeaning(suggestionId, meaningId);
-        Meaning revision = source.revise(request.gloss().trim());
+    public MeaningResponse revise(UUID reviewId, UUID meaningId, CreateMeaningRevisionRequest request) {
+        Meaning currentMeaning = requireMeaningInReview(reviewId, meaningId);
+        Meaning revision = currentMeaning.revise(request.gloss().trim());
+
+        // Release the unique CURRENT slot before inserting its replacement.
         meaningRepository.flush();
-        return MeaningResponse.from(meaningRepository.saveAndFlush(revision));
+        Meaning savedRevision = meaningRepository.saveAndFlush(revision);
+        return MeaningResponse.from(savedRevision);
     }
 
-    private void requireSuggestion(UUID suggestionId) {
-        if (!suggestionRepository.existsById(suggestionId)) {
-            throw new NotFoundException("Suggestion " + suggestionId + " was not found");
-        }
+    private Suggestion requireReview(UUID reviewId) {
+        return suggestionRepository.findById(reviewId)
+                .orElseThrow(() -> new NotFoundException("Review " + reviewId + " was not found"));
     }
 
-    private Meaning requireMeaning(UUID suggestionId, UUID meaningId) {
-        return meaningRepository.findByIdAndSuggestionId(meaningId, suggestionId)
+    private Meaning requireMeaningInReview(UUID reviewId, UUID meaningId) {
+        return meaningRepository.findByIdAndReviewId(meaningId, reviewId)
                 .orElseThrow(() -> new NotFoundException("Meaning " + meaningId + " was not found"));
     }
 }

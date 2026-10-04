@@ -1,46 +1,24 @@
 import { suggestionStatusLabels } from '../labels'
 import type { Suggestion, SuggestionStatus } from '../types'
 
-const suggestionGroups = [
-  {
-    key: 'NEW',
-    label: suggestionStatusLabels.NEW,
-    matches: (suggestion: Suggestion) => suggestion.status === 'NEW',
-  },
-  {
-    key: 'IN_PROGRESS',
-    label: suggestionStatusLabels.IN_PROGRESS,
-    matches: (suggestion: Suggestion) => suggestion.status === 'POSTPONED'
-      || suggestion.status === 'NEEDS_EXPERT'
-      || (suggestion.status === 'IN_PROGRESS'
-        && suggestion.tezaursStatus !== 'FOUND'
-        && suggestion.tezaursStatus !== 'MEANING_NOT_FOUND'),
-  },
-  {
-    key: 'MEANING_NOT_FOUND',
-    label: 'Jāpapildina',
-    matches: (suggestion: Suggestion) => suggestion.status === 'IN_PROGRESS'
-      && (suggestion.tezaursStatus === 'FOUND'
-        || suggestion.tezaursStatus === 'MEANING_NOT_FOUND'),
-  },
-  {
-    key: 'COMPLETED',
-    label: suggestionStatusLabels.COMPLETED,
-    matches: (suggestion: Suggestion) => suggestion.status === 'COMPLETED',
-  },
-  {
-    key: 'GARBAGE',
-    label: suggestionStatusLabels.GARBAGE,
-    matches: (suggestion: Suggestion) => suggestion.status === 'GARBAGE',
-  },
-] as const
+const suggestionGroups: SuggestionStatus[] = [
+  'NEW',
+  'READY_FOR_REVIEW',
+  'IN_PROGRESS',
+  'INVENTED',
+  'ALREADY_EXISTS',
+  'INSUFFICIENT_DATA',
+  'NEEDS_EXPERT',
+  'COMPLETED',
+  'GARBAGE',
+]
 
 type Props = {
   suggestions: Suggestion[]
-  selectedId: string | null
+  selectedId: number | null
   loading: boolean
-  onSelect: (id: string) => void
-  onStatusChange: (id: string, status: SuggestionStatus) => Promise<void>
+  onSelect: (id: number) => void
+  onStatusChange: (id: number, status: SuggestionStatus) => Promise<void>
 }
 
 export function SuggestionList({
@@ -60,22 +38,22 @@ export function SuggestionList({
       {!loading && suggestions.length > 0 && (
         <div className="suggestion-groups">
           {suggestionGroups.map((group) => {
-            const items = suggestions.filter(group.matches)
+            const items = suggestions.filter((suggestion) => suggestion.status === group)
 
             return (
-              <section className="suggestion-group" key={group.key}>
+              <section className="suggestion-group" key={group}>
                 <div className="suggestion-group-heading">
                   <h3>
-                    {group.label}
+                    {suggestionStatusLabels[group]}
                     <span className="suggestion-count">{items.length}</span>
                   </h3>
 
-                  {group.key === 'COMPLETED' && (
+                  {group === 'COMPLETED' && (
                     <button disabled title="Eksports būs pieejams vēlāk" type="button">
                       Eksportēt
                     </button>
                   )}
-                  {group.key === 'GARBAGE' && (
+                  {group === 'GARBAGE' && (
                     <button disabled title="Miskastes iztukšošana būs pieejama vēlāk" type="button">
                       Iztukšot
                     </button>
@@ -93,15 +71,15 @@ export function SuggestionList({
                           onClick={() => onSelect(suggestion.id)}
                           type="button"
                         >
-                          <strong>{suggestion.reviewedTerm ?? suggestion.submittedTerm}</strong>
+                          <strong>{suggestion.submittedTerm}</strong>
                         </button>
 
-                        {group.key === 'NEW' && (
+                        {group === 'NEW' && (
                           <div className="suggestion-quick-actions">
                             <button
                               aria-label={`Sākt izskatīt ${suggestion.submittedTerm}`}
-                              onClick={() => void onStatusChange(suggestion.id, 'IN_PROGRESS')}
-                              title="Pārvietot uz Izskatīšanā"
+                              onClick={() => void onStatusChange(suggestion.id, 'READY_FOR_REVIEW')}
+                              title="Pārvietot uz Skatāms"
                               type="button"
                             >
                               ✓

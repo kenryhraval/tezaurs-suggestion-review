@@ -6,7 +6,7 @@ import lv.tezaurs.suggestions.suggestion.entity.CorpusExample;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface CorpusExampleRepository extends JpaRepository<CorpusExample, UUID> {
-    List<CorpusExample> findAllBySuggestionIdOrderByCreatedAtAscIdAsc(UUID suggestionId);
+    List<CorpusExample> findAllByReviewIdOrderByCreatedAtAscIdAsc(UUID reviewId);
 
-    boolean existsBySuggestionIdAndUrl(UUID suggestionId, String url);
+    boolean existsByReviewIdAndUrl(UUID reviewId, String url);
 }

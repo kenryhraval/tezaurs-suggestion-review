@@ -6,7 +6,7 @@ import type { Suggestion, SuggestionStatus } from '../types'
 
 export function ReviewPage() {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedId, setSelectedId] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -17,7 +17,6 @@ export function ReviewPage() {
       try {
         const items = await getSuggestions()
         setSuggestions(items)
-        setSelectedId(items[0]?.id ?? null)
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : 'Neizdevās ielādēt ieteikumus.')
       } finally {
@@ -34,7 +33,7 @@ export function ReviewPage() {
     )
   }
 
-  async function changeStatus(id: string, status: SuggestionStatus) {
+  async function changeStatus(id: number, status: SuggestionStatus) {
     setError('')
     try {
       updateSuggestion(await changeSuggestionStatus(id, status))

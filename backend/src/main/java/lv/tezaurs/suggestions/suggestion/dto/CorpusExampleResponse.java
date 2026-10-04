@@ -6,12 +6,12 @@ import lv.tezaurs.suggestions.suggestion.entity.CorpusExample;
 
 public record CorpusExampleResponse(
         UUID id,
-        UUID suggestionId,
+        UUID reviewId,
         String url,
         Instant createdAt) {
 
     public static CorpusExampleResponse from(CorpusExample example) {
-        return new CorpusExampleResponse(example.getId(), example.getSuggestionId(),
+        return new CorpusExampleResponse(example.getId(), example.getReviewId(),
                 example.getUrl(), example.getCreatedAt());
     }
 }

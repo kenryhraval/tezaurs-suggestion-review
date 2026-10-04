@@ -6,6 +6,7 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.AccessLevel;
@@ -23,27 +24,11 @@ public class Suggestion {
     @Id
     private UUID id;
 
-    @Column(name = "submitted_term", nullable = false, updatable = false)
-    private String submittedTerm;
+    @Column(name = "source_suggestion_id", nullable = false, unique = true, updatable = false)
+    private Integer sourceSuggestionId;
 
     @Column(name = "reviewed_term")
     private String reviewedTerm;
-
-    @Column(name = "usage_example", columnDefinition = "text")
-    private String usageExample;
-
-    @Column(columnDefinition = "text")
-    private String notes;
-
-    @Column(name = "submitter_name")
-    private String submitterName;
-
-    @Column(name = "submitter_email", length = 320)
-    private String submitterEmail;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 32)
-    private SuggestionStatus status;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "tezaurs_status", nullable = false, length = 32)
@@ -56,6 +41,10 @@ public class Suggestion {
     @Column(name = "corpus_status", nullable = false, length = 32)
     private CheckStatus corpusStatus;
 
+    @Version
+    @Column(nullable = false)
+    private long version;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -64,24 +53,11 @@ public class Suggestion {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    public Suggestion(String submittedTerm, String usageExample, String notes,
-                      String submitterName, String submitterEmail) {
+    public Suggestion(Integer sourceSuggestionId) {
         this.id = UUID.randomUUID();
-        this.submittedTerm = submittedTerm;
-        this.usageExample = usageExample;
-        this.notes = notes;
-        this.submitterName = submitterName;
-        this.submitterEmail = submitterEmail;
-        this.status = SuggestionStatus.NEW;
+        this.sourceSuggestionId = sourceSuggestionId;
         this.tezaursStatus = TezaursStatus.NOT_CHECKED;
         this.corpusStatus = CheckStatus.NOT_CHECKED;
-    }
-
-    public void changeStatus(SuggestionStatus newStatus) {
-        if (newStatus == SuggestionStatus.COMPLETED && !canComplete()) {
-            throw new ConflictException("All required review steps must be completed first");
-        }
-        status = newStatus;
     }
 
     public boolean canComplete() {
@@ -107,7 +83,6 @@ public class Suggestion {
         if (!checkStatus.entryExists() && entryId != null) {
             throw new ConflictException("An entry ID is only allowed when a Tēzaurs entry was found");
         }
-        TezaursStatus previousStatus = tezaursStatus;
         tezaursStatus = checkStatus;
         matchedEntryId = entryId;
 
@@ -117,12 +92,6 @@ public class Suggestion {
             corpusStatus = CheckStatus.NOT_FOUND;
         }
 
-        if (checkStatus == TezaursStatus.MEANING_FOUND) {
-            status = SuggestionStatus.COMPLETED;
-        } else if (previousStatus == TezaursStatus.MEANING_FOUND
-                && status == SuggestionStatus.COMPLETED) {
-            status = SuggestionStatus.IN_PROGRESS;
-        }
     }
 
     public void recordCorpusExample() {

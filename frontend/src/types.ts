@@ -1,10 +1,13 @@
 export type SuggestionStatus =
   | 'NEW'
-  | 'IN_PROGRESS'
-  | 'POSTPONED'
-  | 'NEEDS_EXPERT'
-  | 'COMPLETED'
+  | 'READY_FOR_REVIEW'
   | 'GARBAGE'
+  | 'COMPLETED'
+  | 'IN_PROGRESS'
+  | 'INVENTED'
+  | 'ALREADY_EXISTS'
+  | 'INSUFFICIENT_DATA'
+  | 'NEEDS_EXPERT'
 
 export type CheckStatus = 'NOT_CHECKED' | 'FOUND' | 'NOT_FOUND'
 
@@ -25,26 +28,35 @@ export type CompletionBlockReason =
 export type MeaningOrigin = 'SUBMITTER' | 'GENERATED' | 'REVIEWER' | 'EXISTING'
 
 export type Suggestion = {
-  id: string
+  id: number
   submittedTerm: string
-  reviewedTerm: string | null
+  submittedDefinition: string
   usageExample: string | null
+  source: string | null
+  flagInfo: string | null
   notes: string | null
-  submitterName: string | null
-  submitterEmail: string | null
+  contact: string | null
   status: SuggestionStatus
+  createdAt: string
+  updatedAt: string | null
+}
+
+export type Review = {
+  id: string
+  sourceSuggestionId: number
+  reviewedTerm: string | null
   tezaursStatus: TezaursStatus
   matchedEntryId: number | null
   corpusStatus: CheckStatus
   canComplete: boolean
   completionBlockReason: CompletionBlockReason | null
   createdAt: string
-  updatedAt: string
+  updatedAt: string | null
 }
 
 export type Meaning = {
   id: string
-  suggestionId: string
+  reviewId: string
   supersedesMeaningId: string | null
   origin: MeaningOrigin
   gloss: string
@@ -55,16 +67,7 @@ export type Meaning = {
 
 export type CorpusExample = {
   id: string
-  suggestionId: string
+  reviewId: string
   url: string
   createdAt: string
-}
-
-export type CreateSuggestionInput = {
-  term: string
-  definition: string
-  usageExample: string | null
-  notes: string | null
-  submitterName: string | null
-  submitterEmail: string | null
 }

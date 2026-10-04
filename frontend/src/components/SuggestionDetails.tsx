@@ -1,15 +1,12 @@
 import { useState, type FormEvent } from 'react'
 import {
   changeSuggestionStatus,
-  correctSuggestionTerm,
+  correctReviewTerm,
   saveTezaursCheck,
 } from '../api'
-import type {
-  CompletionBlockReason,
-  Suggestion,
-  SuggestionStatus,
-  TezaursStatus,
-} from '../types'
+import { suggestionStatusLabels, suggestionStatusTransitions } from '../labels'
+import type { Suggestion, SuggestionStatus, TezaursStatus } from '../types'
+import { useSuggestionReview } from '../hooks/useSuggestionReview'
 import { useSuggestionMeaning } from '../hooks/useSuggestionMeaning'
 import { useCorpusExamples } from '../hooks/useCorpusExamples'
 import { MeaningSection } from './MeaningSection'
@@ -21,28 +18,23 @@ type Props = {
   onUpdated: (suggestion: Suggestion) => void
 }
 
-const completionBlockMessages: Record<CompletionBlockReason, string> = {
-  TEZAURS_CHECK_REQUIRED: 'Vispirms pabeidziet pārbaudi Tēzaurā.',
-  MEANING_CHECK_REQUIRED: 'Norādiet, vai iesniegtā nozīme jau ir šķirklī.',
-  CORPUS_CHECK_REQUIRED: 'Vispirms pabeidziet pārbaudi korpusā.',
-}
-
-export function SuggestionDetails({
-  suggestion,
-  onUpdated,
-}: Props) {
+export function SuggestionDetails({ suggestion, onUpdated }: Props) {
   const [error, setError] = useState('')
-  const meaning = useSuggestionMeaning(suggestion.id)
-  const analysisAvailable = suggestion.status !== 'NEW' && suggestion.status !== 'GARBAGE'
-  const tezaursEntryExists = suggestion.tezaursStatus === 'FOUND'
-    || suggestion.tezaursStatus === 'MEANING_FOUND'
-    || suggestion.tezaursStatus === 'MEANING_NOT_FOUND'
-  const meaningEditingAvailable = analysisAvailable
-    && (suggestion.tezaursStatus === 'MEANING_NOT_FOUND'
-      || suggestion.tezaursStatus === 'NOT_FOUND')
-  const corpusReviewAvailable = suggestion.tezaursStatus === 'NOT_FOUND'
-    || suggestion.tezaursStatus === 'MEANING_NOT_FOUND'
-  const corpusExamples = useCorpusExamples(suggestion.id, corpusReviewAvailable)
+  const reviewState = useSuggestionReview(suggestion.id, suggestion.status)
+  const review = reviewState.review
+  const reviewId = review?.id ?? null
+  const reviewInProgress = suggestion.status === 'IN_PROGRESS'
+  const tezaursEntryExists = review?.tezaursStatus === 'FOUND'
+    || review?.tezaursStatus === 'MEANING_FOUND'
+    || review?.tezaursStatus === 'MEANING_NOT_FOUND'
+  const meaningEditingAvailable = reviewInProgress
+    && (review?.tezaursStatus === 'MEANING_NOT_FOUND'
+      || review?.tezaursStatus === 'NOT_FOUND')
+  const corpusReviewAvailable = reviewInProgress
+    && (review?.tezaursStatus === 'NOT_FOUND'
+      || review?.tezaursStatus === 'MEANING_NOT_FOUND')
+  const meaning = useSuggestionMeaning(reviewId, review !== null)
+  const corpusExamples = useCorpusExamples(reviewId, corpusReviewAvailable)
 
   async function handleStatus(status: SuggestionStatus) {
     setError('')
@@ -55,32 +47,34 @@ export function SuggestionDetails({
 
   async function handleTermCorrection(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (!review) return
     setError('')
     const data = new FormData(event.currentTarget)
 
     try {
-      onUpdated(
-        await correctSuggestionTerm(suggestion.id, String(data.get('reviewedTerm'))),
-      )
+      reviewState.setReview(await correctReviewTerm(review.id, String(data.get('reviewedTerm'))))
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Neizdevās labot vārdu.')
     }
   }
 
   async function handleTezaursCheck(status: TezaursStatus, entryId: number | null) {
+    if (!review) return
     setError('')
     try {
-      onUpdated(await saveTezaursCheck(suggestion.id, status, entryId))
+      reviewState.setReview(await saveTezaursCheck(review.id, status, entryId))
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Neizdevās saglabāt pārbaudi.')
     }
   }
 
+  const displayedTerm = review?.reviewedTerm ?? suggestion.submittedTerm
+
   return (
     <article className="details">
-      {analysisAvailable ? (
+      {reviewInProgress && review ? (
         <form
-          key={suggestion.reviewedTerm}
+          key={review.reviewedTerm}
           className="title-form"
           onSubmit={handleTermCorrection}
         >
@@ -89,58 +83,39 @@ export function SuggestionDetails({
             <input
               aria-label="Pārskatītais vārds"
               name="reviewedTerm"
-              defaultValue={suggestion.reviewedTerm ?? suggestion.submittedTerm}
+              defaultValue={displayedTerm}
               maxLength={255}
               required
             />
           </label>
         </form>
       ) : (
-        <h2 className="suggestion-title">
-          {suggestion.reviewedTerm ?? suggestion.submittedTerm}
-        </h2>
+        <h2 className="suggestion-title">{displayedTerm}</h2>
       )}
 
       <p className="muted">
         Iesniegts {new Date(suggestion.createdAt).toLocaleDateString('lv-LV')}
       </p>
 
-      {suggestion.reviewedTerm
-        && suggestion.reviewedTerm !== suggestion.submittedTerm && (
+      {review?.reviewedTerm && review.reviewedTerm !== suggestion.submittedTerm && (
         <p><strong>Iesniegtais vārds:</strong> {suggestion.submittedTerm}</p>
       )}
-      <p>
-        <strong>Iesniegtā nozīme:</strong>{' '}
-        {meaning.submitted?.gloss ?? (meaning.loading ? 'Ielādē...' : 'Nav pieejama')}
-      </p>
+      <p><strong>Iesniegtā nozīme:</strong> {suggestion.submittedDefinition}</p>
       {suggestion.usageExample && (
         <p><strong>Lietojuma piemērs:</strong> {suggestion.usageExample}</p>
       )}
       {suggestion.notes && <p><strong>Piezīmes:</strong> {suggestion.notes}</p>}
-      {(suggestion.submitterName || suggestion.submitterEmail) && (
-        <p>
-          <strong>Iesniedzējs:</strong>{' '}
-          {suggestion.submitterName ?? suggestion.submitterEmail}
-          {suggestion.submitterName && suggestion.submitterEmail
-            ? ` (${suggestion.submitterEmail})`
-            : ''}
-        </p>
-      )}
+      {suggestion.source && <p><strong>Avots:</strong> {suggestion.source}</p>}
+      {suggestion.flagInfo && <p><strong>Joma/stils:</strong> {suggestion.flagInfo}</p>}
+      {suggestion.contact && <p><strong>Saziņai:</strong> {suggestion.contact}</p>}
 
-      {error && <p className="error">{error}</p>}
+      {(error || reviewState.error) && <p className="error">{error || reviewState.error}</p>}
+      {reviewState.loading && <p className="muted">Ielādē pārskatu...</p>}
 
       {suggestion.status === 'NEW' && (
         <section className="initial-review">
           <h3>Sākotnējā izvērtēšana</h3>
           <p>Atzīmējiet ieteikumu izskatīšanai vai pārvietojiet to uz miskasti.</p>
-          <div className="initial-review-actions">
-            <button type="button" onClick={() => void handleStatus('IN_PROGRESS')}>
-              ✓ Sākt izskatīšanu
-            </button>
-            <button type="button" onClick={() => void handleStatus('GARBAGE')}>
-              Pārvietot uz miskasti
-            </button>
-          </div>
         </section>
       )}
 
@@ -150,12 +125,12 @@ export function SuggestionDetails({
         </section>
       )}
 
-      {analysisAvailable && (
+      {reviewInProgress && review && (
         <>
           <div className="checks">
             <TezaursCheckForm
-              status={suggestion.tezaursStatus}
-              matchedEntryId={suggestion.matchedEntryId}
+              status={review.tezaursStatus}
+              matchedEntryId={review.matchedEntryId}
               onSave={handleTezaursCheck}
             />
 
@@ -171,50 +146,39 @@ export function SuggestionDetails({
 
           {tezaursEntryExists && (
             <p className="existing-entry-message">
-              {suggestion.tezaursStatus === 'MEANING_FOUND'
+              {review.tezaursStatus === 'MEANING_FOUND'
                 && 'Šķirklis un ieteiktā nozīme jau ir Tēzaurā. Papildu analīze nav nepieciešama.'}
-              {suggestion.tezaursStatus === 'MEANING_NOT_FOUND'
+              {review.tezaursStatus === 'MEANING_NOT_FOUND'
                 && 'Šķirklis ir Tēzaurā, bet ieteiktās nozīmes nav. Papildināšana vēlāk jāveic Tēzaurā.'}
-              {suggestion.tezaursStatus === 'FOUND'
+              {review.tezaursStatus === 'FOUND'
                 && 'Šķirklis ir Tēzaurā. Vēl jānorāda, vai ieteiktā nozīme tajā jau ir.'}
             </p>
           )}
         </>
       )}
 
-      <MeaningSection
-        current={meaning.current}
-        history={meaning.history}
-        editingAvailable={meaningEditingAvailable}
-        loading={meaning.loading}
-        error={meaning.error}
-        onRevise={meaning.revise}
-      />
+      {review && (
+        <MeaningSection
+          current={meaning.current}
+          history={meaning.history}
+          editingAvailable={meaningEditingAvailable}
+          loading={meaning.loading}
+          error={meaning.error}
+          onRevise={meaning.revise}
+        />
+      )}
 
-      {analysisAvailable && suggestion.status !== 'COMPLETED' && (
-        <div className="review-completion">
-          {suggestion.completionBlockReason && (
-            <p className="muted">
-              {completionBlockMessages[suggestion.completionBlockReason]}
-            </p>
-          )}
+      <div className="review-return">
+        {suggestionStatusTransitions[suggestion.status].map((status) => (
           <button
+            key={status}
             type="button"
-            disabled={!suggestion.canComplete}
-            onClick={() => void handleStatus('COMPLETED')}
+            onClick={() => void handleStatus(status)}
           >
-            Apstiprināt
+            {suggestionStatusLabels[status]}
           </button>
-        </div>
-      )}
-
-      {(suggestion.status === 'COMPLETED' || suggestion.status === 'GARBAGE') && (
-        <div className="review-return">
-          <button type="button" onClick={() => void handleStatus('IN_PROGRESS')}>
-            Atpakaļ uz izskatīšanu
-          </button>
-        </div>
-      )}
+        ))}
+      </div>
     </article>
   )
 }

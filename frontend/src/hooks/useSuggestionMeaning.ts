@@ -21,17 +21,19 @@ function getHistory(current: Meaning | undefined, meanings: Meaning[]) {
   return history
 }
 
-export function useSuggestionMeaning(suggestionId: string) {
+export function useSuggestionMeaning(reviewId: string | null, enabled: boolean) {
   const [meanings, setMeanings] = useState<Meaning[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   useEffect(() => {
+    if (!enabled || !reviewId) return
+    const activeReviewId = reviewId
     let active = true
 
     async function load() {
       try {
-        const loaded = await getMeanings(suggestionId)
+        const loaded = await getMeanings(activeReviewId)
         if (active) setMeanings(loaded)
       } catch (cause) {
         if (active) {
@@ -46,7 +48,7 @@ export function useSuggestionMeaning(suggestionId: string) {
     return () => {
       active = false
     }
-  }, [suggestionId])
+  }, [enabled, reviewId])
 
   const submitted = meanings.find((meaning) => meaning.origin === 'SUBMITTER')
   const current = meanings.find((meaning) => meaning.status === 'CURRENT')
@@ -56,7 +58,8 @@ export function useSuggestionMeaning(suggestionId: string) {
 
     setError('')
     try {
-      const revision = await reviseMeaning(suggestionId, current.id, gloss)
+      if (!reviewId) return
+      const revision = await reviseMeaning(reviewId, current.id, gloss)
       setMeanings((items) => [
         ...items.map((item) => item.id === current.id
           ? { ...item, status: 'SUPERSEDED' as const }

@@ -20,7 +20,7 @@ public class CorpusExample {
     private UUID id;
 
     @Column(name = "suggestion_id", nullable = false, updatable = false)
-    private UUID suggestionId;
+    private UUID reviewId;
 
     @Column(nullable = false, updatable = false, columnDefinition = "text")
     private String url;
@@ -29,9 +29,9 @@ public class CorpusExample {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
-    public CorpusExample(UUID suggestionId, String url) {
+    public CorpusExample(UUID reviewId, String url) {
         this.id = UUID.randomUUID();
-        this.suggestionId = suggestionId;
+        this.reviewId = reviewId;
         this.url = url;
     }
 }

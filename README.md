@@ -1,16 +1,25 @@
 # Tēzaurs suggestion review
 
-A small Spring Boot backend for the first stage of reviewing Tēzaurs.lv user suggestions.
+A Spring Boot and React application for reviewing existing Tēzaurs.lv user suggestions.
 
-The current increment deliberately supports only:
+The application:
 
-- submitting, listing and viewing suggestions;
-- changing a human-selected review status;
-- recording whether an entry was found in Tēzaurs;
-- saving links to corpus and other usage evidence;
-- reviewing candidate meanings for a suggestion.
+- reads source suggestions and their workflow status from `incubator.suggestions`;
+- creates richer data in the separate `review` schema when a suggestion first becomes
+  `READY_FOR_REVIEW` or goes directly to `IN_PROGRESS`;
+- validates the agreed human-selected status transitions;
+- records whether an entry was found in Tēzaurs;
+- saves links to corpus and other usage evidence;
+- reviews candidate meanings for a suggestion.
 
-The review statuses are `NEW`, `IN_PROGRESS`, `POSTPONED`, `NEEDS_EXPERT`, `COMPLETED` and `GARBAGE`. A Tēzaurs check distinguishes an existing meaning from a missing meaning in an existing entry. Confirming that both the entry and submitted meaning already exist completes the suggestion automatically; changing that result reopens the suggestion. When the submitted meaning is absent, the corpus result defaults to not found and changes to found when a persisted evidence link is added.
+The suggestion list reads only `incubator.suggestions`. Opening one suggestion
+loads its separate UUID-based review; meanings and corpus evidence use that review
+UUID rather than the incubator integer ID.
+
+The source statuses are `NEW`, `READY_FOR_REVIEW`, `GARBAGE`, `IN_PROGRESS`,
+`INVENTED`, `ALREADY_EXISTS`, `INSUFFICIENT_DATA`, `NEEDS_EXPERT` and
+`COMPLETED`. `dict` is read-only from the application's perspective; Flyway owns
+only the `review` schema.
 
 Each suggestion has one current meaning and a linear revision history. The
 submitted definition is preserved as the first `SUBMITTER` version. Revising it
@@ -32,8 +41,9 @@ Requirements: Java 21 or newer and Docker with Docker Compose.
 The Compose file starts PostgreSQL only. The Spring Boot application is run with
 Maven so the backend remains easy to develop and debug.
 
-First, from the repository root, prepare the local environment file and start the
-database:
+Place the `dict` and `incubator.suggestions` dumps next to the repository as
+`tezaurs_2026_03-public.pgsql.gz` and `suggestions-2026-09-04.pgsql.gz`. They are
+restored automatically when the PostgreSQL volume is first created. Then:
 
 ```bash
 cp backend/.env.example backend/.env
@@ -67,9 +77,7 @@ docker compose --env-file backend/.env down
 ```
 
 The database is stored in the named Docker volume `tezaurs-postgres`, so ordinary
-`docker compose down` does not delete the data. There is currently no Docker image
-or Dockerfile for the Spring Boot application in the local-development Compose
-file.
+`docker compose down` does not delete or re-import it.
 
 ## Deploy to Hetzner
 
@@ -80,16 +88,15 @@ PostgreSQL and automatic HTTPS, and a GitHub Actions deployment workflow. See
 ## API
 
 - `GET /api/me`
-- `POST /api/suggestions`
 - `GET /api/suggestions`
-- `GET /api/suggestions/{id}`
 - `POST /api/suggestions/{id}/status`
-- `POST /api/suggestions/{id}/term-correction`
-- `POST /api/suggestions/{id}/tezaurs-check`
-- `GET /api/suggestions/{id}/corpus-examples`
-- `POST /api/suggestions/{id}/corpus-examples`
-- `GET /api/suggestions/{id}/meanings`
-- `POST /api/suggestions/{id}/meanings/{meaningId}/revision`
+- `GET /api/reviews/by-source-suggestion/{sourceSuggestionId}`
+- `POST /api/reviews/{reviewId}/term-correction`
+- `POST /api/reviews/{reviewId}/tezaurs-check`
+- `GET /api/reviews/{reviewId}/corpus-examples`
+- `POST /api/reviews/{reviewId}/corpus-examples`
+- `GET /api/reviews/{reviewId}/meanings`
+- `POST /api/reviews/{reviewId}/meanings/{meaningId}/revision`
 - `GET /actuator/health`
 - `GET /swagger-ui.html`
 - `GET /v3/api-docs`

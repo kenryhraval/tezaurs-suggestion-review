@@ -7,7 +7,7 @@ import lv.tezaurs.suggestions.meaning.entity.Meaning;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface MeaningRepository extends JpaRepository<Meaning, UUID> {
-    List<Meaning> findAllBySuggestionIdOrderByCreatedAtAscIdAsc(UUID suggestionId);
+    List<Meaning> findAllByReviewIdOrderByCreatedAtAscIdAsc(UUID reviewId);
 
-    Optional<Meaning> findByIdAndSuggestionId(UUID id, UUID suggestionId);
+    Optional<Meaning> findByIdAndReviewId(UUID id, UUID reviewId);
 }

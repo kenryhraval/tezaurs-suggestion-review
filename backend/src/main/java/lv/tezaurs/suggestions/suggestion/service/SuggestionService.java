@@ -1,110 +1,46 @@
 package lv.tezaurs.suggestions.suggestion.service;
 
 import java.util.List;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import lv.tezaurs.suggestions.common.error.ConflictException;
 import lv.tezaurs.suggestions.common.error.NotFoundException;
-import lv.tezaurs.suggestions.meaning.entity.Meaning;
-import lv.tezaurs.suggestions.meaning.entity.MeaningOrigin;
-import lv.tezaurs.suggestions.meaning.repository.MeaningRepository;
-import lv.tezaurs.suggestions.suggestion.dto.AddCorpusExampleRequest;
-import lv.tezaurs.suggestions.suggestion.dto.CorpusExampleResponse;
-import lv.tezaurs.suggestions.suggestion.dto.CorrectTermRequest;
-import lv.tezaurs.suggestions.suggestion.dto.CreateSuggestionRequest;
-import lv.tezaurs.suggestions.suggestion.dto.RecordTezaursCheckRequest;
 import lv.tezaurs.suggestions.suggestion.dto.SuggestionResponse;
 import lv.tezaurs.suggestions.suggestion.dto.UpdateStatusRequest;
-import lv.tezaurs.suggestions.suggestion.entity.CorpusExample;
-import lv.tezaurs.suggestions.suggestion.entity.Suggestion;
-import lv.tezaurs.suggestions.suggestion.repository.CorpusExampleRepository;
-import lv.tezaurs.suggestions.suggestion.repository.SuggestionRepository;
+import lv.tezaurs.suggestions.suggestion.entity.IncubatorSuggestion;
+import lv.tezaurs.suggestions.suggestion.repository.IncubatorSuggestionRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Handles the initial suggestion review operations. */
+/** Reads and updates the workflow state of source suggestions. */
 @Service
 @RequiredArgsConstructor
 public class SuggestionService {
-    private final SuggestionRepository suggestionRepository;
-    private final MeaningRepository meaningRepository;
-    private final CorpusExampleRepository corpusExampleRepository;
+    private static final int WEB_SUGGESTION_CHANNEL = 1;
 
-    @Transactional
-    public SuggestionResponse create(CreateSuggestionRequest request) {
-        Suggestion suggestion = new Suggestion(request.term().trim(),
-                trimToNull(request.usageExample()), trimToNull(request.notes()), trimToNull(request.submitterName()),
-                trimToNull(request.submitterEmail()));
-        Suggestion saved = suggestionRepository.saveAndFlush(suggestion);
-        Meaning submittedMeaning = new Meaning(saved.getId(), MeaningOrigin.SUBMITTER,
-                request.definition().trim());
-        meaningRepository.save(submittedMeaning);
-        return SuggestionResponse.from(saved);
-    }
+    private final IncubatorSuggestionRepository incubatorSuggestionRepository;
+    private final ReviewService reviewService;
 
     @Transactional(readOnly = true)
     public List<SuggestionResponse> list() {
-        return suggestionRepository.findAllByOrderByCreatedAtAscIdAsc().stream()
+        return incubatorSuggestionRepository
+                .findAllByChannelIdOrderByCreatedAtAscIdAsc(WEB_SUGGESTION_CHANNEL).stream()
                 .map(SuggestionResponse::from)
                 .toList();
     }
 
-    @Transactional(readOnly = true)
-    public SuggestionResponse get(UUID id) {
-        return SuggestionResponse.from(requireSuggestion(id));
-    }
-
     @Transactional
-    public SuggestionResponse changeStatus(UUID id, UpdateStatusRequest request) {
-        Suggestion suggestion = requireSuggestion(id);
-        suggestion.changeStatus(request.status());
-        suggestionRepository.flush();
-        return SuggestionResponse.from(suggestion);
-    }
-
-    @Transactional
-    public SuggestionResponse correctTerm(UUID id, CorrectTermRequest request) {
-        Suggestion suggestion = requireSuggestion(id);
-        suggestion.correctTerm(request.reviewedTerm().trim());
-        suggestionRepository.flush();
-        return SuggestionResponse.from(suggestion);
-    }
-
-    @Transactional
-    public SuggestionResponse recordTezaursCheck(UUID id, RecordTezaursCheckRequest request) {
-        Suggestion suggestion = requireSuggestion(id);
-        suggestion.recordTezaursCheck(request.status(), request.matchedEntryId());
-        suggestionRepository.flush();
-        return SuggestionResponse.from(suggestion);
-    }
-
-    @Transactional(readOnly = true)
-    public List<CorpusExampleResponse> listCorpusExamples(UUID id) {
-        requireSuggestion(id);
-        return corpusExampleRepository.findAllBySuggestionIdOrderByCreatedAtAscIdAsc(id).stream()
-                .map(CorpusExampleResponse::from)
-                .toList();
-    }
-
-    @Transactional
-    public CorpusExampleResponse addCorpusExample(UUID id, AddCorpusExampleRequest request) {
-        Suggestion suggestion = requireSuggestion(id);
-        String url = request.url();
-        if (corpusExampleRepository.existsBySuggestionIdAndUrl(id, url)) {
-            throw new ConflictException("This corpus example link has already been added");
+    public SuggestionResponse changeStatus(Integer id, UpdateStatusRequest request) {
+        IncubatorSuggestion source = requireSourceSuggestionForUpdate(id);
+        source.getStatus().requireTransitionTo(request.status());
+        if (request.status().requiresReviewRecord()) {
+            reviewService.ensureCreated(source);
         }
-
-        suggestion.recordCorpusExample();
-        CorpusExample example = new CorpusExample(id, url);
-        return CorpusExampleResponse.from(corpusExampleRepository.saveAndFlush(example));
+        source.changeStatus(request.status());
+        incubatorSuggestionRepository.flush();
+        return SuggestionResponse.from(source);
     }
 
-    private Suggestion requireSuggestion(UUID id) {
-        return suggestionRepository.findById(id)
+    private IncubatorSuggestion requireSourceSuggestionForUpdate(Integer id) {
+        return incubatorSuggestionRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new NotFoundException("Suggestion " + id + " was not found"));
-    }
-
-    private static String trimToNull(String value) {
-        return value == null || value.isBlank() ? null : value.trim();
     }
 }

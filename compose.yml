@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     environment:
       POSTGRES_DB: tezaurs_suggestions
       POSTGRES_USER: tezaurs
@@ -8,7 +8,12 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - tezaurs-postgres:/var/lib/postgresql/data
+      - tezaurs-postgres:/var/lib/postgresql
+      - ${TEZAURS_DICT_DUMP:-../tezaurs_2026_03-public.pgsql.gz}:/docker-entrypoint-initdb.d/10-dict.sql.gz:ro
+      - ${TEZAURS_SUGGESTIONS_DUMP:-../suggestions-2026-09-04.pgsql.gz}:/docker-entrypoint-initdb.d/30-suggestions.sql.gz:ro
+    configs:
+      - source: create-incubator-schema
+        target: /docker-entrypoint-initdb.d/20-create-incubator.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U tezaurs -d tezaurs_suggestions"]
       interval: 5s
@@ -18,3 +23,8 @@ services:
 
 volumes:
   tezaurs-postgres:
+
+configs:
+  create-incubator-schema:
+    content: |
+      CREATE SCHEMA incubator;
