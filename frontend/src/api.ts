@@ -68,8 +68,9 @@ export function saveTezaursCheck(
   })
 }
 
-export function getTezaursCandidates(reviewId: string) {
-  return request<TezaursEntryCandidate[]>(`/api/reviews/${reviewId}/tezaurs-candidates`)
+export function getTezaursCandidates(reviewId: string, query?: string) {
+  const search = query ? `?query=${encodeURIComponent(query)}` : ''
+  return request<TezaursEntryCandidate[]>(`/api/reviews/${reviewId}/tezaurs-candidates${search}`)
 }
 
 export function getCorpusExamples(reviewId: string) {

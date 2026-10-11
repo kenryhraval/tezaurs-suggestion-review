@@ -75,9 +75,12 @@ public class ReviewService {
     }
 
     @Transactional(readOnly = true)
-    public List<TezaursEntryCandidateResponse> findTezaursCandidates(UUID reviewId) {
+    public List<TezaursEntryCandidateResponse> findTezaursCandidates(UUID reviewId, String query) {
         ReviewSuggestion review = requireReview(reviewId);
-        return tezaursEntrySearchService.findMatches(review.getReviewedTerm(), review.getMatchedEntryId());
+        boolean customSearch = query != null && !query.isBlank();
+        String searchTerm = customSearch ? query.trim() : review.getReviewedTerm();
+        Integer selectedEntryId = customSearch ? null : review.getMatchedEntryId();
+        return tezaursEntrySearchService.findMatches(searchTerm, selectedEntryId);
     }
 
     @Transactional(readOnly = true)

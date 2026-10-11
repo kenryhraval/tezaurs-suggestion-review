@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -46,8 +47,10 @@ public class ReviewController {
     }
 
     @GetMapping("/{reviewId}/tezaurs-candidates")
-    List<TezaursEntryCandidateResponse> findTezaursCandidates(@PathVariable UUID reviewId) {
-        return service.findTezaursCandidates(reviewId);
+    List<TezaursEntryCandidateResponse> findTezaursCandidates(
+            @PathVariable UUID reviewId,
+            @RequestParam(required = false) String query) {
+        return service.findTezaursCandidates(reviewId, query);
     }
 
     @GetMapping("/{reviewId}/corpus-examples")

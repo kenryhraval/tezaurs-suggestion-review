@@ -88,10 +88,14 @@ class ReviewServiceTest {
     void validatesTezaursEntriesAndSearchesByTheReviewTerm() {
         ReviewSuggestion review = inProgressReview();
         review.correctTerm("corrected");
+        review.recordTezaursCheck(TezaursStatus.FOUND, 42);
         when(reviewRepository.findById(review.getId())).thenReturn(Optional.of(review));
 
-        service.findTezaursCandidates(review.getId());
-        verify(tezaursEntrySearchService).findMatches("corrected", null);
+        service.findTezaursCandidates(review.getId(), null);
+        verify(tezaursEntrySearchService).findMatches("corrected", 42);
+
+        service.findTezaursCandidates(review.getId(), "  another term  ");
+        verify(tezaursEntrySearchService).findMatches("another term", null);
         verifyNoInteractions(sourceSuggestionRepository);
 
         when(tezaursEntryRepository.existsById(99)).thenReturn(false);

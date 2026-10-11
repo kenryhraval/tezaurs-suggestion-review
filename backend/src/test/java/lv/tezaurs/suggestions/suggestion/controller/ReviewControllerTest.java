@@ -48,11 +48,11 @@ class ReviewControllerTest {
                 42, "vārds", "vārds:1", "vārds", List.of());
         when(service.listCorpusExamples(review.id())).thenReturn(List.of(example));
         when(service.addCorpusExample(review.id(), request)).thenReturn(example);
-        when(service.findTezaursCandidates(review.id())).thenReturn(List.of(candidate));
+        when(service.findTezaursCandidates(review.id(), "cits")).thenReturn(List.of(candidate));
 
         assertThat(controller.listCorpusExamples(review.id())).containsExactly(example);
         assertThat(controller.addCorpusExample(review.id(), request).getStatusCode().value()).isEqualTo(201);
-        assertThat(controller.findTezaursCandidates(review.id())).containsExactly(candidate);
+        assertThat(controller.findTezaursCandidates(review.id(), "cits")).containsExactly(candidate);
     }
 
     private static ReviewResponse response() {

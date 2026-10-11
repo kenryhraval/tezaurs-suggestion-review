@@ -46,36 +46,88 @@ h3 {
   gap: 12px;
 }
 
-.tezaurs-candidates {
-  display: grid;
-  gap: 8px;
+.tezaurs-dropdown {
+  position: relative;
 }
 
-.tezaurs-candidate {
-  display: block;
-  border: 1px solid #ccc;
+.tezaurs-dropdown-control {
+  border: 1px solid #aaa;
   border-radius: 4px;
-  padding: 10px;
   background: white;
-  cursor: pointer;
 }
 
-.tezaurs-candidate:has(input:checked) {
-  border-color: #333;
-  background: #f2f2f2;
-}
-
-.tezaurs-candidate-title {
+.tezaurs-dropdown-toggle {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  justify-content: space-between;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  text-align: left;
 }
 
-.tezaurs-candidate-title small {
-  margin-left: auto;
+.tezaurs-dropdown-selected-details {
+  border-top: 1px solid #ddd;
+  padding: 10px;
 }
 
-.tezaurs-candidate ol {
+.tezaurs-dropdown-selected-details small {
+  display: block;
+}
+
+.tezaurs-dropdown-selected-details ol {
+  margin: 8px 0 0 28px;
+  padding: 0;
+}
+
+.tezaurs-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  left: 0;
+  z-index: 20;
+  max-height: min(520px, 70vh);
+  overflow: auto;
+  border: 1px solid #aaa;
+  border-radius: 4px;
+  background: white;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 18%);
+}
+
+.tezaurs-dropdown-options {
+  display: grid;
+  padding: 4px;
+}
+
+.tezaurs-dropdown-options button {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border: 0;
+  background: white;
+  text-align: left;
+}
+
+.tezaurs-dropdown-options button:hover,
+.tezaurs-dropdown-options button:focus,
+.tezaurs-dropdown-options button[aria-pressed='true'] {
+  background: #eee;
+}
+
+.tezaurs-dropdown-options .tezaurs-dropdown-special {
+  margin-top: 4px;
+  border-top: 1px solid #ddd;
+}
+
+.tezaurs-dropdown-preview {
+  border-top: 1px solid #ddd;
+  padding: 10px;
+}
+
+.tezaurs-dropdown-preview small {
+  display: block;
+}
+
+.tezaurs-dropdown-preview ol {
   margin: 8px 0 0 28px;
   padding: 0;
 }
@@ -84,6 +136,13 @@ h3 {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.tezaurs-combobox-search {
+  display: grid;
+  gap: 6px;
+  border-bottom: 1px solid #ddd;
+  padding: 10px;
 }
 
 .meaning-existence-check {
