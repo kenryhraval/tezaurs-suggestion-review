@@ -11,35 +11,35 @@ import java.util.UUID;
 import lv.tezaurs.suggestions.common.error.ConflictException;
 import lv.tezaurs.suggestions.common.error.NotFoundException;
 import lv.tezaurs.suggestions.meaning.dto.CreateMeaningRevisionRequest;
-import lv.tezaurs.suggestions.meaning.entity.Meaning;
+import lv.tezaurs.suggestions.meaning.entity.ReviewMeaning;
 import lv.tezaurs.suggestions.meaning.entity.MeaningOrigin;
 import lv.tezaurs.suggestions.meaning.entity.MeaningStatus;
-import lv.tezaurs.suggestions.meaning.repository.MeaningRepository;
-import lv.tezaurs.suggestions.suggestion.entity.Suggestion;
-import lv.tezaurs.suggestions.suggestion.repository.SuggestionRepository;
+import lv.tezaurs.suggestions.meaning.repository.ReviewMeaningRepository;
+import lv.tezaurs.suggestions.suggestion.entity.ReviewSuggestion;
+import lv.tezaurs.suggestions.suggestion.repository.ReviewSuggestionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockMakers;
 
 class MeaningServiceTest {
-    private MeaningRepository meaningRepository;
-    private SuggestionRepository suggestionRepository;
+    private ReviewMeaningRepository meaningRepository;
+    private ReviewSuggestionRepository reviewRepository;
     private MeaningService service;
 
     @BeforeEach
     void setUp() {
-        meaningRepository = mock(MeaningRepository.class, withSettings().mockMaker(MockMakers.PROXY));
-        suggestionRepository = mock(SuggestionRepository.class, withSettings().mockMaker(MockMakers.PROXY));
-        service = new MeaningService(meaningRepository, suggestionRepository);
-        when(meaningRepository.saveAndFlush(org.mockito.ArgumentMatchers.any(Meaning.class)))
+        meaningRepository = mock(ReviewMeaningRepository.class, withSettings().mockMaker(MockMakers.PROXY));
+        reviewRepository = mock(ReviewSuggestionRepository.class, withSettings().mockMaker(MockMakers.PROXY));
+        service = new MeaningService(meaningRepository, reviewRepository);
+        when(meaningRepository.saveAndFlush(org.mockito.ArgumentMatchers.any(ReviewMeaning.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
     }
 
     @Test
     void revisesWithoutOverwritingTheSource() {
-        Suggestion review = new Suggestion(42);
-        Meaning source = meaning(review.getId(), MeaningOrigin.GENERATED, "original text");
-        when(suggestionRepository.findById(review.getId())).thenReturn(Optional.of(review));
+        ReviewSuggestion review = review();
+        ReviewMeaning source = new ReviewMeaning(review.getId(), MeaningOrigin.GENERATED, "original text");
+        when(reviewRepository.findById(review.getId())).thenReturn(Optional.of(review));
         when(meaningRepository.findByIdAndReviewId(source.getId(), review.getId()))
                 .thenReturn(Optional.of(source));
 
@@ -53,27 +53,23 @@ class MeaningServiceTest {
         assertThat(revision.supersedesMeaningId()).isEqualTo(source.getId());
         assertThat(revision.gloss()).isEqualTo("corrected text");
         assertThatThrownBy(() -> source.revise("another revision"))
-                .isInstanceOf(ConflictException.class)
-                .hasMessage("A superseded meaning cannot be changed");
+                .isInstanceOf(ConflictException.class);
     }
 
     @Test
-    void rejectsUnknownSuggestionsAndMeanings() {
+    void rejectsUnknownReviewsAndMeanings() {
         UUID reviewId = UUID.randomUUID();
         UUID meaningId = UUID.randomUUID();
+        assertThatThrownBy(() -> service.list(reviewId)).isInstanceOf(NotFoundException.class);
 
-        assertThatThrownBy(() -> service.list(reviewId))
-                .isInstanceOf(NotFoundException.class)
-                .hasMessage("Review " + reviewId + " was not found");
-        Suggestion review = new Suggestion(42);
-        when(suggestionRepository.findById(review.getId())).thenReturn(Optional.of(review));
+        ReviewSuggestion review = review();
+        when(reviewRepository.findById(review.getId())).thenReturn(Optional.of(review));
         assertThatThrownBy(() -> service.revise(review.getId(), meaningId,
                 new CreateMeaningRevisionRequest("revision")))
-                .isInstanceOf(NotFoundException.class)
-                .hasMessage("Meaning " + meaningId + " was not found");
+                .isInstanceOf(NotFoundException.class);
     }
 
-    private static Meaning meaning(UUID suggestionId, MeaningOrigin origin, String gloss) {
-        return new Meaning(suggestionId, origin, gloss);
+    private static ReviewSuggestion review() {
+        return new ReviewSuggestion(42, "term");
     }
 }

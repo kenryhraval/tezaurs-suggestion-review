@@ -14,8 +14,8 @@ export const suggestionStatusLabels: Record<SuggestionStatus, string> = {
 
 export const suggestionStatusTransitions: Record<SuggestionStatus, SuggestionStatus[]> = {
   NEW: ['READY_FOR_REVIEW', 'IN_PROGRESS', 'GARBAGE'],
-  READY_FOR_REVIEW: ['IN_PROGRESS', 'COMPLETED', 'NEW'],
-  GARBAGE: ['NEW'],
+  READY_FOR_REVIEW: ['IN_PROGRESS', 'COMPLETED'],
+  GARBAGE: ['READY_FOR_REVIEW'],
   IN_PROGRESS: [
     'INVENTED',
     'ALREADY_EXISTS',

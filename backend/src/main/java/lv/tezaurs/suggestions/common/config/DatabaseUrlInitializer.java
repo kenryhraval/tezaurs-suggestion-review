@@ -11,7 +11,6 @@ import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.core.env.MapPropertySource;
 import org.springframework.util.StringUtils;
 
-/** Converts a PostgreSQL connection URI into Spring JDBC datasource properties. */
 public final class DatabaseUrlInitializer
         implements ApplicationContextInitializer<ConfigurableApplicationContext> {
 

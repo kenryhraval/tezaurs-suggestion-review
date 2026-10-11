@@ -4,7 +4,7 @@ import java.time.Instant;
 import java.util.UUID;
 import lv.tezaurs.suggestions.suggestion.entity.CheckStatus;
 import lv.tezaurs.suggestions.suggestion.entity.CompletionBlockReason;
-import lv.tezaurs.suggestions.suggestion.entity.Suggestion;
+import lv.tezaurs.suggestions.suggestion.entity.ReviewSuggestion;
 import lv.tezaurs.suggestions.suggestion.entity.TezaursStatus;
 
 public record ReviewResponse(
@@ -12,14 +12,14 @@ public record ReviewResponse(
         Integer sourceSuggestionId,
         String reviewedTerm,
         TezaursStatus tezaursStatus,
-        Long matchedEntryId,
+        Integer matchedEntryId,
         CheckStatus corpusStatus,
         boolean canComplete,
         CompletionBlockReason completionBlockReason,
         Instant createdAt,
         Instant updatedAt) {
 
-    public static ReviewResponse from(Suggestion review) {
+    public static ReviewResponse from(ReviewSuggestion review) {
         return new ReviewResponse(review.getId(), review.getSourceSuggestionId(), review.getReviewedTerm(),
                 review.getTezaursStatus(), review.getMatchedEntryId(), review.getCorpusStatus(),
                 review.canComplete(), review.completionBlockReason(), review.getCreatedAt(), review.getUpdatedAt());

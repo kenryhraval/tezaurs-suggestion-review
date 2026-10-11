@@ -2,7 +2,7 @@ package lv.tezaurs.suggestions.suggestion.dto;
 
 import java.time.Instant;
 import java.util.UUID;
-import lv.tezaurs.suggestions.suggestion.entity.CorpusExample;
+import lv.tezaurs.suggestions.suggestion.entity.ReviewCorpusExample;
 
 public record CorpusExampleResponse(
         UUID id,
@@ -10,7 +10,7 @@ public record CorpusExampleResponse(
         String url,
         Instant createdAt) {
 
-    public static CorpusExampleResponse from(CorpusExample example) {
+    public static CorpusExampleResponse from(ReviewCorpusExample example) {
         return new CorpusExampleResponse(example.getId(), example.getReviewId(),
                 example.getUrl(), example.getCreatedAt());
     }

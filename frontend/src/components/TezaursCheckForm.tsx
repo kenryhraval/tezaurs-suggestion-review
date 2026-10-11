@@ -1,116 +1,126 @@
-import { useState, type FormEvent } from 'react'
-import type { TezaursStatus } from '../types'
+import { useEffect, useState } from 'react'
+import { getTezaursCandidates } from '../api'
+import type { TezaursEntryCandidate, TezaursStatus } from '../types'
 
 type Props = {
+  reviewId: string
   status: TezaursStatus
   matchedEntryId: number | null
   onSave: (status: TezaursStatus, entryId: number | null) => Promise<void>
 }
 
-type Answer = '' | 'YES' | 'NO'
+export function TezaursCheckForm({
+  reviewId,
+  status,
+  matchedEntryId,
+  onSave,
+}: Props) {
+  const [candidates, setCandidates] = useState<TezaursEntryCandidate[]>([])
+  const [loading, setLoading] = useState(true)
+  const [serverError, setServerError] = useState('')
+  const [chosenEntryId, setChosenEntryId] = useState<number | null>(null)
+  const selectedEntryId = chosenEntryId ?? matchedEntryId ?? candidates[0]?.id ?? null
+  const selectedCandidate = candidates.find((candidate) => candidate.id === selectedEntryId)
+  const entryExists = status === 'FOUND'
+    || status === 'MEANING_FOUND'
+    || status === 'MEANING_NOT_FOUND'
 
-export function TezaursCheckForm({ status, matchedEntryId, onSave }: Props) {
-  const [entryId, setEntryId] = useState(matchedEntryId?.toString() ?? '')
-  const [error, setError] = useState('')
-  const entryAnswer: Answer = status === 'NOT_CHECKED'
-    ? ''
-    : status === 'NOT_FOUND' ? 'NO' : 'YES'
-  const meaningAnswer: Answer = status === 'MEANING_FOUND'
-    ? 'YES'
-    : status === 'MEANING_NOT_FOUND' ? 'NO' : ''
+  useEffect(() => {
+    let active = true
 
-  function parseEntryId() {
-    const parsedEntryId = entryId.trim() === '' ? null : Number(entryId)
-    if (parsedEntryId !== null
-      && (!Number.isInteger(parsedEntryId) || parsedEntryId < 1)) {
-      setError('Ievadiet Tēzaura šķirkļa ID.')
-      return undefined
+    async function loadCandidates() {
+      try {
+        const loaded = await getTezaursCandidates(reviewId)
+        if (active) setCandidates(loaded)
+      } catch (cause) {
+        if (active) {
+          setServerError(cause instanceof Error
+            ? cause.message
+            : 'Neizdevās pārbaudīt Tēzauru.')
+        }
+      } finally {
+        if (active) setLoading(false)
+      }
     }
 
-    setError('')
-    return parsedEntryId
-  }
-
-  function saveFoundEntry(nextMeaningAnswer: Answer) {
-    const parsedEntryId = parseEntryId()
-    if (parsedEntryId === undefined) return
-
-    const nextStatus: TezaursStatus = nextMeaningAnswer === 'YES'
-      ? 'MEANING_FOUND'
-      : nextMeaningAnswer === 'NO' ? 'MEANING_NOT_FOUND' : 'FOUND'
-
-    void onSave(nextStatus, parsedEntryId)
-  }
-
-  function handleEntryAnswer(nextAnswer: Answer) {
-    setError('')
-
-    if (nextAnswer === '') {
-      setEntryId('')
-      void onSave('NOT_CHECKED', null)
-      return
+    void loadCandidates()
+    return () => {
+      active = false
     }
-    if (nextAnswer === 'NO') {
-      setEntryId('')
-      void onSave('NOT_FOUND', null)
-      return
-    }
-    saveFoundEntry('')
+  }, [reviewId])
+
+  function confirmEntry() {
+    if (selectedEntryId !== null) void onSave('FOUND', selectedEntryId)
   }
 
-  function handleEntryIdSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    saveFoundEntry(meaningAnswer)
+  function recordMeaning(status: 'MEANING_FOUND' | 'MEANING_NOT_FOUND') {
+    if (selectedEntryId !== null) void onSave(status, selectedEntryId)
   }
 
   return (
     <section className="tezaurs-check">
       <h3>Pārbaude Tēzaurā</h3>
+      <p className="muted">Izvēlieties tuvāko atrasto šķirkli vai norādiet, ka atbilstoša šķirkļa nav.</p>
 
-      {error && <p className="error">{error}</p>}
+      {serverError && <p className="error">{serverError}</p>}
+      {loading && <p className="muted">Meklē Tēzaurā...</p>}
 
-      <label>
-        Vai šķirklis ir Tēzaurā?
-        <select
-          value={entryAnswer}
-          onChange={(event) => handleEntryAnswer(event.target.value as Answer)}
-        >
-          <option value="">Nav pārbaudīts</option>
-          <option value="YES">Ir</option>
-          <option value="NO">Nav</option>
-        </select>
-      </label>
+      {!loading && candidates.length === 0 && (
+        <p>Neviens pietiekami līdzīgs šķirklis netika atrasts.</p>
+      )}
 
-      {entryAnswer === 'YES' && (
-        <>
-          <form onSubmit={handleEntryIdSubmit}>
-            <label>
-              Tēzaura šķirkļa ID
-              <input
-                name="entryId"
-                type="number"
-                min="1"
-                value={entryId}
-                onChange={(event) => setEntryId(event.target.value)}
-              />
+      {candidates.length > 0 && (
+        <div className="tezaurs-candidates">
+          {candidates.map((candidate) => (
+            <label className="tezaurs-candidate" key={candidate.id}>
+              <span className="tezaurs-candidate-title">
+                <input
+                  checked={candidate.id === selectedEntryId}
+                  name="tezaursEntry"
+                  onChange={() => setChosenEntryId(candidate.id)}
+                  type="radio"
+                />
+                <strong>{candidate.heading}</strong>
+                <small>{candidate.humanKey}</small>
+              </span>
+              {candidate.matchedLexeme !== candidate.heading && (
+                <small>Atrasts pēc leksēmas “{candidate.matchedLexeme}”</small>
+              )}
+              {candidate.senses.length > 0 ? (
+                <ol>
+                  {candidate.senses.map((sense) => (
+                    <li key={sense.id}>{sense.gloss || 'Nozīmes skaidrojums nav norādīts.'}</li>
+                  ))}
+                </ol>
+              ) : (
+                <small>Šķirklim nav nozīmju skaidrojumu.</small>
+              )}
             </label>
-          </form>
+          ))}
+        </div>
+      )}
 
-          <label>
-            Vai iesniegtā nozīme jau ir šķirklī?
-            <select
-              value={meaningAnswer}
-              onChange={(event) => {
-                const nextAnswer = event.target.value as Answer
-                saveFoundEntry(nextAnswer)
-              }}
-            >
-              <option value="">Nav pārbaudīts</option>
-              <option value="YES">Ir</option>
-              <option value="NO">Nav</option>
-            </select>
-          </label>
-        </>
+      <div className="tezaurs-answer-actions">
+        <button disabled={selectedEntryId === null} onClick={confirmEntry} type="button">
+          Šis šķirklis atbilst
+        </button>
+        <button onClick={() => void onSave('NOT_FOUND', null)} type="button">
+          Šķirkļa nav Tēzaurā
+        </button>
+      </div>
+
+      {entryExists && selectedCandidate && (
+        <div className="meaning-existence-check">
+          <p><strong>Vai iesniegtā nozīme jau ir šķirklī “{selectedCandidate.heading}”?</strong></p>
+          <div className="tezaurs-answer-actions">
+            <button onClick={() => recordMeaning('MEANING_FOUND')} type="button">
+              Jā, nozīme jau ir
+            </button>
+            <button onClick={() => recordMeaning('MEANING_NOT_FOUND')} type="button">
+              Nē, tā ir jauna nozīme
+            </button>
+          </div>
+        </div>
       )}
     </section>
   )

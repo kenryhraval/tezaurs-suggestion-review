@@ -38,13 +38,12 @@ export type Suggestion = {
   contact: string | null
   status: SuggestionStatus
   createdAt: string
-  updatedAt: string | null
 }
 
 export type Review = {
   id: string
   sourceSuggestionId: number
-  reviewedTerm: string | null
+  reviewedTerm: string
   tezaursStatus: TezaursStatus
   matchedEntryId: number | null
   corpusStatus: CheckStatus
@@ -52,6 +51,21 @@ export type Review = {
   completionBlockReason: CompletionBlockReason | null
   createdAt: string
   updatedAt: string | null
+}
+
+export type TezaursSense = {
+  id: number
+  parentSenseId: number | null
+  gloss: string | null
+  orderNo: number | null
+}
+
+export type TezaursEntryCandidate = {
+  id: number
+  heading: string
+  humanKey: string
+  matchedLexeme: string
+  senses: TezaursSense[]
 }
 
 export type Meaning = {

@@ -6,66 +6,78 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lv.tezaurs.suggestions.common.error.ConflictException;
 import lv.tezaurs.suggestions.common.error.NotFoundException;
-import lv.tezaurs.suggestions.meaning.entity.Meaning;
+import lv.tezaurs.suggestions.meaning.entity.ReviewMeaning;
 import lv.tezaurs.suggestions.meaning.entity.MeaningOrigin;
-import lv.tezaurs.suggestions.meaning.repository.MeaningRepository;
+import lv.tezaurs.suggestions.meaning.repository.ReviewMeaningRepository;
 import lv.tezaurs.suggestions.suggestion.dto.AddCorpusExampleRequest;
 import lv.tezaurs.suggestions.suggestion.dto.CorpusExampleResponse;
 import lv.tezaurs.suggestions.suggestion.dto.CorrectTermRequest;
 import lv.tezaurs.suggestions.suggestion.dto.RecordTezaursCheckRequest;
 import lv.tezaurs.suggestions.suggestion.dto.ReviewResponse;
-import lv.tezaurs.suggestions.suggestion.entity.CorpusExample;
+import lv.tezaurs.suggestions.suggestion.entity.ReviewCorpusExample;
 import lv.tezaurs.suggestions.suggestion.entity.IncubatorSuggestion;
-import lv.tezaurs.suggestions.suggestion.entity.Suggestion;
-import lv.tezaurs.suggestions.suggestion.repository.CorpusExampleRepository;
+import lv.tezaurs.suggestions.suggestion.entity.ReviewSuggestion;
+import lv.tezaurs.suggestions.suggestion.entity.SuggestionStatus;
+import lv.tezaurs.suggestions.suggestion.repository.ReviewCorpusExampleRepository;
 import lv.tezaurs.suggestions.suggestion.repository.IncubatorSuggestionRepository;
-import lv.tezaurs.suggestions.suggestion.repository.SuggestionRepository;
+import lv.tezaurs.suggestions.suggestion.repository.ReviewSuggestionRepository;
+import lv.tezaurs.suggestions.tezaurs.dto.TezaursEntryCandidateResponse;
+import lv.tezaurs.suggestions.tezaurs.repository.TezaursEntryRepository;
+import lv.tezaurs.suggestions.tezaurs.service.TezaursEntrySearchService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Manages review data that belongs to a source suggestion. */
 @Service
 @RequiredArgsConstructor
 public class ReviewService {
-    private final IncubatorSuggestionRepository incubatorSuggestionRepository;
-    private final SuggestionRepository suggestionRepository;
-    private final MeaningRepository meaningRepository;
-    private final CorpusExampleRepository corpusExampleRepository;
+    private final IncubatorSuggestionRepository sourceSuggestionRepository;
+    private final ReviewSuggestionRepository reviewRepository;
+    private final ReviewMeaningRepository meaningRepository;
+    private final ReviewCorpusExampleRepository corpusExampleRepository;
+    private final TezaursEntryRepository tezaursEntryRepository;
+    private final TezaursEntrySearchService tezaursEntrySearchService;
 
-    @Transactional
+    @Transactional(readOnly = true)
     public Optional<ReviewResponse> findBySourceSuggestionId(Integer sourceSuggestionId) {
         requireSourceSuggestion(sourceSuggestionId);
-        Suggestion review = suggestionRepository.findBySourceSuggestionId(sourceSuggestionId).orElse(null);
-        if (review == null) {
-            IncubatorSuggestion source = requireSourceSuggestionForUpdate(sourceSuggestionId);
-            review = suggestionRepository.findBySourceSuggestionId(sourceSuggestionId).orElse(null);
-            if (review == null && source.getStatus().requiresReviewRecord()) {
-                review = create(source);
-            }
-        }
-        return Optional.ofNullable(review).map(ReviewResponse::from);
+        return reviewRepository.findBySourceSuggestionId(sourceSuggestionId)
+                .map(ReviewResponse::from);
     }
 
     @Transactional
-    public Suggestion ensureCreated(IncubatorSuggestion source) {
-        return suggestionRepository.findBySourceSuggestionId(source.getId())
+    public ReviewSuggestion changeStatus(IncubatorSuggestion source, SuggestionStatus status) {
+        ReviewSuggestion review = reviewRepository.findBySourceSuggestionId(source.getId())
                 .orElseGet(() -> create(source));
+        review.changeStatus(status);
+        reviewRepository.flush();
+        return review;
     }
 
     @Transactional
     public ReviewResponse correctTerm(UUID reviewId, CorrectTermRequest request) {
-        Suggestion review = requireReview(reviewId);
+        ReviewSuggestion review = requireReview(reviewId);
         review.correctTerm(request.reviewedTerm().trim());
-        suggestionRepository.flush();
+        reviewRepository.flush();
         return ReviewResponse.from(review);
     }
 
     @Transactional
     public ReviewResponse recordTezaursCheck(UUID reviewId, RecordTezaursCheckRequest request) {
-        Suggestion review = requireReview(reviewId);
+        ReviewSuggestion review = requireReview(reviewId);
+        if (request.status().entryExists()
+                && (request.matchedEntryId() == null
+                || !tezaursEntryRepository.existsById(request.matchedEntryId()))) {
+            throw new ConflictException("The selected Tēzaurs entry does not exist");
+        }
         review.recordTezaursCheck(request.status(), request.matchedEntryId());
-        suggestionRepository.flush();
+        reviewRepository.flush();
         return ReviewResponse.from(review);
+    }
+
+    @Transactional(readOnly = true)
+    public List<TezaursEntryCandidateResponse> findTezaursCandidates(UUID reviewId) {
+        ReviewSuggestion review = requireReview(reviewId);
+        return tezaursEntrySearchService.findMatches(review.getReviewedTerm(), review.getMatchedEntryId());
     }
 
     @Transactional(readOnly = true)
@@ -78,35 +90,31 @@ public class ReviewService {
 
     @Transactional
     public CorpusExampleResponse addCorpusExample(UUID reviewId, AddCorpusExampleRequest request) {
-        Suggestion review = requireReview(reviewId);
+        ReviewSuggestion review = requireReview(reviewId);
         String url = request.url();
         if (corpusExampleRepository.existsByReviewIdAndUrl(review.getId(), url)) {
             throw new ConflictException("This corpus example link has already been added");
         }
 
         review.recordCorpusExample();
-        CorpusExample example = new CorpusExample(review.getId(), url);
+        ReviewCorpusExample example = new ReviewCorpusExample(review.getId(), url);
         return CorpusExampleResponse.from(corpusExampleRepository.saveAndFlush(example));
     }
 
     private IncubatorSuggestion requireSourceSuggestion(Integer id) {
-        return incubatorSuggestionRepository.findById(id)
+        return sourceSuggestionRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Suggestion " + id + " was not found"));
     }
 
-    private IncubatorSuggestion requireSourceSuggestionForUpdate(Integer id) {
-        return incubatorSuggestionRepository.findByIdForUpdate(id)
-                .orElseThrow(() -> new NotFoundException("Suggestion " + id + " was not found"));
-    }
-
-    private Suggestion requireReview(UUID id) {
-        return suggestionRepository.findById(id)
+    private ReviewSuggestion requireReview(UUID id) {
+        return reviewRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Review " + id + " was not found"));
     }
 
-    private Suggestion create(IncubatorSuggestion source) {
-        Suggestion review = suggestionRepository.saveAndFlush(new Suggestion(source.getId()));
-        meaningRepository.save(new Meaning(review.getId(), MeaningOrigin.SUBMITTER, source.getGloss()));
+    private ReviewSuggestion create(IncubatorSuggestion source) {
+        ReviewSuggestion review = reviewRepository.saveAndFlush(
+                new ReviewSuggestion(source.getId(), source.getLemma()));
+        meaningRepository.save(new ReviewMeaning(review.getId(), MeaningOrigin.SUBMITTER, source.getGloss()));
         return review;
     }
 }

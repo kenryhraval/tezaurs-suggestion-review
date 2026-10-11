@@ -4,6 +4,7 @@ import type {
   Review,
   Suggestion,
   SuggestionStatus,
+  TezaursEntryCandidate,
   TezaursStatus,
 } from './types'
 
@@ -65,6 +66,10 @@ export function saveTezaursCheck(
     method: 'POST',
     body: JSON.stringify({ status, matchedEntryId }),
   })
+}
+
+export function getTezaursCandidates(reviewId: string) {
+  return request<TezaursEntryCandidate[]>(`/api/reviews/${reviewId}/tezaurs-candidates`)
 }
 
 export function getCorpusExamples(reviewId: string) {

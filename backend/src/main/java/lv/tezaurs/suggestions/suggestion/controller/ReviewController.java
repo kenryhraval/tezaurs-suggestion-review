@@ -11,6 +11,7 @@ import lv.tezaurs.suggestions.suggestion.dto.CorrectTermRequest;
 import lv.tezaurs.suggestions.suggestion.dto.RecordTezaursCheckRequest;
 import lv.tezaurs.suggestions.suggestion.dto.ReviewResponse;
 import lv.tezaurs.suggestions.suggestion.service.ReviewService;
+import lv.tezaurs.suggestions.tezaurs.dto.TezaursEntryCandidateResponse;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -42,6 +43,11 @@ public class ReviewController {
     ReviewResponse recordTezaursCheck(@PathVariable UUID reviewId,
                                       @Valid @RequestBody RecordTezaursCheckRequest request) {
         return service.recordTezaursCheck(reviewId, request);
+    }
+
+    @GetMapping("/{reviewId}/tezaurs-candidates")
+    List<TezaursEntryCandidateResponse> findTezaursCandidates(@PathVariable UUID reviewId) {
+        return service.findTezaursCandidates(reviewId);
     }
 
     @GetMapping("/{reviewId}/corpus-examples")

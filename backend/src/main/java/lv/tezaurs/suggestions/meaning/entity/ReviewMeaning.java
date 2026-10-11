@@ -16,10 +16,10 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 @Entity
-@Table(name = "meaning")
+@Table(name = "meanings", schema = "review")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Meaning {
+public class ReviewMeaning {
     @Id
     private UUID id;
 
@@ -48,12 +48,12 @@ public class Meaning {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    public Meaning(UUID reviewId, MeaningOrigin origin, String gloss) {
+    public ReviewMeaning(UUID reviewId, MeaningOrigin origin, String gloss) {
         this(UUID.randomUUID(), reviewId, null, origin, gloss, MeaningStatus.CURRENT);
     }
 
-    private Meaning(UUID id, UUID reviewId, UUID supersedesMeaningId,
-                    MeaningOrigin origin, String gloss, MeaningStatus status) {
+    private ReviewMeaning(UUID id, UUID reviewId, UUID supersedesMeaningId,
+                          MeaningOrigin origin, String gloss, MeaningStatus status) {
         this.id = id;
         this.reviewId = reviewId;
         this.supersedesMeaningId = supersedesMeaningId;
@@ -67,9 +67,9 @@ public class Meaning {
         status = MeaningStatus.SUPERSEDED;
     }
 
-    public Meaning revise(String revisedGloss) {
+    public ReviewMeaning revise(String revisedGloss) {
         supersede();
-        return new Meaning(UUID.randomUUID(), reviewId, id, MeaningOrigin.REVIEWER,
+        return new ReviewMeaning(UUID.randomUUID(), reviewId, id, MeaningOrigin.REVIEWER,
                 revisedGloss, MeaningStatus.CURRENT);
     }
 

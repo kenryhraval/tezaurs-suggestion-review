@@ -28,13 +28,17 @@ export function SuggestionDetails({ suggestion, onUpdated }: Props) {
     || review?.tezaursStatus === 'MEANING_FOUND'
     || review?.tezaursStatus === 'MEANING_NOT_FOUND'
   const meaningEditingAvailable = reviewInProgress
-    && (review?.tezaursStatus === 'MEANING_NOT_FOUND'
-      || review?.tezaursStatus === 'NOT_FOUND')
+    && review?.tezaursStatus === 'NOT_FOUND'
   const corpusReviewAvailable = reviewInProgress
-    && (review?.tezaursStatus === 'NOT_FOUND'
-      || review?.tezaursStatus === 'MEANING_NOT_FOUND')
-  const meaning = useSuggestionMeaning(reviewId, review !== null)
+    && review?.tezaursStatus === 'NOT_FOUND'
+  const meaning = useSuggestionMeaning(reviewId, review?.tezaursStatus === 'NOT_FOUND')
   const corpusExamples = useCorpusExamples(reviewId, corpusReviewAvailable)
+  const visibleTransitions = suggestionStatusTransitions[suggestion.status].filter((status) => {
+    if (status === 'ALREADY_EXISTS') return review?.tezaursStatus === 'MEANING_FOUND'
+    if (status === 'COMPLETED' && review?.tezaursStatus === 'MEANING_FOUND') return false
+    if (status === 'COMPLETED' && review?.tezaursStatus === 'MEANING_NOT_FOUND') return false
+    return true
+  })
 
   async function handleStatus(status: SuggestionStatus) {
     setError('')
@@ -66,6 +70,16 @@ export function SuggestionDetails({ suggestion, onUpdated }: Props) {
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Neizdevās saglabāt pārbaudi.')
     }
+  }
+
+  if (suggestion.status !== 'NEW' && !review) {
+    return (
+      <article className="details">
+        {reviewState.error
+          ? <p className="error">{reviewState.error}</p>
+          : <p className="muted">Ielādē ieteikumu...</p>}
+      </article>
+    )
   }
 
   const displayedTerm = review?.reviewedTerm ?? suggestion.submittedTerm
@@ -110,7 +124,6 @@ export function SuggestionDetails({ suggestion, onUpdated }: Props) {
       {suggestion.contact && <p><strong>Saziņai:</strong> {suggestion.contact}</p>}
 
       {(error || reviewState.error) && <p className="error">{error || reviewState.error}</p>}
-      {reviewState.loading && <p className="muted">Ielādē pārskatu...</p>}
 
       {suggestion.status === 'NEW' && (
         <section className="initial-review">
@@ -129,6 +142,8 @@ export function SuggestionDetails({ suggestion, onUpdated }: Props) {
         <>
           <div className="checks">
             <TezaursCheckForm
+              key={review.reviewedTerm ?? suggestion.submittedTerm}
+              reviewId={review.id}
               status={review.tezaursStatus}
               matchedEntryId={review.matchedEntryId}
               onSave={handleTezaursCheck}
@@ -147,9 +162,9 @@ export function SuggestionDetails({ suggestion, onUpdated }: Props) {
           {tezaursEntryExists && (
             <p className="existing-entry-message">
               {review.tezaursStatus === 'MEANING_FOUND'
-                && 'Šķirklis un ieteiktā nozīme jau ir Tēzaurā. Papildu analīze nav nepieciešama.'}
+                && 'Šķirklis un ieteiktā nozīme jau ir Tēzaurā. Pabeidziet ieteikumu ar pogu “Jau bija”.'}
               {review.tezaursStatus === 'MEANING_NOT_FOUND'
-                && 'Šķirklis ir Tēzaurā, bet ieteiktās nozīmes nav. Papildināšana vēlāk jāveic Tēzaurā.'}
+                && 'Šķirklis ir Tēzaurā, bet ieteiktās nozīmes nav. Šī plūsma būs pieejama līdz ar šķirkļa redaktoru.'}
               {review.tezaursStatus === 'FOUND'
                 && 'Šķirklis ir Tēzaurā. Vēl jānorāda, vai ieteiktā nozīme tajā jau ir.'}
             </p>
@@ -157,7 +172,7 @@ export function SuggestionDetails({ suggestion, onUpdated }: Props) {
         </>
       )}
 
-      {review && (
+      {review?.tezaursStatus === 'NOT_FOUND' && (
         <MeaningSection
           current={meaning.current}
           history={meaning.history}
@@ -169,13 +184,13 @@ export function SuggestionDetails({ suggestion, onUpdated }: Props) {
       )}
 
       <div className="review-return">
-        {suggestionStatusTransitions[suggestion.status].map((status) => (
+        {visibleTransitions.map((status) => (
           <button
             key={status}
             type="button"
             onClick={() => void handleStatus(status)}
           >
-            {suggestionStatusLabels[status]}
+            {status === 'ALREADY_EXISTS' ? 'Jau bija' : suggestionStatusLabels[status]}
           </button>
         ))}
       </div>

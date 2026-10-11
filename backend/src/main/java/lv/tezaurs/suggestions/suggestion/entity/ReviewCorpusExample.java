@@ -12,10 +12,10 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 
 @Entity
-@Table(name = "corpus_example")
+@Table(name = "corpus_examples", schema = "review")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class CorpusExample {
+public class ReviewCorpusExample {
     @Id
     private UUID id;
 
@@ -29,7 +29,7 @@ public class CorpusExample {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
-    public CorpusExample(UUID reviewId, String url) {
+    public ReviewCorpusExample(UUID reviewId, String url) {
         this.id = UUID.randomUUID();
         this.reviewId = reviewId;
         this.url = url;

@@ -4,19 +4,20 @@ A Spring Boot and React application for reviewing existing Tēzaurs.lv user sugg
 
 The application:
 
-- reads source suggestions and their workflow status from `incubator.suggestions`;
-- creates richer data in the separate `review` schema when a suggestion first becomes
-  `READY_FOR_REVIEW` or goes directly to `IN_PROGRESS`;
+- reads source suggestions from the immutable `incubator.suggestions` table;
+- stores this service's workflow status and richer review data in the separate `review` schema;
 - validates the agreed human-selected status transitions;
 - records whether an entry was found in Tēzaurs;
 - saves links to corpus and other usage evidence;
 - reviews candidate meanings for a suggestion.
 
-The suggestion list reads only `incubator.suggestions`. Opening one suggestion
-loads its separate UUID-based review; meanings and corpus evidence use that review
-UUID rather than the incubator integer ID.
+Each review links to one source suggestion through `source_suggestion_id`.
+Meanings and corpus evidence belong to the UUID-based review. The application
+does not update `incubator.suggestions`.
+Suggestions without a review are treated as `NEW`; the first status action
+creates the review, which then owns the workflow status.
 
-The source statuses are `NEW`, `READY_FOR_REVIEW`, `GARBAGE`, `IN_PROGRESS`,
+The review statuses are `NEW`, `READY_FOR_REVIEW`, `GARBAGE`, `IN_PROGRESS`,
 `INVENTED`, `ALREADY_EXISTS`, `INSUFFICIENT_DATA`, `NEEDS_EXPERT` and
 `COMPLETED`. `dict` is read-only from the application's perspective; Flyway owns
 only the `review` schema.
@@ -93,6 +94,7 @@ PostgreSQL and automatic HTTPS, and a GitHub Actions deployment workflow. See
 - `GET /api/reviews/by-source-suggestion/{sourceSuggestionId}`
 - `POST /api/reviews/{reviewId}/term-correction`
 - `POST /api/reviews/{reviewId}/tezaurs-check`
+- `GET /api/reviews/{reviewId}/tezaurs-candidates`
 - `GET /api/reviews/{reviewId}/corpus-examples`
 - `POST /api/reviews/{reviewId}/corpus-examples`
 - `GET /api/reviews/{reviewId}/meanings`

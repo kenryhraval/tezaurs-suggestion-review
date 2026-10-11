@@ -17,25 +17,29 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 @Entity
-@Table(name = "suggestion")
+@Table(name = "suggestions", schema = "review")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Suggestion {
+public class ReviewSuggestion {
     @Id
     private UUID id;
 
     @Column(name = "source_suggestion_id", nullable = false, unique = true, updatable = false)
     private Integer sourceSuggestionId;
 
-    @Column(name = "reviewed_term")
+    @Column(name = "reviewed_term", nullable = false)
     private String reviewedTerm;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 32)
+    private SuggestionStatus status;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "tezaurs_status", nullable = false, length = 32)
     private TezaursStatus tezaursStatus;
 
     @Column(name = "matched_entry_id")
-    private Long matchedEntryId;
+    private Integer matchedEntryId;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "corpus_status", nullable = false, length = 32)
@@ -53,11 +57,22 @@ public class Suggestion {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    public Suggestion(Integer sourceSuggestionId) {
+    public ReviewSuggestion(Integer sourceSuggestionId, String submittedTerm) {
         this.id = UUID.randomUUID();
         this.sourceSuggestionId = sourceSuggestionId;
+        this.reviewedTerm = submittedTerm;
+        this.status = SuggestionStatus.NEW;
         this.tezaursStatus = TezaursStatus.NOT_CHECKED;
         this.corpusStatus = CheckStatus.NOT_CHECKED;
+    }
+
+    public void changeStatus(SuggestionStatus newStatus) {
+        status.requireTransitionTo(newStatus);
+        if (newStatus == SuggestionStatus.ALREADY_EXISTS
+                && tezaursStatus != TezaursStatus.MEANING_FOUND) {
+            throw new ConflictException("The submitted meaning must be confirmed in Tēzaurs first");
+        }
+        status = newStatus;
     }
 
     public boolean canComplete() {
@@ -79,7 +94,7 @@ public class Suggestion {
         reviewedTerm = term;
     }
 
-    public void recordTezaursCheck(TezaursStatus checkStatus, Long entryId) {
+    public void recordTezaursCheck(TezaursStatus checkStatus, Integer entryId) {
         if (!checkStatus.entryExists() && entryId != null) {
             throw new ConflictException("An entry ID is only allowed when a Tēzaurs entry was found");
         }
@@ -91,7 +106,6 @@ public class Suggestion {
                 && corpusStatus == CheckStatus.NOT_CHECKED) {
             corpusStatus = CheckStatus.NOT_FOUND;
         }
-
     }
 
     public void recordCorpusExample() {

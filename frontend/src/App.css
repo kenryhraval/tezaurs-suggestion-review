@@ -46,6 +46,55 @@ h3 {
   gap: 12px;
 }
 
+.tezaurs-candidates {
+  display: grid;
+  gap: 8px;
+}
+
+.tezaurs-candidate {
+  display: block;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 10px;
+  background: white;
+  cursor: pointer;
+}
+
+.tezaurs-candidate:has(input:checked) {
+  border-color: #333;
+  background: #f2f2f2;
+}
+
+.tezaurs-candidate-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tezaurs-candidate-title small {
+  margin-left: auto;
+}
+
+.tezaurs-candidate ol {
+  margin: 8px 0 0 28px;
+  padding: 0;
+}
+
+.tezaurs-answer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.meaning-existence-check {
+  border-top: 1px solid #ddd;
+  padding-top: 12px;
+}
+
+.meaning-existence-check p {
+  margin-top: 0;
+}
+
 .layout {
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr);

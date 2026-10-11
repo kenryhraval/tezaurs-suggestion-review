@@ -1,6 +1,5 @@
 package lv.tezaurs.suggestions.suggestion.entity;
 
-/** Result of manually checking the suggested entry and meaning in Tēzaurs. */
 public enum TezaursStatus {
     NOT_CHECKED,
     FOUND,
