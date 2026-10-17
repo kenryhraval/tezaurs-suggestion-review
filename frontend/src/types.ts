@@ -42,7 +42,6 @@ export type Suggestion = {
 
 export type Review = {
   id: string
-  sourceSuggestionId: number
   reviewedTerm: string
   tezaursStatus: TezaursStatus
   matchedEntryId: number | null
@@ -51,6 +50,13 @@ export type Review = {
   completionBlockReason: CompletionBlockReason | null
   createdAt: string
   updatedAt: string | null
+}
+
+export type DuplicateReviewCandidate = {
+  id: string
+  reviewedTerm: string
+  status: SuggestionStatus
+  sourceCount: number
 }
 
 export type TezaursSense = {

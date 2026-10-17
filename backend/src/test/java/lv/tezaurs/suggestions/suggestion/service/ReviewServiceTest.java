@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.withSettings;
 
 import java.util.Optional;
+import java.util.List;
 import lv.tezaurs.suggestions.common.error.ConflictException;
 import lv.tezaurs.suggestions.meaning.entity.ReviewMeaning;
 import lv.tezaurs.suggestions.meaning.entity.MeaningOrigin;
@@ -20,21 +21,25 @@ import lv.tezaurs.suggestions.suggestion.dto.RecordTezaursCheckRequest;
 import lv.tezaurs.suggestions.suggestion.entity.ReviewCorpusExample;
 import lv.tezaurs.suggestions.suggestion.entity.IncubatorSuggestion;
 import lv.tezaurs.suggestions.suggestion.entity.ReviewSuggestion;
+import lv.tezaurs.suggestions.suggestion.entity.ReviewSuggestionSource;
 import lv.tezaurs.suggestions.suggestion.entity.SuggestionStatus;
 import lv.tezaurs.suggestions.suggestion.entity.TezaursStatus;
 import lv.tezaurs.suggestions.suggestion.repository.ReviewCorpusExampleRepository;
 import lv.tezaurs.suggestions.suggestion.repository.IncubatorSuggestionRepository;
 import lv.tezaurs.suggestions.suggestion.repository.ReviewSuggestionRepository;
+import lv.tezaurs.suggestions.suggestion.repository.ReviewSuggestionSourceRepository;
 import lv.tezaurs.suggestions.tezaurs.repository.TezaursEntryRepository;
 import lv.tezaurs.suggestions.tezaurs.service.TezaursEntrySearchService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.MockMakers;
+import org.springframework.data.domain.Pageable;
 
 class ReviewServiceTest {
     private IncubatorSuggestionRepository sourceSuggestionRepository;
     private ReviewSuggestionRepository reviewRepository;
+    private ReviewSuggestionSourceRepository reviewSourceRepository;
     private ReviewMeaningRepository meaningRepository;
     private ReviewCorpusExampleRepository corpusExampleRepository;
     private TezaursEntryRepository tezaursEntryRepository;
@@ -47,14 +52,19 @@ class ReviewServiceTest {
                 withSettings().mockMaker(MockMakers.PROXY));
         reviewRepository = mock(ReviewSuggestionRepository.class,
                 withSettings().mockMaker(MockMakers.PROXY));
+        reviewSourceRepository = mock(ReviewSuggestionSourceRepository.class,
+                withSettings().mockMaker(MockMakers.PROXY));
         meaningRepository = mock(ReviewMeaningRepository.class, withSettings().mockMaker(MockMakers.PROXY));
         corpusExampleRepository = mock(ReviewCorpusExampleRepository.class,
                 withSettings().mockMaker(MockMakers.PROXY));
         tezaursEntryRepository = mock(TezaursEntryRepository.class);
         tezaursEntrySearchService = mock(TezaursEntrySearchService.class);
-        service = new ReviewService(sourceSuggestionRepository, reviewRepository, meaningRepository,
+        service = new ReviewService(sourceSuggestionRepository, reviewRepository, reviewSourceRepository,
+                meaningRepository,
                 corpusExampleRepository, tezaursEntryRepository, tezaursEntrySearchService);
         when(reviewRepository.saveAndFlush(any(ReviewSuggestion.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(reviewSourceRepository.saveAndFlush(any(ReviewSuggestionSource.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
         when(meaningRepository.save(any(ReviewMeaning.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(corpusExampleRepository.saveAndFlush(any(ReviewCorpusExample.class)))
@@ -76,12 +86,39 @@ class ReviewServiceTest {
 
         ReviewSuggestion review = service.changeStatus(source, SuggestionStatus.READY_FOR_REVIEW);
 
-        assertThat(review.getSourceSuggestionId()).isEqualTo(42);
         assertThat(review.getStatus()).isEqualTo(SuggestionStatus.READY_FOR_REVIEW);
+        ArgumentCaptor<ReviewSuggestionSource> link = ArgumentCaptor.forClass(ReviewSuggestionSource.class);
+        verify(reviewSourceRepository).saveAndFlush(link.capture());
+        assertThat(link.getValue().getSourceSuggestion()).isSameAs(source);
+        assertThat(link.getValue().getReview()).isSameAs(review);
+        assertThat(link.getValue().isPrimarySource()).isTrue();
         ArgumentCaptor<ReviewMeaning> meaning = ArgumentCaptor.forClass(ReviewMeaning.class);
         verify(meaningRepository).save(meaning.capture());
         assertThat(meaning.getValue().getReviewId()).isEqualTo(review.getId());
         assertThat(meaning.getValue().getOrigin()).isEqualTo(MeaningOrigin.SUBMITTER);
+    }
+
+    @Test
+    void findsExistingReviewsAndLinksDuplicateSources() {
+        IncubatorSuggestion source = source();
+        ReviewSuggestion review = new ReviewSuggestion("term");
+        review.changeStatus(SuggestionStatus.READY_FOR_REVIEW);
+        when(reviewRepository.findByReviewedTermContainingIgnoreCase(
+                org.mockito.ArgumentMatchers.eq("term"), any(Pageable.class)))
+                .thenReturn(List.of(review));
+        when(reviewSourceRepository.countByReviewId(review.getId())).thenReturn(2L);
+        when(reviewRepository.findById(review.getId())).thenReturn(Optional.of(review));
+
+        var candidates = service.findDuplicateCandidates("  term  ");
+        service.linkDuplicate(source, review.getId());
+
+        assertThat(candidates).hasSize(1);
+        assertThat(candidates.getFirst().sourceCount()).isEqualTo(2);
+        ArgumentCaptor<ReviewSuggestionSource> link = ArgumentCaptor.forClass(ReviewSuggestionSource.class);
+        verify(reviewSourceRepository).saveAndFlush(link.capture());
+        assertThat(link.getValue().getSourceSuggestion()).isSameAs(source);
+        assertThat(link.getValue().getReview()).isSameAs(review);
+        assertThat(link.getValue().isPrimarySource()).isFalse();
     }
 
     @Test
@@ -121,7 +158,7 @@ class ReviewServiceTest {
     }
 
     private static ReviewSuggestion inProgressReview() {
-        ReviewSuggestion review = new ReviewSuggestion(42, "term");
+        ReviewSuggestion review = new ReviewSuggestion("term");
         review.changeStatus(SuggestionStatus.IN_PROGRESS);
         return review;
     }

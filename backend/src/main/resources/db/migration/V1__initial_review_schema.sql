@@ -1,6 +1,5 @@
 CREATE TABLE suggestions (
     id UUID PRIMARY KEY,
-    source_suggestion_id INTEGER NOT NULL,
     reviewed_term VARCHAR(255) NOT NULL,
     status VARCHAR(32) NOT NULL,
     tezaurs_status VARCHAR(32) NOT NULL,
@@ -9,7 +8,6 @@ CREATE TABLE suggestions (
     version BIGINT NOT NULL DEFAULT 0,
     created_at TIMESTAMPTZ NOT NULL,
     updated_at TIMESTAMPTZ NOT NULL,
-    CONSTRAINT uq_review_suggestions_source_suggestion UNIQUE (source_suggestion_id),
     CONSTRAINT ck_review_suggestions_status CHECK (
         status IN (
             'NEW', 'READY_FOR_REVIEW', 'GARBAGE', 'COMPLETED', 'IN_PROGRESS',
@@ -29,6 +27,20 @@ CREATE TABLE suggestions (
         OR tezaurs_status IN ('FOUND', 'MEANING_FOUND', 'MEANING_NOT_FOUND')
     )
 );
+
+CREATE TABLE suggestion_sources (
+    source_suggestion_id INTEGER PRIMARY KEY,
+    suggestion_id UUID NOT NULL REFERENCES suggestions (id) ON DELETE CASCADE,
+    primary_source BOOLEAN NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL
+);
+
+CREATE INDEX ix_review_suggestion_sources_suggestion
+    ON suggestion_sources (suggestion_id);
+
+CREATE UNIQUE INDEX uq_review_suggestion_sources_primary
+    ON suggestion_sources (suggestion_id)
+    WHERE primary_source;
 
 CREATE TABLE meanings (
     id UUID PRIMARY KEY,

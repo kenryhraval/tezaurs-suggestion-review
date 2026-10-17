@@ -27,6 +27,10 @@ public record SuggestionResponse(
         return from(sourceSuggestion, review.getStatus());
     }
 
+    public static SuggestionResponse fromNewSuggestion(IncubatorSuggestion sourceSuggestion) {
+        return from(sourceSuggestion, SuggestionStatus.NEW);
+    }
+
     private static SuggestionResponse from(IncubatorSuggestion sourceSuggestion,
                                            SuggestionStatus status) {
         return new SuggestionResponse(sourceSuggestion.getId(), sourceSuggestion.getLemma(),

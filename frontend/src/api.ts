@@ -1,5 +1,6 @@
 import type {
   CorpusExample,
+  DuplicateReviewCandidate,
   Meaning,
   Review,
   Suggestion,
@@ -27,17 +28,32 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     throw new Error('Pieprasījumu neizdevās izpildīt.')
   }
 
+  if (response.status === 204) return undefined as T
   return response.json() as Promise<T>
 }
 
-export function getSuggestions() {
-  return request<Suggestion[]>('/api/suggestions')
+export function getSuggestions(status?: SuggestionStatus) {
+  const query = status ? `?status=${status}` : ''
+  return request<Suggestion[]>(`/api/suggestions${query}`)
 }
 
 export function changeSuggestionStatus(id: number, status: SuggestionStatus) {
   return request<Suggestion>(`/api/suggestions/${id}/status`, {
     method: 'POST',
     body: JSON.stringify({ status }),
+  })
+}
+
+export function getDuplicateReviewCandidates(query: string) {
+  return request<DuplicateReviewCandidate[]>(
+    `/api/reviews/duplicate-candidates?query=${encodeURIComponent(query)}`,
+  )
+}
+
+export function linkDuplicateSuggestion(id: number, reviewId: string) {
+  return request<void>(`/api/suggestions/${id}/duplicate`, {
+    method: 'POST',
+    body: JSON.stringify({ reviewId }),
   })
 }
 

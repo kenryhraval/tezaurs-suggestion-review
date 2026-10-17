@@ -12,13 +12,15 @@ import { useCorpusExamples } from '../hooks/useCorpusExamples'
 import { MeaningSection } from './MeaningSection'
 import { TezaursCheckForm } from './TezaursCheckForm'
 import { CorpusExampleLinks } from './CorpusExampleLinks'
+import { DuplicateReviewCombobox } from './DuplicateReviewCombobox'
 
 type Props = {
   suggestion: Suggestion
   onUpdated: (suggestion: Suggestion) => void
+  onDuplicate: (sourceSuggestionId: number, reviewId: string) => Promise<void>
 }
 
-export function SuggestionDetails({ suggestion, onUpdated }: Props) {
+export function SuggestionDetails({ suggestion, onUpdated, onDuplicate }: Props) {
   const [error, setError] = useState('')
   const reviewState = useSuggestionReview(suggestion.id, suggestion.status)
   const review = reviewState.review
@@ -128,7 +130,11 @@ export function SuggestionDetails({ suggestion, onUpdated }: Props) {
       {suggestion.status === 'NEW' && (
         <section className="initial-review">
           <h3>Sākotnējā izvērtēšana</h3>
-          <p>Atzīmējiet ieteikumu izskatīšanai vai pārvietojiet to uz miskasti.</p>
+          <p>Atzīmējiet ieteikumu izskatīšanai, pārvietojiet to uz miskasti vai piesaistiet dublikātu.</p>
+          <DuplicateReviewCombobox
+            initialQuery={suggestion.submittedTerm}
+            onSelect={(reviewId) => onDuplicate(suggestion.id, reviewId)}
+          />
         </section>
       )}
 

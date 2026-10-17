@@ -9,7 +9,6 @@ import lv.tezaurs.suggestions.suggestion.entity.TezaursStatus;
 
 public record ReviewResponse(
         UUID id,
-        Integer sourceSuggestionId,
         String reviewedTerm,
         TezaursStatus tezaursStatus,
         Integer matchedEntryId,
@@ -20,7 +19,7 @@ public record ReviewResponse(
         Instant updatedAt) {
 
     public static ReviewResponse from(ReviewSuggestion review) {
-        return new ReviewResponse(review.getId(), review.getSourceSuggestionId(), review.getReviewedTerm(),
+        return new ReviewResponse(review.getId(), review.getReviewedTerm(),
                 review.getTezaursStatus(), review.getMatchedEntryId(), review.getCorpusStatus(),
                 review.canComplete(), review.completionBlockReason(), review.getCreatedAt(), review.getUpdatedAt());
     }

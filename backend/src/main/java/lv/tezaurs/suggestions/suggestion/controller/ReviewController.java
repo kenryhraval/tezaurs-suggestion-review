@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import lv.tezaurs.suggestions.suggestion.dto.AddCorpusExampleRequest;
 import lv.tezaurs.suggestions.suggestion.dto.CorpusExampleResponse;
 import lv.tezaurs.suggestions.suggestion.dto.CorrectTermRequest;
+import lv.tezaurs.suggestions.suggestion.dto.DuplicateReviewCandidateResponse;
 import lv.tezaurs.suggestions.suggestion.dto.RecordTezaursCheckRequest;
 import lv.tezaurs.suggestions.suggestion.dto.ReviewResponse;
 import lv.tezaurs.suggestions.suggestion.service.ReviewService;
@@ -32,6 +33,11 @@ public class ReviewController {
         return service.findBySourceSuggestionId(sourceSuggestionId)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.noContent().build());
+    }
+
+    @GetMapping("/duplicate-candidates")
+    List<DuplicateReviewCandidateResponse> findDuplicateCandidates(@RequestParam String query) {
+        return service.findDuplicateCandidates(query);
     }
 
     @PostMapping("/{reviewId}/term-correction")

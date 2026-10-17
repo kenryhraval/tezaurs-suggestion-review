@@ -4,10 +4,14 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -23,9 +27,6 @@ import org.hibernate.annotations.UpdateTimestamp;
 public class ReviewSuggestion {
     @Id
     private UUID id;
-
-    @Column(name = "source_suggestion_id", nullable = false, unique = true, updatable = false)
-    private Integer sourceSuggestionId;
 
     @Column(name = "reviewed_term", nullable = false)
     private String reviewedTerm;
@@ -57,13 +58,19 @@ public class ReviewSuggestion {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    public ReviewSuggestion(Integer sourceSuggestionId, String submittedTerm) {
+    @OneToMany(mappedBy = "review", fetch = FetchType.LAZY)
+    private List<ReviewSuggestionSource> sources = new ArrayList<>();
+
+    public ReviewSuggestion(String submittedTerm) {
         this.id = UUID.randomUUID();
-        this.sourceSuggestionId = sourceSuggestionId;
         this.reviewedTerm = submittedTerm;
         this.status = SuggestionStatus.NEW;
         this.tezaursStatus = TezaursStatus.NOT_CHECKED;
         this.corpusStatus = CheckStatus.NOT_CHECKED;
+    }
+
+    void addSource(ReviewSuggestionSource source) {
+        sources.add(source);
     }
 
     public void changeStatus(SuggestionStatus newStatus) {

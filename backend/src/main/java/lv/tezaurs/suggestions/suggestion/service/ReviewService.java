@@ -12,18 +12,23 @@ import lv.tezaurs.suggestions.meaning.repository.ReviewMeaningRepository;
 import lv.tezaurs.suggestions.suggestion.dto.AddCorpusExampleRequest;
 import lv.tezaurs.suggestions.suggestion.dto.CorpusExampleResponse;
 import lv.tezaurs.suggestions.suggestion.dto.CorrectTermRequest;
+import lv.tezaurs.suggestions.suggestion.dto.DuplicateReviewCandidateResponse;
 import lv.tezaurs.suggestions.suggestion.dto.RecordTezaursCheckRequest;
 import lv.tezaurs.suggestions.suggestion.dto.ReviewResponse;
 import lv.tezaurs.suggestions.suggestion.entity.ReviewCorpusExample;
 import lv.tezaurs.suggestions.suggestion.entity.IncubatorSuggestion;
 import lv.tezaurs.suggestions.suggestion.entity.ReviewSuggestion;
+import lv.tezaurs.suggestions.suggestion.entity.ReviewSuggestionSource;
 import lv.tezaurs.suggestions.suggestion.entity.SuggestionStatus;
 import lv.tezaurs.suggestions.suggestion.repository.ReviewCorpusExampleRepository;
 import lv.tezaurs.suggestions.suggestion.repository.IncubatorSuggestionRepository;
 import lv.tezaurs.suggestions.suggestion.repository.ReviewSuggestionRepository;
+import lv.tezaurs.suggestions.suggestion.repository.ReviewSuggestionSourceRepository;
 import lv.tezaurs.suggestions.tezaurs.dto.TezaursEntryCandidateResponse;
 import lv.tezaurs.suggestions.tezaurs.repository.TezaursEntryRepository;
 import lv.tezaurs.suggestions.tezaurs.service.TezaursEntrySearchService;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,6 +37,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ReviewService {
     private final IncubatorSuggestionRepository sourceSuggestionRepository;
     private final ReviewSuggestionRepository reviewRepository;
+    private final ReviewSuggestionSourceRepository reviewSourceRepository;
     private final ReviewMeaningRepository meaningRepository;
     private final ReviewCorpusExampleRepository corpusExampleRepository;
     private final TezaursEntryRepository tezaursEntryRepository;
@@ -40,17 +46,42 @@ public class ReviewService {
     @Transactional(readOnly = true)
     public Optional<ReviewResponse> findBySourceSuggestionId(Integer sourceSuggestionId) {
         requireSourceSuggestion(sourceSuggestionId);
-        return reviewRepository.findBySourceSuggestionId(sourceSuggestionId)
+        return reviewSourceRepository.findById(sourceSuggestionId)
+                .map(ReviewSuggestionSource::getReview)
                 .map(ReviewResponse::from);
     }
 
     @Transactional
     public ReviewSuggestion changeStatus(IncubatorSuggestion source, SuggestionStatus status) {
-        ReviewSuggestion review = reviewRepository.findBySourceSuggestionId(source.getId())
+        ReviewSuggestion review = reviewSourceRepository.findById(source.getId())
+                .map(ReviewSuggestionSource::getReview)
                 .orElseGet(() -> create(source));
         review.changeStatus(status);
         reviewRepository.flush();
         return review;
+    }
+
+    @Transactional(readOnly = true)
+    public List<DuplicateReviewCandidateResponse> findDuplicateCandidates(String query) {
+        if (query == null || query.isBlank()) {
+            return List.of();
+        }
+        return reviewRepository.findByReviewedTermContainingIgnoreCase(
+                        query.trim(), PageRequest.of(0, 5, Sort.by("reviewedTerm")))
+                .stream()
+                .map(review -> DuplicateReviewCandidateResponse.from(
+                        review, reviewSourceRepository.countByReviewId(review.getId())))
+                .toList();
+    }
+
+    @Transactional
+    public void linkDuplicate(IncubatorSuggestion source, UUID reviewId) {
+        if (reviewSourceRepository.existsById(source.getId())) {
+            throw new ConflictException("The source suggestion already belongs to a review");
+        }
+        ReviewSuggestion review = requireReview(reviewId);
+        reviewSourceRepository.saveAndFlush(
+                new ReviewSuggestionSource(source, review, false));
     }
 
     @Transactional
@@ -116,7 +147,9 @@ public class ReviewService {
 
     private ReviewSuggestion create(IncubatorSuggestion source) {
         ReviewSuggestion review = reviewRepository.saveAndFlush(
-                new ReviewSuggestion(source.getId(), source.getLemma()));
+                new ReviewSuggestion(source.getLemma()));
+        reviewSourceRepository.saveAndFlush(
+                new ReviewSuggestionSource(source, review, true));
         meaningRepository.save(new ReviewMeaning(review.getId(), MeaningOrigin.SUBMITTER, source.getGloss()));
         return review;
     }

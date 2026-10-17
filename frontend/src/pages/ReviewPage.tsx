@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { changeSuggestionStatus, getSuggestions } from '../api'
+import { changeSuggestionStatus, getSuggestions, linkDuplicateSuggestion } from '../api'
 import { SuggestionDetails } from '../components/SuggestionDetails'
 import { SuggestionList } from '../components/SuggestionList'
 import type { Suggestion, SuggestionStatus } from '../types'
@@ -42,6 +42,19 @@ export function ReviewPage() {
     }
   }
 
+  async function linkDuplicate(id: number, reviewId: string) {
+    setError('')
+    try {
+      await linkDuplicateSuggestion(id, reviewId)
+      setSuggestions((items) => items.filter((item) => item.id !== id))
+      if (selectedId === id) setSelectedId(null)
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : 'Neizdevās piesaistīt dublikātu.'
+      setError(message)
+      throw cause
+    }
+  }
+
   return (
     <main>
       <header>
@@ -71,6 +84,7 @@ export function ReviewPage() {
             key={selected.id}
             suggestion={selected}
             onUpdated={updateSuggestion}
+            onDuplicate={linkDuplicate}
           />
         )}
       </div>

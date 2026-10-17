@@ -15,12 +15,14 @@ import lv.tezaurs.suggestions.suggestion.entity.IncubatorSuggestion;
 import lv.tezaurs.suggestions.suggestion.entity.ReviewSuggestion;
 import lv.tezaurs.suggestions.suggestion.entity.SuggestionStatus;
 import lv.tezaurs.suggestions.suggestion.repository.IncubatorSuggestionRepository;
+import lv.tezaurs.suggestions.suggestion.repository.ReviewSuggestionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockMakers;
 
 class SuggestionServiceTest {
     private IncubatorSuggestionRepository sourceSuggestionRepository;
+    private ReviewSuggestionRepository reviewRepository;
     private ReviewService reviewService;
     private SuggestionService service;
 
@@ -28,18 +30,21 @@ class SuggestionServiceTest {
     void setUp() {
         sourceSuggestionRepository = mock(IncubatorSuggestionRepository.class,
                 withSettings().mockMaker(MockMakers.PROXY));
+        reviewRepository = mock(ReviewSuggestionRepository.class,
+                withSettings().mockMaker(MockMakers.PROXY));
         reviewService = mock(ReviewService.class);
-        service = new SuggestionService(sourceSuggestionRepository, reviewService);
+        service = new SuggestionService(sourceSuggestionRepository, reviewRepository, reviewService);
     }
 
     @Test
     void listsUnstartedSourcesAndStartedReviewsOnceEach() {
-        SuggestionListItem unstartedSuggestion = item(41, SuggestionStatus.NEW);
+        IncubatorSuggestion unstartedSuggestion = source(41);
         SuggestionListItem startedReview = item(42, SuggestionStatus.IN_PROGRESS);
-        when(sourceSuggestionRepository.findAllForReviewQueue())
-                .thenReturn(List.of(unstartedSuggestion, startedReview));
+        when(sourceSuggestionRepository.findAllByReviewSourceIsNullOrderByCreatedAtAscIdAsc())
+                .thenReturn(List.of(unstartedSuggestion));
+        when(reviewRepository.findForReviewQueue(null)).thenReturn(List.of(startedReview));
 
-        List<SuggestionResponse> responses = service.list();
+        List<SuggestionResponse> responses = service.list(null);
 
         assertThat(responses).extracting(SuggestionResponse::id).containsExactly(41, 42);
         assertThat(responses).extracting(SuggestionResponse::status)
@@ -47,9 +52,31 @@ class SuggestionServiceTest {
     }
 
     @Test
+    void listsOnlyUnstartedSourcesForNewStatus() {
+        IncubatorSuggestion unstartedSuggestion = source(41);
+        when(sourceSuggestionRepository.findAllByReviewSourceIsNullOrderByCreatedAtAscIdAsc())
+                .thenReturn(List.of(unstartedSuggestion));
+
+        List<SuggestionResponse> responses = service.list(SuggestionStatus.NEW);
+
+        assertThat(responses).extracting(SuggestionResponse::id).containsExactly(41);
+    }
+
+    @Test
+    void listsOnlyReviewsForOtherStatuses() {
+        SuggestionListItem startedReview = item(42, SuggestionStatus.IN_PROGRESS);
+        when(reviewRepository.findForReviewQueue(SuggestionStatus.IN_PROGRESS.name()))
+                .thenReturn(List.of(startedReview));
+
+        List<SuggestionResponse> responses = service.list(SuggestionStatus.IN_PROGRESS);
+
+        assertThat(responses).extracting(SuggestionResponse::id).containsExactly(42);
+    }
+
+    @Test
     void delegatesTheFirstStatusChangeToReviewCreation() {
         IncubatorSuggestion source = source(42);
-        ReviewSuggestion review = new ReviewSuggestion(42, "term");
+        ReviewSuggestion review = new ReviewSuggestion("term");
         review.changeStatus(SuggestionStatus.GARBAGE);
         when(sourceSuggestionRepository.findById(42)).thenReturn(Optional.of(source));
         when(reviewService.changeStatus(source, SuggestionStatus.GARBAGE)).thenReturn(review);

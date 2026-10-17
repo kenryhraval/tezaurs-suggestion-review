@@ -20,10 +20,10 @@ class SuggestionControllerTest {
         SuggestionResponse response = new SuggestionResponse(42, "term", "definition", null,
                 null, null, null, null, SuggestionStatus.NEW, Instant.EPOCH);
         UpdateStatusRequest request = new UpdateStatusRequest(SuggestionStatus.READY_FOR_REVIEW);
-        when(service.list()).thenReturn(List.of(response));
+        when(service.list(null)).thenReturn(List.of(response));
         when(service.changeStatus(response.id(), request)).thenReturn(response);
 
-        assertThat(controller.list()).containsExactly(response);
+        assertThat(controller.list(null)).containsExactly(response);
         assertThat(controller.changeStatus(response.id(), request)).isEqualTo(response);
     }
 }

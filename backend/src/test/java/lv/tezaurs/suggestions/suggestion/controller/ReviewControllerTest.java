@@ -56,7 +56,7 @@ class ReviewControllerTest {
     }
 
     private static ReviewResponse response() {
-        return new ReviewResponse(UUID.randomUUID(), 42, "term", TezaursStatus.NOT_CHECKED, null,
+        return new ReviewResponse(UUID.randomUUID(), "term", TezaursStatus.NOT_CHECKED, null,
                 CheckStatus.NOT_CHECKED, false, CompletionBlockReason.TEZAURS_CHECK_REQUIRED,
                 Instant.EPOCH, Instant.EPOCH);
     }

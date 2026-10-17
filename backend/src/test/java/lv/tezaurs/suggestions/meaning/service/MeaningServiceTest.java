@@ -70,6 +70,6 @@ class MeaningServiceTest {
     }
 
     private static ReviewSuggestion review() {
-        return new ReviewSuggestion(42, "term");
+        return new ReviewSuggestion("term");
     }
 }

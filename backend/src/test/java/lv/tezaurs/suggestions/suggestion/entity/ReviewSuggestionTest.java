@@ -39,7 +39,7 @@ class ReviewSuggestionTest {
 
     @Test
     void startsNewAndOwnsItsWorkflowState() {
-        ReviewSuggestion review = new ReviewSuggestion(42, "submitted");
+        ReviewSuggestion review = new ReviewSuggestion("submitted");
 
         assertThat(review.getStatus()).isEqualTo(SuggestionStatus.NEW);
         review.changeStatus(SuggestionStatus.IN_PROGRESS);
@@ -53,14 +53,13 @@ class ReviewSuggestionTest {
         review.recordTezaursCheck(TezaursStatus.MEANING_NOT_FOUND, 42);
         review.recordCorpusExample();
 
-        assertThat(review.getSourceSuggestionId()).isEqualTo(42);
         assertThat(review.getReviewedTerm()).isEqualTo("corrected");
         assertThat(review.getCorpusStatus()).isEqualTo(CheckStatus.FOUND);
     }
 
     @Test
     void validatesStatusAndEvidenceTransitions() {
-        ReviewSuggestion review = new ReviewSuggestion(42, "submitted");
+        ReviewSuggestion review = new ReviewSuggestion("submitted");
         review.changeStatus(SuggestionStatus.READY_FOR_REVIEW);
         assertThatThrownBy(() -> review.changeStatus(SuggestionStatus.GARBAGE))
                 .isInstanceOf(ConflictException.class);
@@ -75,7 +74,7 @@ class ReviewSuggestionTest {
     }
 
     private static ReviewSuggestion inProgressReview() {
-        ReviewSuggestion review = new ReviewSuggestion(42, "submitted");
+        ReviewSuggestion review = new ReviewSuggestion("submitted");
         review.changeStatus(SuggestionStatus.IN_PROGRESS);
         return review;
     }

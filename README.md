@@ -11,11 +11,12 @@ The application:
 - saves links to corpus and other usage evidence;
 - reviews candidate meanings for a suggestion.
 
-Each review links to one source suggestion through `source_suggestion_id`.
-Meanings and corpus evidence belong to the UUID-based review. The application
-does not update `incubator.suggestions`.
-Suggestions without a review are treated as `NEW`; the first status action
-creates the review, which then owns the workflow status.
+Each source suggestion belongs to at most one UUID-based review through
+`review.suggestion_sources`, while one review can collect multiple duplicate
+source suggestions. Meanings and corpus evidence belong to the review. The
+application does not update `incubator.suggestions`. Unlinked suggestions are
+treated as `NEW`; the first status action creates a review, while the duplicate
+action links the source to an existing review.
 
 The review statuses are `NEW`, `READY_FOR_REVIEW`, `GARBAGE`, `IN_PROGRESS`,
 `INVENTED`, `ALREADY_EXISTS`, `INSUFFICIENT_DATA`, `NEEDS_EXPERT` and
@@ -89,9 +90,11 @@ PostgreSQL and automatic HTTPS, and a GitHub Actions deployment workflow. See
 ## API
 
 - `GET /api/me`
-- `GET /api/suggestions`
+- `GET /api/suggestions?status={status}` (`status` is optional)
 - `POST /api/suggestions/{id}/status`
+- `POST /api/suggestions/{id}/duplicate`
 - `GET /api/reviews/by-source-suggestion/{sourceSuggestionId}`
+- `GET /api/reviews/duplicate-candidates`
 - `POST /api/reviews/{reviewId}/term-correction`
 - `POST /api/reviews/{reviewId}/tezaurs-check`
 - `GET /api/reviews/{reviewId}/tezaurs-candidates`
