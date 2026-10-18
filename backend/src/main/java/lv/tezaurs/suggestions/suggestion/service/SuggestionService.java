@@ -1,18 +1,19 @@
 package lv.tezaurs.suggestions.suggestion.service;
 
-import java.util.ArrayList;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lv.tezaurs.suggestions.common.error.NotFoundException;
 import lv.tezaurs.suggestions.suggestion.dto.LinkDuplicateRequest;
-import lv.tezaurs.suggestions.suggestion.dto.SuggestionListItem;
+import lv.tezaurs.suggestions.suggestion.dto.SuggestionPageResponse;
 import lv.tezaurs.suggestions.suggestion.dto.SuggestionResponse;
+import lv.tezaurs.suggestions.suggestion.dto.SuggestionSort;
 import lv.tezaurs.suggestions.suggestion.dto.UpdateStatusRequest;
 import lv.tezaurs.suggestions.suggestion.entity.IncubatorSuggestion;
 import lv.tezaurs.suggestions.suggestion.entity.ReviewSuggestion;
 import lv.tezaurs.suggestions.suggestion.entity.SuggestionStatus;
 import lv.tezaurs.suggestions.suggestion.repository.IncubatorSuggestionRepository;
 import lv.tezaurs.suggestions.suggestion.repository.ReviewSuggestionRepository;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,29 +25,31 @@ public class SuggestionService {
     private final ReviewService reviewService;
 
     @Transactional(readOnly = true)
-    public List<SuggestionResponse> list(SuggestionStatus status) {
+    public SuggestionPageResponse list(
+            SuggestionStatus status, String query, int page, int size, SuggestionSort sort) {
+        String searchQuery = query == null ? "" : query.trim();
+
         if (status == SuggestionStatus.NEW) {
-            return findNewSuggestions();
+            Sort.Direction direction = sort == SuggestionSort.OLDEST
+                    ? Sort.Direction.ASC : Sort.Direction.DESC;
+            PageRequest pageable = PageRequest.of(page, size,
+                    Sort.by(direction, "createdAt").and(Sort.by(direction, "id")));
+            return SuggestionPageResponse.from(sourceSuggestionRepository
+                    .findUnstartedForReviewQueue(searchQuery, pageable)
+                    .map(SuggestionResponse::fromNewSuggestion));
         }
-        if (status != null) {
-            return mapReviews(reviewRepository.findForReviewQueue(status.name()));
-        }
 
-        List<SuggestionResponse> suggestions = new ArrayList<>(findNewSuggestions());
-        suggestions.addAll(mapReviews(reviewRepository.findForReviewQueue(null)));
-        return suggestions;
-    }
+        Sort reviewSort = switch (sort) {
+            case NEWEST -> Sort.by(Sort.Direction.DESC, "createdAt");
+            case OLDEST -> Sort.by(Sort.Direction.ASC, "createdAt");
+            case MOST_SUGGESTIONS -> Sort.by(Sort.Direction.DESC, "sourceCount")
+                    .and(Sort.by(Sort.Direction.DESC, "createdAt"));
+        };
+        reviewSort = reviewSort.and(Sort.by("id"));
 
-    private List<SuggestionResponse> findNewSuggestions() {
-        return sourceSuggestionRepository.findAllByReviewSourceIsNullOrderByCreatedAtAscIdAsc().stream()
-                .map(SuggestionResponse::fromNewSuggestion)
-                .toList();
-    }
-
-    private List<SuggestionResponse> mapReviews(List<SuggestionListItem> items) {
-        return items.stream()
-                .map(SuggestionResponse::from)
-                .toList();
+        return SuggestionPageResponse.from(reviewRepository.findForReviewQueue(
+                        status, searchQuery, PageRequest.of(page, size, reviewSort))
+                .map(SuggestionResponse::from));
     }
 
     @Transactional

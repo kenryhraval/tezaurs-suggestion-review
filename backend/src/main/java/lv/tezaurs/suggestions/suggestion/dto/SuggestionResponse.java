@@ -15,27 +15,29 @@ public record SuggestionResponse(
         String notes,
         String contact,
         SuggestionStatus status,
-        Instant createdAt) {
+        Instant createdAt,
+        int sourceCount) {
 
     public static SuggestionResponse from(SuggestionListItem item) {
         return new SuggestionResponse(item.getId(), item.getSubmittedTerm(), item.getSubmittedDefinition(),
                 item.getUsageExample(), item.getSource(), item.getFlagInfo(), item.getNotes(),
-                item.getContact(), SuggestionStatus.valueOf(item.getStatus()), item.getCreatedAt());
+                item.getContact(), item.getStatus(), item.getCreatedAt(), item.getSourceCount());
     }
 
     public static SuggestionResponse fromReview(IncubatorSuggestion sourceSuggestion, ReviewSuggestion review) {
-        return from(sourceSuggestion, review.getStatus());
+        return from(sourceSuggestion, review.getStatus(), review.getSources().size());
     }
 
     public static SuggestionResponse fromNewSuggestion(IncubatorSuggestion sourceSuggestion) {
-        return from(sourceSuggestion, SuggestionStatus.NEW);
+        return from(sourceSuggestion, SuggestionStatus.NEW, 1);
     }
 
     private static SuggestionResponse from(IncubatorSuggestion sourceSuggestion,
-                                           SuggestionStatus status) {
+                                           SuggestionStatus status,
+                                           int sourceCount) {
         return new SuggestionResponse(sourceSuggestion.getId(), sourceSuggestion.getLemma(),
                 sourceSuggestion.getGloss(), sourceSuggestion.getExample(), sourceSuggestion.getSource(),
                 sourceSuggestion.getFlagInfo(), sourceSuggestion.getNotes(), sourceSuggestion.getContact(),
-                status, sourceSuggestion.getCreatedAt());
+                status, sourceSuggestion.getCreatedAt(), sourceCount);
     }
 }

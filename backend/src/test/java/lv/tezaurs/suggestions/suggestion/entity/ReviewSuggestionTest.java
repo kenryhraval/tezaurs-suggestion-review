@@ -73,6 +73,19 @@ class ReviewSuggestionTest {
         assertThat(inProgress.getStatus()).isEqualTo(SuggestionStatus.ALREADY_EXISTS);
     }
 
+    @Test
+    void requiresReviewChecksBeforeCompletion() {
+        ReviewSuggestion review = inProgressReview();
+
+        assertThatThrownBy(() -> review.changeStatus(SuggestionStatus.COMPLETED))
+                .isInstanceOf(ConflictException.class);
+
+        review.recordTezaursCheck(TezaursStatus.NOT_FOUND, null);
+        review.changeStatus(SuggestionStatus.COMPLETED);
+
+        assertThat(review.getStatus()).isEqualTo(SuggestionStatus.COMPLETED);
+    }
+
     private static ReviewSuggestion inProgressReview() {
         ReviewSuggestion review = new ReviewSuggestion("submitted");
         review.changeStatus(SuggestionStatus.IN_PROGRESS);

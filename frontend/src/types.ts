@@ -9,6 +9,8 @@ export type SuggestionStatus =
   | 'INSUFFICIENT_DATA'
   | 'NEEDS_EXPERT'
 
+export type SuggestionSort = 'NEWEST' | 'OLDEST' | 'MOST_SUGGESTIONS'
+
 export type CheckStatus = 'NOT_CHECKED' | 'FOUND' | 'NOT_FOUND'
 
 export type TezaursStatus =
@@ -38,6 +40,14 @@ export type Suggestion = {
   contact: string | null
   status: SuggestionStatus
   createdAt: string
+  sourceCount: number
+}
+
+export type SuggestionPage = {
+  items: Suggestion[]
+  page: number
+  totalPages: number
+  totalItems: number
 }
 
 export type Review = {

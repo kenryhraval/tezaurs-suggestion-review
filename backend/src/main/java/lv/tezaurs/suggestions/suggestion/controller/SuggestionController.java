@@ -1,10 +1,13 @@
 package lv.tezaurs.suggestions.suggestion.controller;
 
 import jakarta.validation.Valid;
-import java.util.List;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import lv.tezaurs.suggestions.suggestion.dto.LinkDuplicateRequest;
+import lv.tezaurs.suggestions.suggestion.dto.SuggestionPageResponse;
 import lv.tezaurs.suggestions.suggestion.dto.SuggestionResponse;
+import lv.tezaurs.suggestions.suggestion.dto.SuggestionSort;
 import lv.tezaurs.suggestions.suggestion.dto.UpdateStatusRequest;
 import lv.tezaurs.suggestions.suggestion.entity.SuggestionStatus;
 import lv.tezaurs.suggestions.suggestion.service.SuggestionService;
@@ -24,8 +27,13 @@ public class SuggestionController {
     private final SuggestionService service;
 
     @GetMapping
-    List<SuggestionResponse> list(@RequestParam(required = false) SuggestionStatus status) {
-        return service.list(status);
+    SuggestionPageResponse list(
+            @RequestParam(defaultValue = "NEW") SuggestionStatus status,
+            @RequestParam(defaultValue = "") String query,
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
+            @RequestParam(defaultValue = "NEWEST") SuggestionSort sort) {
+        return service.list(status, query, page, size, sort);
     }
 
     @PostMapping("/{id}/status")

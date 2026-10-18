@@ -62,9 +62,9 @@ class ReviewServiceTest {
         service = new ReviewService(sourceSuggestionRepository, reviewRepository, reviewSourceRepository,
                 meaningRepository,
                 corpusExampleRepository, tezaursEntryRepository, tezaursEntrySearchService);
-        when(reviewRepository.saveAndFlush(any(ReviewSuggestion.class)))
+        when(reviewRepository.save(any(ReviewSuggestion.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
-        when(reviewSourceRepository.saveAndFlush(any(ReviewSuggestionSource.class)))
+        when(reviewSourceRepository.save(any(ReviewSuggestionSource.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
         when(meaningRepository.save(any(ReviewMeaning.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(corpusExampleRepository.saveAndFlush(any(ReviewCorpusExample.class)))
@@ -77,7 +77,7 @@ class ReviewServiceTest {
         when(sourceSuggestionRepository.findById(42)).thenReturn(Optional.of(source));
 
         assertThat(service.findBySourceSuggestionId(42)).isEmpty();
-        verify(reviewRepository, never()).saveAndFlush(any(ReviewSuggestion.class));
+        verify(reviewRepository, never()).save(any(ReviewSuggestion.class));
     }
 
     @Test
@@ -88,7 +88,7 @@ class ReviewServiceTest {
 
         assertThat(review.getStatus()).isEqualTo(SuggestionStatus.READY_FOR_REVIEW);
         ArgumentCaptor<ReviewSuggestionSource> link = ArgumentCaptor.forClass(ReviewSuggestionSource.class);
-        verify(reviewSourceRepository).saveAndFlush(link.capture());
+        verify(reviewSourceRepository).save(link.capture());
         assertThat(link.getValue().getSourceSuggestion()).isSameAs(source);
         assertThat(link.getValue().getReview()).isSameAs(review);
         assertThat(link.getValue().isPrimarySource()).isTrue();
@@ -115,7 +115,7 @@ class ReviewServiceTest {
         assertThat(candidates).hasSize(1);
         assertThat(candidates.getFirst().sourceCount()).isEqualTo(2);
         ArgumentCaptor<ReviewSuggestionSource> link = ArgumentCaptor.forClass(ReviewSuggestionSource.class);
-        verify(reviewSourceRepository).saveAndFlush(link.capture());
+        verify(reviewSourceRepository).save(link.capture());
         assertThat(link.getValue().getSourceSuggestion()).isSameAs(source);
         assertThat(link.getValue().getReview()).isSameAs(review);
         assertThat(link.getValue().isPrimarySource()).isFalse();

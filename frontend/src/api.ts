@@ -4,6 +4,8 @@ import type {
   Meaning,
   Review,
   Suggestion,
+  SuggestionPage,
+  SuggestionSort,
   SuggestionStatus,
   TezaursEntryCandidate,
   TezaursStatus,
@@ -32,9 +34,21 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return response.json() as Promise<T>
 }
 
-export function getSuggestions(status?: SuggestionStatus) {
-  const query = status ? `?status=${status}` : ''
-  return request<Suggestion[]>(`/api/suggestions${query}`)
+export function getSuggestions(
+  status: SuggestionStatus,
+  query: string,
+  page: number,
+  size: number,
+  sort: SuggestionSort,
+) {
+  const parameters = new URLSearchParams({
+    status,
+    query,
+    page: String(page),
+    size: String(size),
+    sort,
+  })
+  return request<SuggestionPage>(`/api/suggestions?${parameters}`)
 }
 
 export function changeSuggestionStatus(id: number, status: SuggestionStatus) {

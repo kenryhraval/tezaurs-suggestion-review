@@ -1,6 +1,5 @@
 import { useState, type FormEvent } from 'react'
 import {
-  changeSuggestionStatus,
   correctReviewTerm,
   saveTezaursCheck,
 } from '../api'
@@ -16,14 +15,15 @@ import { DuplicateReviewCombobox } from './DuplicateReviewCombobox'
 
 type Props = {
   suggestion: Suggestion
-  onUpdated: (suggestion: Suggestion) => void
+  onStatusChange: (status: SuggestionStatus) => Promise<void>
   onDuplicate: (sourceSuggestionId: number, reviewId: string) => Promise<void>
 }
 
-export function SuggestionDetails({ suggestion, onUpdated, onDuplicate }: Props) {
+export function SuggestionDetails({ suggestion, onStatusChange, onDuplicate }: Props) {
   const [error, setError] = useState('')
   const reviewState = useSuggestionReview(suggestion.id, suggestion.status)
   const review = reviewState.review
+  const reviewLoading = suggestion.status !== 'NEW' && !review && !reviewState.error
   const reviewId = review?.id ?? null
   const reviewInProgress = suggestion.status === 'IN_PROGRESS'
   const tezaursEntryExists = review?.tezaursStatus === 'FOUND'
@@ -37,18 +37,16 @@ export function SuggestionDetails({ suggestion, onUpdated, onDuplicate }: Props)
   const corpusExamples = useCorpusExamples(reviewId, corpusReviewAvailable)
   const visibleTransitions = suggestionStatusTransitions[suggestion.status].filter((status) => {
     if (status === 'ALREADY_EXISTS') return review?.tezaursStatus === 'MEANING_FOUND'
-    if (status === 'COMPLETED' && review?.tezaursStatus === 'MEANING_FOUND') return false
-    if (status === 'COMPLETED' && review?.tezaursStatus === 'MEANING_NOT_FOUND') return false
+    if (status === 'COMPLETED') {
+      return review?.canComplete === true
+        && review.tezaursStatus !== 'MEANING_FOUND'
+        && review.tezaursStatus !== 'MEANING_NOT_FOUND'
+    }
     return true
   })
 
   async function handleStatus(status: SuggestionStatus) {
-    setError('')
-    try {
-      onUpdated(await changeSuggestionStatus(suggestion.id, status))
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Neizdevās mainīt statusu.')
-    }
+    await onStatusChange(status)
   }
 
   async function handleTermCorrection(event: FormEvent<HTMLFormElement>) {
@@ -72,16 +70,6 @@ export function SuggestionDetails({ suggestion, onUpdated, onDuplicate }: Props)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Neizdevās saglabāt pārbaudi.')
     }
-  }
-
-  if (suggestion.status !== 'NEW' && !review) {
-    return (
-      <article className="details">
-        {reviewState.error
-          ? <p className="error">{reviewState.error}</p>
-          : <p className="muted">Ielādē ieteikumu...</p>}
-      </article>
-    )
   }
 
   const displayedTerm = review?.reviewedTerm ?? suggestion.submittedTerm
@@ -126,6 +114,7 @@ export function SuggestionDetails({ suggestion, onUpdated, onDuplicate }: Props)
       {suggestion.contact && <p><strong>Saziņai:</strong> {suggestion.contact}</p>}
 
       {(error || reviewState.error) && <p className="error">{error || reviewState.error}</p>}
+      {reviewLoading && <p className="muted">Ielādē izskatīšanas informāciju...</p>}
 
       {suggestion.status === 'NEW' && (
         <section className="initial-review">
@@ -189,17 +178,19 @@ export function SuggestionDetails({ suggestion, onUpdated, onDuplicate }: Props)
         />
       )}
 
-      <div className="review-return">
-        {visibleTransitions.map((status) => (
-          <button
-            key={status}
-            type="button"
-            onClick={() => void handleStatus(status)}
-          >
-            {status === 'ALREADY_EXISTS' ? 'Jau bija' : suggestionStatusLabels[status]}
-          </button>
-        ))}
-      </div>
+      {(suggestion.status === 'NEW' || review) && (
+        <div className="review-return">
+          {visibleTransitions.map((status) => (
+            <button
+              key={status}
+              type="button"
+              onClick={() => void handleStatus(status)}
+            >
+              {status === 'ALREADY_EXISTS' ? 'Jau bija' : suggestionStatusLabels[status]}
+            </button>
+          ))}
+        </div>
+      )}
     </article>
   )
 }

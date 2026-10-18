@@ -90,7 +90,7 @@ PostgreSQL and automatic HTTPS, and a GitHub Actions deployment workflow. See
 ## API
 
 - `GET /api/me`
-- `GET /api/suggestions?status={status}` (`status` is optional)
+- `GET /api/suggestions?status={status}&query={query}&page={page}&size={size}&sort={sort}`
 - `POST /api/suggestions/{id}/status`
 - `POST /api/suggestions/{id}/duplicate`
 - `GET /api/reviews/by-source-suggestion/{sourceSuggestionId}`

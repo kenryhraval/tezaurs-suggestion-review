@@ -1,6 +1,7 @@
 package lv.tezaurs.suggestions.suggestion.dto;
 
 import java.time.Instant;
+import lv.tezaurs.suggestions.suggestion.entity.SuggestionStatus;
 
 public interface SuggestionListItem {
     Integer getId();
@@ -19,7 +20,9 @@ public interface SuggestionListItem {
 
     String getContact();
 
-    String getStatus();
+    SuggestionStatus getStatus();
 
     Instant getCreatedAt();
+
+    Integer getSourceCount();
 }

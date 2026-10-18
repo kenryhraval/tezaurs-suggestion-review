@@ -1,6 +1,8 @@
 package lv.tezaurs.suggestions.suggestion.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -9,7 +11,9 @@ import static org.mockito.Mockito.withSettings;
 import java.util.List;
 import java.util.Optional;
 import lv.tezaurs.suggestions.suggestion.dto.SuggestionListItem;
+import lv.tezaurs.suggestions.suggestion.dto.SuggestionPageResponse;
 import lv.tezaurs.suggestions.suggestion.dto.SuggestionResponse;
+import lv.tezaurs.suggestions.suggestion.dto.SuggestionSort;
 import lv.tezaurs.suggestions.suggestion.dto.UpdateStatusRequest;
 import lv.tezaurs.suggestions.suggestion.entity.IncubatorSuggestion;
 import lv.tezaurs.suggestions.suggestion.entity.ReviewSuggestion;
@@ -19,6 +23,8 @@ import lv.tezaurs.suggestions.suggestion.repository.ReviewSuggestionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockMakers;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 
 class SuggestionServiceTest {
     private IncubatorSuggestionRepository sourceSuggestionRepository;
@@ -37,40 +43,33 @@ class SuggestionServiceTest {
     }
 
     @Test
-    void listsUnstartedSourcesAndStartedReviewsOnceEach() {
+    void listsUnstartedSourcesForNewStatus() {
         IncubatorSuggestion unstartedSuggestion = source(41);
-        SuggestionListItem startedReview = item(42, SuggestionStatus.IN_PROGRESS);
-        when(sourceSuggestionRepository.findAllByReviewSourceIsNullOrderByCreatedAtAscIdAsc())
-                .thenReturn(List.of(unstartedSuggestion));
-        when(reviewRepository.findForReviewQueue(null)).thenReturn(List.of(startedReview));
+        when(sourceSuggestionRepository.findUnstartedForReviewQueue(eq("term"), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(unstartedSuggestion)));
 
-        List<SuggestionResponse> responses = service.list(null);
+        SuggestionPageResponse response = service.list(
+                SuggestionStatus.NEW, " term ", 0, 20, SuggestionSort.NEWEST);
 
-        assertThat(responses).extracting(SuggestionResponse::id).containsExactly(41, 42);
-        assertThat(responses).extracting(SuggestionResponse::status)
-                .containsExactly(SuggestionStatus.NEW, SuggestionStatus.IN_PROGRESS);
+        assertThat(response.items()).extracting(SuggestionResponse::id).containsExactly(41);
+        assertThat(response.items()).extracting(SuggestionResponse::status)
+                .containsExactly(SuggestionStatus.NEW);
     }
 
     @Test
-    void listsOnlyUnstartedSourcesForNewStatus() {
-        IncubatorSuggestion unstartedSuggestion = source(41);
-        when(sourceSuggestionRepository.findAllByReviewSourceIsNullOrderByCreatedAtAscIdAsc())
-                .thenReturn(List.of(unstartedSuggestion));
-
-        List<SuggestionResponse> responses = service.list(SuggestionStatus.NEW);
-
-        assertThat(responses).extracting(SuggestionResponse::id).containsExactly(41);
-    }
-
-    @Test
-    void listsOnlyReviewsForOtherStatuses() {
+    void listsReviewsForTheSelectedStatus() {
         SuggestionListItem startedReview = item(42, SuggestionStatus.IN_PROGRESS);
-        when(reviewRepository.findForReviewQueue(SuggestionStatus.IN_PROGRESS.name()))
-                .thenReturn(List.of(startedReview));
+        when(reviewRepository.findForReviewQueue(
+                eq(SuggestionStatus.IN_PROGRESS), eq("term"), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(startedReview)));
 
-        List<SuggestionResponse> responses = service.list(SuggestionStatus.IN_PROGRESS);
+        SuggestionPageResponse response = service.list(
+                SuggestionStatus.IN_PROGRESS, "term", 0, 20,
+                SuggestionSort.MOST_SUGGESTIONS);
 
-        assertThat(responses).extracting(SuggestionResponse::id).containsExactly(42);
+        assertThat(response.items()).extracting(SuggestionResponse::id).containsExactly(42);
+        assertThat(response.items()).extracting(SuggestionResponse::status)
+                .containsExactly(SuggestionStatus.IN_PROGRESS);
     }
 
     @Test
@@ -95,7 +94,8 @@ class SuggestionServiceTest {
     private static SuggestionListItem item(int id, SuggestionStatus status) {
         SuggestionListItem item = mock(SuggestionListItem.class);
         when(item.getId()).thenReturn(id);
-        when(item.getStatus()).thenReturn(status.name());
+        when(item.getStatus()).thenReturn(status);
+        when(item.getSourceCount()).thenReturn(3);
         return item;
     }
 }

@@ -57,7 +57,6 @@ public class ReviewService {
                 .map(ReviewSuggestionSource::getReview)
                 .orElseGet(() -> create(source));
         review.changeStatus(status);
-        reviewRepository.flush();
         return review;
     }
 
@@ -80,7 +79,7 @@ public class ReviewService {
             throw new ConflictException("The source suggestion already belongs to a review");
         }
         ReviewSuggestion review = requireReview(reviewId);
-        reviewSourceRepository.saveAndFlush(
+        reviewSourceRepository.save(
                 new ReviewSuggestionSource(source, review, false));
     }
 
@@ -146,9 +145,9 @@ public class ReviewService {
     }
 
     private ReviewSuggestion create(IncubatorSuggestion source) {
-        ReviewSuggestion review = reviewRepository.saveAndFlush(
+        ReviewSuggestion review = reviewRepository.save(
                 new ReviewSuggestion(source.getLemma()));
-        reviewSourceRepository.saveAndFlush(
+        reviewSourceRepository.save(
                 new ReviewSuggestionSource(source, review, true));
         meaningRepository.save(new ReviewMeaning(review.getId(), MeaningOrigin.SUBMITTER, source.getGloss()));
         return review;

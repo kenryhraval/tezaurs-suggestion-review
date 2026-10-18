@@ -1,6 +1,7 @@
 services:
   postgres:
     image: postgres:18-alpine
+    shm_size: 256mb
     environment:
       POSTGRES_DB: tezaurs_suggestions
       POSTGRES_USER: tezaurs

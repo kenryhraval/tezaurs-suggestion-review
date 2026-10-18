@@ -75,6 +75,9 @@ public class ReviewSuggestion {
 
     public void changeStatus(SuggestionStatus newStatus) {
         status.requireTransitionTo(newStatus);
+        if (newStatus == SuggestionStatus.COMPLETED && !canComplete()) {
+            throw new ConflictException("The required review checks must be completed first");
+        }
         if (newStatus == SuggestionStatus.ALREADY_EXISTS
                 && tezaursStatus != TezaursStatus.MEANING_FOUND) {
             throw new ConflictException("The submitted meaning must be confirmed in Tēzaurs first");
