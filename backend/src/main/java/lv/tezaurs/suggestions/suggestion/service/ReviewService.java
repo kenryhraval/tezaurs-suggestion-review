@@ -6,9 +6,6 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lv.tezaurs.suggestions.common.error.ConflictException;
 import lv.tezaurs.suggestions.common.error.NotFoundException;
-import lv.tezaurs.suggestions.meaning.entity.ReviewMeaning;
-import lv.tezaurs.suggestions.meaning.entity.MeaningOrigin;
-import lv.tezaurs.suggestions.meaning.repository.ReviewMeaningRepository;
 import lv.tezaurs.suggestions.suggestion.dto.AddCorpusExampleRequest;
 import lv.tezaurs.suggestions.suggestion.dto.CorpusExampleResponse;
 import lv.tezaurs.suggestions.suggestion.dto.CorrectTermRequest;
@@ -38,7 +35,6 @@ public class ReviewService {
     private final IncubatorSuggestionRepository sourceSuggestionRepository;
     private final ReviewSuggestionRepository reviewRepository;
     private final ReviewSuggestionSourceRepository reviewSourceRepository;
-    private final ReviewMeaningRepository meaningRepository;
     private final ReviewCorpusExampleRepository corpusExampleRepository;
     private final TezaursEntryRepository tezaursEntryRepository;
     private final TezaursEntrySearchService tezaursEntrySearchService;
@@ -107,10 +103,9 @@ public class ReviewService {
     @Transactional(readOnly = true)
     public List<TezaursEntryCandidateResponse> findTezaursCandidates(UUID reviewId, String query) {
         ReviewSuggestion review = requireReview(reviewId);
-        boolean customSearch = query != null && !query.isBlank();
-        String searchTerm = customSearch ? query.trim() : review.getReviewedTerm();
-        Integer selectedEntryId = customSearch ? null : review.getMatchedEntryId();
-        return tezaursEntrySearchService.findMatches(searchTerm, selectedEntryId);
+        String searchTerm = query == null || query.isBlank()
+                ? review.getReviewedTerm() : query.trim();
+        return tezaursEntrySearchService.findMatches(searchTerm);
     }
 
     @Transactional(readOnly = true)
@@ -149,7 +144,6 @@ public class ReviewService {
                 new ReviewSuggestion(source.getLemma()));
         reviewSourceRepository.save(
                 new ReviewSuggestionSource(source, review, true));
-        meaningRepository.save(new ReviewMeaning(review.getId(), MeaningOrigin.SUBMITTER, source.getGloss()));
         return review;
     }
 }

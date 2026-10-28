@@ -1,4 +1,4 @@
-import type { MeaningOrigin, SuggestionStatus } from './types'
+import type { SuggestionStatus } from './types'
 
 export const suggestionStatusLabels: Record<SuggestionStatus, string> = {
   NEW: 'Jauns',
@@ -30,11 +30,4 @@ export const suggestionStatusTransitions: Record<SuggestionStatus, SuggestionSta
   INSUFFICIENT_DATA: ['IN_PROGRESS', 'GARBAGE'],
   NEEDS_EXPERT: ['IN_PROGRESS'],
   COMPLETED: [],
-}
-
-export const meaningOriginLabels: Record<MeaningOrigin, string> = {
-  SUBMITTER: 'Iesniedzējs',
-  GENERATED: 'Ģenerēta',
-  REVIEWER: 'Redaktors',
-  EXISTING: 'Esoša Tēzaurā',
 }

@@ -6,6 +6,5 @@ public record TezaursEntryCandidateResponse(
         Integer id,
         String heading,
         String humanKey,
-        String matchedLexeme,
         List<TezaursSenseResponse> senses) {
 }

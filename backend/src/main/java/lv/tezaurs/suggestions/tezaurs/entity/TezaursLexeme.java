@@ -7,10 +7,13 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import java.util.Map;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.Immutable;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Immutable
@@ -30,6 +33,28 @@ public class TezaursLexeme {
 
     @Column(updatable = false)
     private String lemma;
+
+    @Column(name = "role_id", nullable = false, updatable = false)
+    private Integer roleId;
+
+    @Column(name = "paradigm_id", updatable = false)
+    private Integer paradigmId;
+
+    @Column(updatable = false)
+    private String stem1;
+
+    @Column(updatable = false)
+    private String stem2;
+
+    @Column(updatable = false)
+    private String stem3;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "jsonb", updatable = false)
+    private Map<String, Object> data;
+
+    @Column(updatable = false)
+    private boolean hidden;
 
     @Column(name = "order_no", updatable = false)
     private Integer orderNo;

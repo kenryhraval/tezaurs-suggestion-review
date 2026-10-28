@@ -81,9 +81,64 @@ class ReviewSuggestionTest {
                 .isInstanceOf(ConflictException.class);
 
         review.recordTezaursCheck(TezaursStatus.NOT_FOUND, null);
+        assertThat(review.completionBlockReason()).isEqualTo(CompletionBlockReason.ENTRY_DRAFT_REQUIRED);
+        review.recordEntryDraftReadiness(true);
+        assertThat(review.completionBlockReason()).isEqualTo(CompletionBlockReason.SENSE_DRAFT_REQUIRED);
+        review.markSenseDraftReady();
         review.changeStatus(SuggestionStatus.COMPLETED);
 
         assertThat(review.getStatus()).isEqualTo(SuggestionStatus.COMPLETED);
+    }
+
+    @Test
+    void requiresANewMeaningDraftForAnExistingEntry() {
+        ReviewSuggestion review = inProgressReview();
+        review.recordTezaursCheck(TezaursStatus.MEANING_NOT_FOUND, 42);
+
+        assertThat(review.completionBlockReason()).isEqualTo(CompletionBlockReason.SENSE_DRAFT_REQUIRED);
+
+        review.markSenseDraftReady();
+
+        assertThat(review.canComplete()).isTrue();
+    }
+
+    @Test
+    void reportsThePendingTezaursAndMeaningChecks() {
+        ReviewSuggestion review = inProgressReview();
+
+        assertThat(review.completionBlockReason())
+                .isEqualTo(CompletionBlockReason.TEZAURS_CHECK_REQUIRED);
+
+        review.recordTezaursCheck(TezaursStatus.FOUND, 42);
+
+        assertThat(review.completionBlockReason())
+                .isEqualTo(CompletionBlockReason.MEANING_CHECK_REQUIRED);
+    }
+
+    @Test
+    void acceptsCompletionWhenTheMeaningAlreadyExists() {
+        ReviewSuggestion review = inProgressReview();
+        review.recordTezaursCheck(TezaursStatus.MEANING_FOUND, 42);
+
+        assertThat(review.canComplete()).isTrue();
+        review.changeStatus(SuggestionStatus.COMPLETED);
+        assertThat(review.getStatus()).isEqualTo(SuggestionStatus.COMPLETED);
+    }
+
+    @Test
+    void rejectsReviewDataThatDoesNotMatchTheTezaursCheck() {
+        ReviewSuggestion review = inProgressReview();
+
+        assertThatThrownBy(() -> review.recordTezaursCheck(TezaursStatus.NOT_FOUND, 42))
+                .isInstanceOf(ConflictException.class);
+        assertThatThrownBy(() -> review.recordEntryDraftReadiness(true))
+                .isInstanceOf(ConflictException.class);
+        assertThatThrownBy(review::markSenseDraftReady)
+                .isInstanceOf(ConflictException.class);
+
+        review.recordTezaursCheck(TezaursStatus.FOUND, 42);
+        assertThatThrownBy(review::recordCorpusExample)
+                .isInstanceOf(ConflictException.class);
     }
 
     private static ReviewSuggestion inProgressReview() {

@@ -1,17 +1,24 @@
 import type {
   CorpusExample,
   DuplicateReviewCandidate,
-  Meaning,
+  EntryDraft,
   Review,
+  SaveSenseDraft,
+  SenseDraft,
   Suggestion,
   SuggestionPage,
   SuggestionSort,
   SuggestionStatus,
+  SaveEntryDraft,
+  SaveLexemeDraft,
+  LexemeDraft,
   TezaursEntryCandidate,
+  TezaursEntryDetails,
+  TezaursFormOptions,
   TezaursStatus,
 } from './types'
 
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
+async function request(path: string, options?: RequestInit): Promise<Response> {
   const response = await fetch(path, {
     headers: { 'Content-Type': 'application/json' },
     ...options,
@@ -30,17 +37,16 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     throw new Error('Pieprasījumu neizdevās izpildīt.')
   }
 
-  if (response.status === 204) return undefined as T
-  return response.json() as Promise<T>
+  return response
 }
 
-export function getSuggestions(
+export async function getSuggestions(
   status: SuggestionStatus,
   query: string,
   page: number,
   size: number,
   sort: SuggestionSort,
-) {
+): Promise<SuggestionPage> {
   const parameters = new URLSearchParams({
     status,
     query,
@@ -48,79 +54,173 @@ export function getSuggestions(
     size: String(size),
     sort,
   })
-  return request<SuggestionPage>(`/api/suggestions?${parameters}`)
+  const response = await request(`/api/suggestions?${parameters}`)
+  return response.json()
 }
 
-export function changeSuggestionStatus(id: number, status: SuggestionStatus) {
-  return request<Suggestion>(`/api/suggestions/${id}/status`, {
+export async function changeSuggestionStatus(
+  id: number,
+  status: SuggestionStatus,
+): Promise<Suggestion> {
+  const response = await request(`/api/suggestions/${id}/status`, {
     method: 'POST',
     body: JSON.stringify({ status }),
   })
+  return response.json()
 }
 
-export function getDuplicateReviewCandidates(query: string) {
-  return request<DuplicateReviewCandidate[]>(
+export async function getDuplicateReviewCandidates(
+  query: string,
+): Promise<DuplicateReviewCandidate[]> {
+  const response = await request(
     `/api/reviews/duplicate-candidates?query=${encodeURIComponent(query)}`,
   )
+  return response.json()
 }
 
-export function linkDuplicateSuggestion(id: number, reviewId: string) {
-  return request<void>(`/api/suggestions/${id}/duplicate`, {
+export async function linkDuplicateSuggestion(id: number, reviewId: string): Promise<void> {
+  await request(`/api/suggestions/${id}/duplicate`, {
     method: 'POST',
     body: JSON.stringify({ reviewId }),
   })
 }
 
-export async function getReview(sourceSuggestionId: number) {
-  const response = await fetch(`/api/reviews/by-source-suggestion/${sourceSuggestionId}`, {
-    headers: { 'Content-Type': 'application/json' },
-  })
+export async function getReview(sourceSuggestionId: number): Promise<Review | null> {
+  const response = await request(`/api/reviews/by-source-suggestion/${sourceSuggestionId}`)
   if (response.status === 204) return null
-  if (!response.ok) throw new Error('Pārskatu neizdevās ielādēt.')
-  return response.json() as Promise<Review>
+  return response.json()
 }
 
-export function correctReviewTerm(reviewId: string, reviewedTerm: string) {
-  return request<Review>(`/api/reviews/${reviewId}/term-correction`, {
+export async function correctReviewTerm(
+  reviewId: string,
+  reviewedTerm: string,
+): Promise<Review> {
+  const response = await request(`/api/reviews/${reviewId}/term-correction`, {
     method: 'POST',
     body: JSON.stringify({ reviewedTerm }),
   })
+  return response.json()
 }
 
-export function saveTezaursCheck(
+export async function saveTezaursCheck(
   reviewId: string,
   status: TezaursStatus,
   matchedEntryId: number | null,
-) {
-  return request<Review>(`/api/reviews/${reviewId}/tezaurs-check`, {
+): Promise<Review> {
+  const response = await request(`/api/reviews/${reviewId}/tezaurs-check`, {
     method: 'POST',
     body: JSON.stringify({ status, matchedEntryId }),
   })
+  return response.json()
 }
 
-export function getTezaursCandidates(reviewId: string, query?: string) {
+export async function getTezaursCandidates(
+  reviewId: string,
+  query?: string,
+): Promise<TezaursEntryCandidate[]> {
   const search = query ? `?query=${encodeURIComponent(query)}` : ''
-  return request<TezaursEntryCandidate[]>(`/api/reviews/${reviewId}/tezaurs-candidates${search}`)
+  const response = await request(`/api/reviews/${reviewId}/tezaurs-candidates${search}`)
+  return response.json()
 }
 
-export function getCorpusExamples(reviewId: string) {
-  return request<CorpusExample[]>(`/api/reviews/${reviewId}/corpus-examples`)
+export async function getCorpusExamples(reviewId: string): Promise<CorpusExample[]> {
+  const response = await request(`/api/reviews/${reviewId}/corpus-examples`)
+  return response.json()
 }
 
-export function addCorpusExample(reviewId: string, url: string) {
-  return request<CorpusExample>(`/api/reviews/${reviewId}/corpus-examples`, {
+export async function addCorpusExample(reviewId: string, url: string): Promise<CorpusExample> {
+  const response = await request(`/api/reviews/${reviewId}/corpus-examples`, {
     method: 'POST',
     body: JSON.stringify({ url }),
   })
+  return response.json()
 }
 
-export function getMeanings(reviewId: string) {
-  return request<Meaning[]>(`/api/reviews/${reviewId}/meanings`)
+export async function getEntryDraft(reviewId: string): Promise<EntryDraft | null> {
+  const response = await request(`/api/reviews/${reviewId}/entry-draft`)
+  if (response.status === 204) return null
+  return response.json()
 }
 
-export function reviseMeaning(reviewId: string, meaningId: string, gloss: string) {
-  return request<Meaning>(
-    `/api/reviews/${reviewId}/meanings/${meaningId}/revision`,
-    { method: 'POST', body: JSON.stringify({ gloss }) },
+export async function createEntryDraft(
+  reviewId: string,
+  entry: SaveEntryDraft,
+  primaryLexeme: SaveLexemeDraft,
+): Promise<{ draft: EntryDraft; review: Review }> {
+  const response = await request(
+    `/api/reviews/${reviewId}/entry-draft`,
+    { method: 'POST', body: JSON.stringify({ entry, primaryLexeme }) },
   )
+  return response.json()
+}
+
+export async function updateEntryDraft(
+  reviewId: string,
+  draft: SaveEntryDraft,
+): Promise<{ draft: EntryDraft; review: Review }> {
+  const response = await request(
+    `/api/reviews/${reviewId}/entry-draft`,
+    { method: 'PUT', body: JSON.stringify(draft) },
+  )
+  return response.json()
+}
+
+export async function createLexemeDraft(
+  reviewId: string,
+  lexeme: SaveLexemeDraft,
+): Promise<{ lexeme: LexemeDraft; review: Review }> {
+  const response = await request(
+    `/api/reviews/${reviewId}/entry-draft/lexemes`,
+    { method: 'POST', body: JSON.stringify(lexeme) },
+  )
+  return response.json()
+}
+
+export async function updateLexemeDraft(
+  reviewId: string,
+  lexemeId: string,
+  lexeme: SaveLexemeDraft,
+): Promise<{ lexeme: LexemeDraft; review: Review }> {
+  const response = await request(
+    `/api/reviews/${reviewId}/entry-draft/lexemes/${lexemeId}`,
+    { method: 'PUT', body: JSON.stringify(lexeme) },
+  )
+  return response.json()
+}
+
+export async function deleteLexemeDraft(
+  reviewId: string,
+  lexemeId: string,
+): Promise<Review> {
+  const response = await request(
+    `/api/reviews/${reviewId}/entry-draft/lexemes/${lexemeId}`,
+    { method: 'DELETE' },
+  )
+  return response.json()
+}
+
+export async function getTezaursFormOptions(): Promise<TezaursFormOptions> {
+  const response = await request('/api/tezaurs/form-options')
+  return response.json()
+}
+
+export async function getTezaursEntry(entryId: number): Promise<TezaursEntryDetails> {
+  const response = await request(`/api/tezaurs/entries/${entryId}`)
+  return response.json()
+}
+
+export async function getSenseDrafts(reviewId: string): Promise<SenseDraft[]> {
+  const response = await request(`/api/reviews/${reviewId}/sense-drafts`)
+  return response.json()
+}
+
+export async function saveSenseDrafts(
+  reviewId: string,
+  senses: SaveSenseDraft[],
+): Promise<{ senses: SenseDraft[]; review: Review }> {
+  const response = await request(
+    `/api/reviews/${reviewId}/sense-drafts`,
+    { method: 'PUT', body: JSON.stringify({ senses }) },
+  )
+  return response.json()
 }

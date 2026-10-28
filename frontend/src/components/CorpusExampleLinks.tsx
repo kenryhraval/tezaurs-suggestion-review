@@ -1,16 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import type { CorpusExample } from '../types'
 
-const sources = [
-  { value: 'KORPUSS_LV', label: 'Korpuss.lv' },
-  { value: 'INTERNET', label: 'Internets' },
-  { value: 'PERIODIKA_LV', label: 'Periodika.lv' },
-  { value: 'TERMINI_GOV_LV', label: 'Termini.gov.lv' },
-  { value: 'TEZAURS_LV', label: 'Tēzaurs.lv' },
-] as const
-
-type Source = typeof sources[number]['value']
-
 type Props = {
   examples: CorpusExample[]
   loading: boolean
@@ -20,7 +10,6 @@ type Props = {
 
 export function CorpusExampleLinks({ examples, loading, serverError, onAdd }: Props) {
   const [error, setError] = useState('')
-  const [sourceByUrl, setSourceByUrl] = useState<Record<string, Source>>({})
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -28,7 +17,6 @@ export function CorpusExampleLinks({ examples, loading, serverError, onAdd }: Pr
     const form = event.currentTarget
     const data = new FormData(form)
     const url = String(data.get('url')).trim()
-    const source = String(data.get('source')) as Source
 
     try {
       const parsedUrl = new URL(url)
@@ -46,7 +34,6 @@ export function CorpusExampleLinks({ examples, loading, serverError, onAdd }: Pr
     }
 
     if (await onAdd(url)) {
-      setSourceByUrl((current) => ({ ...current, [url]: source }))
       form.reset()
     }
   }
@@ -57,15 +44,9 @@ export function CorpusExampleLinks({ examples, loading, serverError, onAdd }: Pr
 
       {(error || serverError) && <p className="error">{error || serverError}</p>}
 
+      <p className="muted">Avota veida saglabāšana tiks pievienota vēlāk.</p>
+
       <form onSubmit={(event) => void handleSubmit(event)}>
-        <label>
-          <span className="visually-hidden">Avots</span>
-          <select aria-label="Avots" defaultValue="KORPUSS_LV" name="source">
-            {sources.map((source) => (
-              <option key={source.value} value={source.value}>{source.label}</option>
-            ))}
-          </select>
-        </label>
         <label>
           <span className="visually-hidden">Korpusa piemēra saite</span>
           <input
@@ -85,9 +66,6 @@ export function CorpusExampleLinks({ examples, loading, serverError, onAdd }: Pr
           {examples.map((example) => (
             <li key={example.id}>
               <a href={example.url} rel="noreferrer" target="_blank">{example.url}</a>
-              {sourceByUrl[example.url] && (
-                <small>{sources.find((source) => source.value === sourceByUrl[example.url])?.label}</small>
-              )}
             </li>
           ))}
         </ul>

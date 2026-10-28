@@ -13,9 +13,6 @@ import static org.mockito.Mockito.withSettings;
 import java.util.Optional;
 import java.util.List;
 import lv.tezaurs.suggestions.common.error.ConflictException;
-import lv.tezaurs.suggestions.meaning.entity.ReviewMeaning;
-import lv.tezaurs.suggestions.meaning.entity.MeaningOrigin;
-import lv.tezaurs.suggestions.meaning.repository.ReviewMeaningRepository;
 import lv.tezaurs.suggestions.suggestion.dto.AddCorpusExampleRequest;
 import lv.tezaurs.suggestions.suggestion.dto.RecordTezaursCheckRequest;
 import lv.tezaurs.suggestions.suggestion.entity.ReviewCorpusExample;
@@ -40,7 +37,6 @@ class ReviewServiceTest {
     private IncubatorSuggestionRepository sourceSuggestionRepository;
     private ReviewSuggestionRepository reviewRepository;
     private ReviewSuggestionSourceRepository reviewSourceRepository;
-    private ReviewMeaningRepository meaningRepository;
     private ReviewCorpusExampleRepository corpusExampleRepository;
     private TezaursEntryRepository tezaursEntryRepository;
     private TezaursEntrySearchService tezaursEntrySearchService;
@@ -54,19 +50,16 @@ class ReviewServiceTest {
                 withSettings().mockMaker(MockMakers.PROXY));
         reviewSourceRepository = mock(ReviewSuggestionSourceRepository.class,
                 withSettings().mockMaker(MockMakers.PROXY));
-        meaningRepository = mock(ReviewMeaningRepository.class, withSettings().mockMaker(MockMakers.PROXY));
         corpusExampleRepository = mock(ReviewCorpusExampleRepository.class,
                 withSettings().mockMaker(MockMakers.PROXY));
         tezaursEntryRepository = mock(TezaursEntryRepository.class);
         tezaursEntrySearchService = mock(TezaursEntrySearchService.class);
         service = new ReviewService(sourceSuggestionRepository, reviewRepository, reviewSourceRepository,
-                meaningRepository,
                 corpusExampleRepository, tezaursEntryRepository, tezaursEntrySearchService);
         when(reviewRepository.save(any(ReviewSuggestion.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
         when(reviewSourceRepository.save(any(ReviewSuggestionSource.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
-        when(meaningRepository.save(any(ReviewMeaning.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(corpusExampleRepository.saveAndFlush(any(ReviewCorpusExample.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
     }
@@ -81,7 +74,7 @@ class ReviewServiceTest {
     }
 
     @Test
-    void theFirstStatusChangeCreatesTheLinkedReviewAndInitialMeaning() {
+    void theFirstStatusChangeCreatesTheLinkedReview() {
         IncubatorSuggestion source = source();
 
         ReviewSuggestion review = service.changeStatus(source, SuggestionStatus.READY_FOR_REVIEW);
@@ -92,10 +85,6 @@ class ReviewServiceTest {
         assertThat(link.getValue().getSourceSuggestion()).isSameAs(source);
         assertThat(link.getValue().getReview()).isSameAs(review);
         assertThat(link.getValue().isPrimarySource()).isTrue();
-        ArgumentCaptor<ReviewMeaning> meaning = ArgumentCaptor.forClass(ReviewMeaning.class);
-        verify(meaningRepository).save(meaning.capture());
-        assertThat(meaning.getValue().getReviewId()).isEqualTo(review.getId());
-        assertThat(meaning.getValue().getOrigin()).isEqualTo(MeaningOrigin.SUBMITTER);
     }
 
     @Test
@@ -129,10 +118,10 @@ class ReviewServiceTest {
         when(reviewRepository.findById(review.getId())).thenReturn(Optional.of(review));
 
         service.findTezaursCandidates(review.getId(), null);
-        verify(tezaursEntrySearchService).findMatches("corrected", 42);
+        verify(tezaursEntrySearchService).findMatches("corrected");
 
         service.findTezaursCandidates(review.getId(), "  another term  ");
-        verify(tezaursEntrySearchService).findMatches("another term", null);
+        verify(tezaursEntrySearchService).findMatches("another term");
         verifyNoInteractions(sourceSuggestionRepository);
 
         when(tezaursEntryRepository.existsById(99)).thenReturn(false);

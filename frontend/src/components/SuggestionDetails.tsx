@@ -6,12 +6,13 @@ import {
 import { suggestionStatusLabels, suggestionStatusTransitions } from '../labels'
 import type { Suggestion, SuggestionStatus, TezaursStatus } from '../types'
 import { useSuggestionReview } from '../hooks/useSuggestionReview'
-import { useSuggestionMeaning } from '../hooks/useSuggestionMeaning'
 import { useCorpusExamples } from '../hooks/useCorpusExamples'
-import { MeaningSection } from './MeaningSection'
 import { TezaursCheckForm } from './TezaursCheckForm'
 import { CorpusExampleLinks } from './CorpusExampleLinks'
 import { DuplicateReviewCombobox } from './DuplicateReviewCombobox'
+import { EntryDraftForm } from './EntryDraftForm'
+import { ExistingEntryDetails } from './ExistingEntryDetails'
+import { SenseDraftForm } from './SenseDraftForm'
 
 type Props = {
   suggestion: Suggestion
@@ -29,23 +30,27 @@ export function SuggestionDetails({ suggestion, onStatusChange, onDuplicate }: P
   const tezaursEntryExists = review?.tezaursStatus === 'FOUND'
     || review?.tezaursStatus === 'MEANING_FOUND'
     || review?.tezaursStatus === 'MEANING_NOT_FOUND'
-  const meaningEditingAvailable = reviewInProgress
-    && review?.tezaursStatus === 'NOT_FOUND'
+  const senseEditingAvailable = reviewInProgress
+    && (review?.tezaursStatus === 'NOT_FOUND'
+      || review?.tezaursStatus === 'MEANING_NOT_FOUND')
   const corpusReviewAvailable = reviewInProgress
-    && review?.tezaursStatus === 'NOT_FOUND'
-  const meaning = useSuggestionMeaning(reviewId, review?.tezaursStatus === 'NOT_FOUND')
+    && (review?.tezaursStatus === 'NOT_FOUND'
+      || review?.tezaursStatus === 'MEANING_NOT_FOUND')
   const corpusExamples = useCorpusExamples(reviewId, corpusReviewAvailable)
   const visibleTransitions = suggestionStatusTransitions[suggestion.status].filter((status) => {
     if (status === 'ALREADY_EXISTS') return review?.tezaursStatus === 'MEANING_FOUND'
     if (status === 'COMPLETED') {
       return review?.canComplete === true
         && review.tezaursStatus !== 'MEANING_FOUND'
-        && review.tezaursStatus !== 'MEANING_NOT_FOUND'
     }
     return true
   })
 
   async function handleStatus(status: SuggestionStatus) {
+    if (status === 'ALREADY_EXISTS'
+      && !window.confirm('Vai ieteiktā nozīme tiešām jau ir Tēzaurā un ieteikumu var slēgt kā “Jau bija”?')) {
+      return
+    }
     await onStatusChange(status)
   }
 
@@ -159,7 +164,7 @@ export function SuggestionDetails({ suggestion, onStatusChange, onDuplicate }: P
               {review.tezaursStatus === 'MEANING_FOUND'
                 && 'Šķirklis un ieteiktā nozīme jau ir Tēzaurā. Pabeidziet ieteikumu ar pogu “Jau bija”.'}
               {review.tezaursStatus === 'MEANING_NOT_FOUND'
-                && 'Šķirklis ir Tēzaurā, bet ieteiktās nozīmes nav. Šī plūsma būs pieejama līdz ar šķirkļa redaktoru.'}
+                && 'Šķirklis ir Tēzaurā, bet ieteiktās nozīmes nav. Esošie dati zemāk ir tikai lasāmi.'}
               {review.tezaursStatus === 'FOUND'
                 && 'Šķirklis ir Tēzaurā. Vēl jānorāda, vai ieteiktā nozīme tajā jau ir.'}
             </p>
@@ -167,14 +172,24 @@ export function SuggestionDetails({ suggestion, onStatusChange, onDuplicate }: P
         </>
       )}
 
-      {review?.tezaursStatus === 'NOT_FOUND' && (
-        <MeaningSection
-          current={meaning.current}
-          history={meaning.history}
-          editingAvailable={meaningEditingAvailable}
-          loading={meaning.loading}
-          error={meaning.error}
-          onRevise={meaning.revise}
+      {review?.tezaursStatus === 'NOT_FOUND' && reviewInProgress && (
+        <EntryDraftForm
+          reviewId={review.id}
+          reviewedTerm={review.reviewedTerm}
+          onReviewUpdated={reviewState.setReview}
+        />
+      )}
+
+      {tezaursEntryExists && review?.matchedEntryId !== null && (
+        <ExistingEntryDetails entryId={review.matchedEntryId} />
+      )}
+
+      {senseEditingAvailable && review && (
+        <SenseDraftForm
+          initialGloss={suggestion.submittedDefinition}
+          matchedEntryId={review.matchedEntryId}
+          onReviewUpdated={reviewState.setReview}
+          reviewId={review.id}
         />
       )}
 

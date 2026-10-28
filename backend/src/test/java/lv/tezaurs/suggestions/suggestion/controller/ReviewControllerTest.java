@@ -45,7 +45,7 @@ class ReviewControllerTest {
         CorpusExampleResponse example = new CorpusExampleResponse(
                 UUID.randomUUID(), review.id(), request.url(), Instant.EPOCH);
         TezaursEntryCandidateResponse candidate = new TezaursEntryCandidateResponse(
-                42, "vārds", "vārds:1", "vārds", List.of());
+                42, "vārds", "vārds:1", List.of());
         when(service.listCorpusExamples(review.id())).thenReturn(List.of(example));
         when(service.addCorpusExample(review.id(), request)).thenReturn(example);
         when(service.findTezaursCandidates(review.id(), "cits")).thenReturn(List.of(candidate));

@@ -46,6 +46,12 @@ public class ReviewSuggestion {
     @Column(name = "corpus_status", nullable = false, length = 32)
     private CheckStatus corpusStatus;
 
+    @Column(name = "entry_draft_ready", nullable = false)
+    private boolean entryDraftReady;
+
+    @Column(name = "sense_draft_ready", nullable = false)
+    private boolean senseDraftReady;
+
     @Version
     @Column(nullable = false)
     private long version;
@@ -94,9 +100,21 @@ public class ReviewSuggestion {
             case NOT_CHECKED -> CompletionBlockReason.TEZAURS_CHECK_REQUIRED;
             case FOUND -> CompletionBlockReason.MEANING_CHECK_REQUIRED;
             case MEANING_FOUND -> null;
-            case MEANING_NOT_FOUND, NOT_FOUND -> corpusStatus == CheckStatus.NOT_CHECKED
-                    ? CompletionBlockReason.CORPUS_CHECK_REQUIRED
-                    : null;
+            case MEANING_NOT_FOUND -> {
+                if (corpusStatus == CheckStatus.NOT_CHECKED) {
+                    yield CompletionBlockReason.CORPUS_CHECK_REQUIRED;
+                }
+                yield senseDraftReady ? null : CompletionBlockReason.SENSE_DRAFT_REQUIRED;
+            }
+            case NOT_FOUND -> {
+                if (corpusStatus == CheckStatus.NOT_CHECKED) {
+                    yield CompletionBlockReason.CORPUS_CHECK_REQUIRED;
+                }
+                if (!entryDraftReady) {
+                    yield CompletionBlockReason.ENTRY_DRAFT_REQUIRED;
+                }
+                yield senseDraftReady ? null : CompletionBlockReason.SENSE_DRAFT_REQUIRED;
+            }
         };
     }
 
@@ -124,5 +142,20 @@ public class ReviewSuggestion {
             throw new ConflictException("Corpus evidence is only applicable when the submitted meaning is absent");
         }
         corpusStatus = CheckStatus.FOUND;
+    }
+
+    public void recordEntryDraftReadiness(boolean ready) {
+        if (tezaursStatus != TezaursStatus.NOT_FOUND) {
+            throw new ConflictException("An entry draft is only applicable when the entry is absent from Tēzaurs");
+        }
+        entryDraftReady = ready;
+    }
+
+    public void markSenseDraftReady() {
+        if (tezaursStatus != TezaursStatus.MEANING_NOT_FOUND
+                && tezaursStatus != TezaursStatus.NOT_FOUND) {
+            throw new ConflictException("A sense draft requires an absent entry or meaning");
+        }
+        senseDraftReady = true;
     }
 }

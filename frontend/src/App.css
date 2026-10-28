@@ -123,12 +123,34 @@ small, .muted, .empty-group { color: #666; }
 .tezaurs-combobox-search, .tezaurs-dropdown-preview,
 .tezaurs-dropdown-selected-details { padding: 8px; }
 
-.checks, .initial-review, .meaning-section,
-.meaning-existence-check, .review-return {
+.checks, .initial-review,
+.meaning-existence-check, .review-return,
+.entry-draft-section, .sense-draft-section, .existing-entry {
   margin-top: 20px;
   border-top: 1px solid #ccc;
   padding-top: 16px;
 }
+
+.entry-draft-form fieldset {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 14px;
+  border: 1px solid #ccc;
+  padding: 12px;
+}
+
+.entry-draft-form textarea { resize: vertical; }
+.lexeme-draft, .sense-draft { margin: 8px 0; border: 1px solid #ddd; padding: 10px; }
+.checkbox-label { display: flex; align-items: center; }
+.checkbox-label input { width: auto; }
+.flag-editor { display: grid; gap: 8px; }
+.flag-row { display: grid; grid-template-columns: 1fr 2fr auto; align-items: center; gap: 8px; }
+.selected-flag-values { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.existing-entry dl { display: grid; grid-template-columns: 180px 1fr; gap: 4px 12px; }
+.existing-entry dt { font-weight: bold; }
+.existing-entry dd { margin: 0; }
+.existing-entry details, .existing-sense { margin: 8px 0; padding: 8px; border: 1px solid #ddd; }
+.existing-entry details dl div { display: contents; }
 
 .visually-hidden {
   position: absolute;
@@ -140,4 +162,5 @@ small, .muted, .empty-group { color: #666; }
 
 @media (max-width: 700px) {
   .layout { grid-template-columns: 1fr; }
+  .flag-row { grid-template-columns: 1fr; }
 }

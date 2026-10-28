@@ -1,7 +1,6 @@
 package lv.tezaurs.suggestions.tezaurs.repository;
 
 import java.util.List;
-import java.util.Optional;
 import lv.tezaurs.suggestions.tezaurs.entity.TezaursLexeme;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -13,8 +12,7 @@ public interface TezaursLexemeRepository extends JpaRepository<TezaursLexeme, In
     @EntityGraph(attributePaths = "entry")
     List<TezaursLexeme> findByLemmaIgnoreCase(String lemma);
 
-    @EntityGraph(attributePaths = "entry")
-    Optional<TezaursLexeme> findFirstByEntryIdOrderByOrderNoAscIdAsc(Integer entryId);
+    List<TezaursLexeme> findAllByEntryIdOrderByOrderNoAscIdAsc(Integer entryId);
 
     @Query("""
             SELECT lexeme

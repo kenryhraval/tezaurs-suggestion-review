@@ -24,7 +24,7 @@ public class TezaursEntrySearchService {
     private final TezaursSenseRepository senseRepository;
 
     @Transactional(readOnly = true)
-    public List<TezaursEntryCandidateResponse> findMatches(String term, Integer selectedEntryId) {
+    public List<TezaursEntryCandidateResponse> findMatches(String term) {
         String normalizedTerm = normalize(term);
         List<TezaursLexeme> matches = normalizedTerm.isBlank()
                 ? List.of()
@@ -38,20 +38,7 @@ public class TezaursEntrySearchService {
             }
         }
 
-        keepSelectedEntryVisible(results, selectedEntryId);
         return results;
-    }
-
-    private void keepSelectedEntryVisible(
-            List<TezaursEntryCandidateResponse> results, Integer selectedEntryId) {
-        if (selectedEntryId == null || results.stream().anyMatch(result -> result.id().equals(selectedEntryId))) {
-            return;
-        }
-
-        lexemeRepository.findFirstByEntryIdOrderByOrderNoAscIdAsc(selectedEntryId)
-                .filter(lexeme -> lexeme.getEntry() != null)
-                .map(this::toResponse)
-                .ifPresent(results::add);
     }
 
     private TezaursEntryCandidateResponse toResponse(TezaursLexeme lexeme) {
@@ -59,7 +46,6 @@ public class TezaursEntrySearchService {
                 lexeme.getEntryId(),
                 lexeme.getEntry().getHeading(),
                 lexeme.getEntry().getHumanKey(),
-                lexeme.getLemma(),
                 findSenses(lexeme.getEntryId()));
     }
 

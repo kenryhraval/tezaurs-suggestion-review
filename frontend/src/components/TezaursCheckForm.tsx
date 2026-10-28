@@ -1,6 +1,6 @@
 import { useEffect, useState, type ChangeEvent, type FocusEvent } from 'react'
-import { getTezaursCandidates } from '../api'
-import type { TezaursEntryCandidate, TezaursStatus } from '../types'
+import { getTezaursCandidates, getTezaursEntry } from '../api'
+import type { TezaursEntryCandidate, TezaursEntryDetails, TezaursStatus } from '../types'
 
 type Props = {
   reviewId: string
@@ -14,6 +14,20 @@ const NOT_FOUND = 'not-found'
 function initialSelection(status: TezaursStatus, matchedEntryId: number | null) {
   if (status === 'NOT_FOUND') return NOT_FOUND
   return matchedEntryId === null ? '' : String(matchedEntryId)
+}
+
+function asCandidate(entry: TezaursEntryDetails): TezaursEntryCandidate {
+  return {
+    id: entry.id,
+    heading: entry.heading,
+    humanKey: entry.humanKey,
+    senses: entry.senses.map((sense) => ({
+      id: sense.id,
+      parentSenseId: sense.parentSenseId,
+      gloss: sense.gloss,
+      orderNo: sense.orderNo,
+    })),
+  }
 }
 
 function EntryDescription({ candidate }: { candidate: TezaursEntryCandidate }) {
@@ -49,7 +63,7 @@ export function TezaursCheckForm({
   onSave,
 }: Props) {
   const [candidates, setCandidates] = useState<TezaursEntryCandidate[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(matchedEntryId !== null)
   const [serverError, setServerError] = useState('')
   const [selection, setSelection] = useState(() => initialSelection(status, matchedEntryId))
   const [customSelection, setCustomSelection] = useState<TezaursEntryCandidate | null>(null)
@@ -78,11 +92,14 @@ export function TezaursCheckForm({
 
   useEffect(() => {
     let active = true
+    const selectedId = matchedEntryId
 
-    async function loadCandidates() {
+    if (selectedId === null) return
+
+    async function loadSelectedEntry(entryId: number) {
       try {
-        const loaded = await getTezaursCandidates(reviewId)
-        if (active) setCandidates(loaded)
+        const loaded = await getTezaursEntry(entryId)
+        if (active) setCustomSelection(asCandidate(loaded))
       } catch (cause) {
         if (active) {
           setServerError(cause instanceof Error
@@ -94,21 +111,24 @@ export function TezaursCheckForm({
       }
     }
 
-    void loadCandidates()
+    void loadSelectedEntry(selectedId)
     return () => {
       active = false
     }
-  }, [reviewId])
+  }, [matchedEntryId])
 
   useEffect(() => {
     const term = query.trim()
-    if (!dropdownOpen || term.length < 2) return
+    if (!dropdownOpen || term.length === 1) return
 
     let active = true
     const timeout = window.setTimeout(async () => {
       try {
-        const loaded = await getTezaursCandidates(reviewId, term)
-        if (active) setSearchResults(loaded)
+        const loaded = await getTezaursCandidates(reviewId, term || undefined)
+        if (active) {
+          if (term === '') setCandidates(loaded)
+          else setSearchResults(loaded)
+        }
       } catch (cause) {
         if (active) {
           setSearchError(cause instanceof Error
@@ -118,7 +138,7 @@ export function TezaursCheckForm({
       } finally {
         if (active) setSearching(false)
       }
-    }, 300)
+    }, term === '' ? 0 : 300)
 
     return () => {
       active = false
@@ -128,9 +148,10 @@ export function TezaursCheckForm({
 
   function openDropdown() {
     setQuery('')
+    setCandidates([])
     setSearchResults([])
     setSearchError('')
-    setSearching(false)
+    setSearching(true)
     setPreviewEntryId(null)
     setDropdownOpen(true)
   }
@@ -176,7 +197,7 @@ export function TezaursCheckForm({
       <p className="muted">Izvēlieties atbilstošo šķirkli vai norādiet, ka tāda nav.</p>
 
       {serverError && <p className="error">{serverError}</p>}
-      {loading && <p className="muted">Meklē Tēzaurā...</p>}
+      {loading && <p className="muted">Ielādē izvēlēto šķirkli...</p>}
 
       <span>Tēzaura šķirklis</span>
       <div
