@@ -184,12 +184,10 @@ export async function getEntryDraft(reviewId: string): Promise<EntryDraft | null
 
 export async function createEntryDraft(
   reviewId: string,
-  entry: SaveEntryDraft,
-  primaryLexeme: SaveLexemeDraft,
 ): Promise<{ draft: EntryDraft; review: Review }> {
   const response = await request(
     `/api/reviews/${reviewId}/entry-draft`,
-    { method: 'POST', body: JSON.stringify({ entry, primaryLexeme }) },
+    { method: 'POST' },
   )
   return response.json()
 }

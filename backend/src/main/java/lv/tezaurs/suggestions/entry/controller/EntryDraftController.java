@@ -3,7 +3,6 @@ package lv.tezaurs.suggestions.entry.controller;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import lv.tezaurs.suggestions.entry.dto.CreateEntryDraftRequest;
 import lv.tezaurs.suggestions.entry.dto.EntryDraftResponse;
 import lv.tezaurs.suggestions.entry.dto.SaveEntryDraftRequest;
 import lv.tezaurs.suggestions.entry.dto.SaveEntryDraftResponse;
@@ -36,8 +35,7 @@ public class EntryDraftController {
     }
 
     @PostMapping
-    SaveEntryDraftResponse create(
-            @PathVariable UUID reviewId, @Valid @RequestBody CreateEntryDraftRequest request) {
-        return service.create(reviewId, request);
+    SaveEntryDraftResponse create(@PathVariable UUID reviewId) {
+        return service.create(reviewId);
     }
 }

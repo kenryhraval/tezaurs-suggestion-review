@@ -1,15 +1,16 @@
 package lv.tezaurs.suggestions.entry.service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lv.tezaurs.suggestions.common.error.ConflictException;
 import lv.tezaurs.suggestions.common.error.NotFoundException;
-import lv.tezaurs.suggestions.entry.dto.CreateEntryDraftRequest;
 import lv.tezaurs.suggestions.entry.dto.EntryDraftResponse;
 import lv.tezaurs.suggestions.entry.dto.SaveEntryDraftRequest;
 import lv.tezaurs.suggestions.entry.dto.SaveEntryDraftResponse;
+import lv.tezaurs.suggestions.entry.dto.SaveLexemeDraftRequest;
 import lv.tezaurs.suggestions.entry.entity.ReviewEntry;
 import lv.tezaurs.suggestions.entry.entity.ReviewLexeme;
 import lv.tezaurs.suggestions.entry.repository.ReviewEntryRepository;
@@ -27,6 +28,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class EntryDraftService {
+    private static final int DEFAULT_ENTRY_TYPE_ID = 1;
+    private static final int DEFAULT_LEXEME_ROLE_ID = 1;
+
     private final ReviewEntryRepository entryRepository;
     private final ReviewLexemeRepository lexemeRepository;
     private final ReviewCaseRepository caseRepository;
@@ -44,21 +48,25 @@ public class EntryDraftService {
     }
 
     @Transactional
-    public SaveEntryDraftResponse create(UUID caseId, CreateEntryDraftRequest request) {
+    public SaveEntryDraftResponse create(UUID caseId) {
         ReviewCase reviewCase = requireCaseWithoutTezaursEntry(caseId);
-        if (entryRepository.findByCaseId(caseId).isPresent()) {
-            throw new ConflictException("An entry draft already exists for this review");
+        var existing = entryRepository.findByCaseId(caseId);
+        if (existing.isPresent()) {
+            ReviewEntry entry = existing.get();
+            return response(entry,
+                    lexemeRepository.findAllByEntryIdOrderByOrderNoAscIdAsc(entry.getId()), reviewCase);
         }
 
-        validateEntry(request.entry());
-        if (!request.primaryLexeme().primary()) {
-            throw new ConflictException("The first lexeme must be the primary lexeme");
-        }
+        SaveEntryDraftRequest request = new SaveEntryDraftRequest(
+                reviewCase.getReviewedTerm(), DEFAULT_ENTRY_TYPE_ID,
+                null, null, null, null, null, Map.of());
+        validateEntry(request);
         ReviewEntry entry = new ReviewEntry(caseId);
-        updateEntry(entry, request.entry());
+        updateEntry(entry, request);
         ReviewEntry savedEntry = entryRepository.save(entry);
         ReviewLexeme primaryLexeme = lexemeDraftService.createInitial(
-                savedEntry, request.primaryLexeme());
+                savedEntry, new SaveLexemeDraftRequest(entry.getHeading(), true, DEFAULT_LEXEME_ROLE_ID, null,
+                        null, null, null, List.of(), Map.of(), null));
         List<ReviewLexeme> lexemes = List.of(primaryLexeme);
         reviewCase.recordEntryDraftReadiness(savedEntry.isReady(lexemes));
 

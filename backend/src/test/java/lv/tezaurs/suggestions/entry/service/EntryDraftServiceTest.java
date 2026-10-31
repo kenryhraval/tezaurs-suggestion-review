@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.withSettings;
 
 import java.util.List;
@@ -12,8 +14,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import lv.tezaurs.suggestions.common.error.ConflictException;
-import lv.tezaurs.suggestions.entry.dto.CreateEntryDraftRequest;
-import lv.tezaurs.suggestions.entry.dto.SaveEntryDraftRequest;
 import lv.tezaurs.suggestions.entry.dto.SaveLexemeDraftRequest;
 import lv.tezaurs.suggestions.entry.entity.ReviewEntry;
 import lv.tezaurs.suggestions.entry.entity.ReviewLexeme;
@@ -30,6 +30,7 @@ import lv.tezaurs.suggestions.tezaurs.service.TezaursFlagService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockMakers;
+import org.mockito.ArgumentCaptor;
 
 class EntryDraftServiceTest {
     private ReviewEntryRepository entryRepository;
@@ -66,25 +67,30 @@ class EntryDraftServiceTest {
 
         TezaursEntry existingEntry = mock(TezaursEntry.class);
         when(existingEntry.getHomonymNo()).thenReturn(2);
-        when(tezaursEntryRepository.findFirstByHeadingOrderByHomonymNoDesc("Jauns vārds"))
+        when(tezaursEntryRepository.findFirstByHeadingOrderByHomonymNoDesc("jauns vārds"))
                 .thenReturn(Optional.of(existingEntry));
         ReviewEntry otherDraft = mock(ReviewEntry.class);
         when(otherDraft.getHomonymNo()).thenReturn(4);
         when(entryRepository.findFirstByHeadingAndIdNotOrderByHomonymNoDesc(
-                org.mockito.ArgumentMatchers.eq("Jauns vārds"), any(UUID.class)))
+                org.mockito.ArgumentMatchers.eq("jauns vārds"), any(UUID.class)))
                 .thenReturn(Optional.of(otherDraft));
 
         ReviewLexeme primaryLexeme = primaryLexeme("jauns vārds");
         when(lexemeDraftService.createInitial(any(ReviewEntry.class), any(SaveLexemeDraftRequest.class)))
                 .thenReturn(primaryLexeme);
 
-        var response = service.create(review.getId(), createRequest());
+        var response = service.create(review.getId());
 
-        assertThat(response.draft().heading()).isEqualTo("Jauns vārds");
-        assertThat(response.draft().humanKey()).isEqualTo("Jauns vārds:5");
+        assertThat(response.draft().heading()).isEqualTo("jauns vārds");
+        assertThat(response.draft().humanKey()).isEqualTo("jauns vārds:5");
         assertThat(response.draft().lexemes()).singleElement()
                 .extracting(lexeme -> lexeme.lemma())
                 .isEqualTo("jauns vārds");
+        var request = ArgumentCaptor.forClass(SaveLexemeDraftRequest.class);
+        verify(lexemeDraftService).createInitial(any(ReviewEntry.class), request.capture());
+        assertThat(request.getValue().lemma()).isEqualTo("jauns vārds");
+        assertThat(request.getValue().primary()).isTrue();
+        assertThat(request.getValue().paradigmId()).isNull();
     }
 
     @Test
@@ -93,28 +99,33 @@ class EntryDraftServiceTest {
         review.recordTezaursCheck(TezaursStatus.MEANING_NOT_FOUND, 42);
         when(caseRepository.findById(review.getId())).thenReturn(Optional.of(review));
 
-        assertThatThrownBy(() -> service.create(review.getId(), createRequest()))
+        assertThatThrownBy(() -> service.create(review.getId()))
                 .isInstanceOf(ConflictException.class);
+    }
+
+    @Test
+    void reusesAnExistingDraftWithoutOverwritingItsEdits() {
+        ReviewCase review = inProgressReview();
+        review.recordTezaursCheck(TezaursStatus.NOT_FOUND, null);
+        ReviewEntry entry = new ReviewEntry(review.getId());
+        entry.update("edited heading", 2, 1, null, null, null, null, "saved note", Map.of());
+        when(caseRepository.findById(review.getId())).thenReturn(Optional.of(review));
+        when(entryRepository.findByCaseId(review.getId())).thenReturn(Optional.of(entry));
+        when(lexemeRepository.findAllByEntryIdOrderByOrderNoAscIdAsc(entry.getId()))
+                .thenReturn(List.of(primaryLexeme("saved lemma")));
+
+        var response = service.create(review.getId());
+
+        assertThat(response.draft().heading()).isEqualTo("edited heading");
+        assertThat(response.draft().notes()).isEqualTo("saved note");
+        verify(entryRepository, never()).save(any());
+        verify(lexemeDraftService, never()).createInitial(any(), any());
     }
 
     private static ReviewCase inProgressReview() {
         ReviewCase review = new ReviewCase("jauns vārds");
         review.changeStatus(SuggestionStatus.IN_PROGRESS);
         return review;
-    }
-
-    private static CreateEntryDraftRequest createRequest() {
-        return new CreateEntryDraftRequest(entryRequest(), lexemeRequest(true));
-    }
-
-    private static SaveEntryDraftRequest entryRequest() {
-        return new SaveEntryDraftRequest(" Jauns vārds ", 1,
-                null, null, null, null, " piezīme ", Map.of());
-    }
-
-    private static SaveLexemeDraftRequest lexemeRequest(boolean primary) {
-        return new SaveLexemeDraftRequest(" jauns vārds ", primary, 1, 10,
-                "jaun", null, null, List.of(), Map.of(), null);
     }
 
     private static ReviewLexeme primaryLexeme(String lemma) {

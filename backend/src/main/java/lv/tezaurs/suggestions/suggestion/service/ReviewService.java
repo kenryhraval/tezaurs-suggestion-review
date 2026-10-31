@@ -3,6 +3,7 @@ package lv.tezaurs.suggestions.suggestion.service;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lv.tezaurs.suggestions.entry.service.EntryDraftService;
 import lv.tezaurs.suggestions.common.error.ConflictException;
 import lv.tezaurs.suggestions.common.error.NotFoundException;
 import lv.tezaurs.suggestions.suggestion.dto.CorrectTermRequest;
@@ -17,6 +18,7 @@ import lv.tezaurs.suggestions.suggestion.entity.IncubatorSuggestion;
 import lv.tezaurs.suggestions.suggestion.entity.ReviewCase;
 import lv.tezaurs.suggestions.suggestion.entity.CaseSuggestion;
 import lv.tezaurs.suggestions.suggestion.entity.SuggestionStatus;
+import lv.tezaurs.suggestions.suggestion.entity.TezaursStatus;
 import lv.tezaurs.suggestions.suggestion.repository.ReviewCaseRepository;
 import lv.tezaurs.suggestions.suggestion.repository.CaseSuggestionRepository;
 import lv.tezaurs.suggestions.tezaurs.dto.TezaursEntryCandidateResponse;
@@ -34,6 +36,7 @@ public class ReviewService {
     private final CaseSuggestionRepository reviewSourceRepository;
     private final TezaursEntryRepository tezaursEntryRepository;
     private final TezaursEntrySearchService tezaursEntrySearchService;
+    private final EntryDraftService entryDraftService;
 
     @Transactional(readOnly = true)
     public ReviewPageResponse list(
@@ -112,6 +115,9 @@ public class ReviewService {
             throw new ConflictException("The selected Tēzaurs entry does not exist");
         }
         review.recordTezaursCheck(request.status(), request.matchedEntryId());
+        if (request.status() == TezaursStatus.NOT_FOUND) {
+            entryDraftService.create(reviewId);
+        }
         return ReviewResponse.from(review);
     }
 

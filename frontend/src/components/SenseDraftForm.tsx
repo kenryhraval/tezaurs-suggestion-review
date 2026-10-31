@@ -13,6 +13,7 @@ import type {
 } from '../types'
 import { FlagEditor } from './FlagEditor'
 import { RestrictionEditor } from './RestrictionEditor'
+import { DraftProperties } from './DraftProperties'
 
 type Props = {
   reviewId: string
@@ -42,7 +43,8 @@ export function SenseDraftForm({
   const [options, setOptions] = useState<TezaursFormOptions | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
+  const [savedSenses, setSavedSenses] = useState<SaveSenseDraft[]>([])
+  const [editingIndex, setEditingIndex] = useState<number | null>(null)
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -54,7 +56,8 @@ export function SenseDraftForm({
     Promise.all([getSenseDrafts(reviewId), getTezaursFormOptions(), entryRequest])
       .then(([loadedSenses, loadedOptions, entry]) => {
         if (!active) return
-        setSenses(loadedSenses.length > 0 ? loadedSenses : [newSense(initialGloss)])
+        setSenses(loadedSenses)
+        setSavedSenses(loadedSenses)
         setOptions(loadedOptions)
         setExistingSenses(entry?.senses ?? [])
       })
@@ -70,7 +73,7 @@ export function SenseDraftForm({
     return () => {
       active = false
     }
-  }, [initialGloss, matchedEntryId, reviewId])
+  }, [matchedEntryId, reviewId])
 
   function replaceSense(index: number, updatedSense: SaveSenseDraft) {
     setSenses((currentSenses) => {
@@ -106,22 +109,23 @@ export function SenseDraftForm({
   }
 
   function removeSense(index: number) {
-    setSenses((currentSenses) => currentSenses.filter((_, itemIndex) => itemIndex !== index))
+    void save(senses.filter((_, itemIndex) => itemIndex !== index))
   }
 
   function addSense() {
-    setSenses((currentSenses) => [...currentSenses, newSense('')])
+    setEditingIndex(senses.length)
+    setSenses((currentSenses) => [...currentSenses, newSense(senses.length === 0 ? initialGloss : '')])
   }
 
-  async function save() {
+  async function save(nextSenses = senses) {
     setSaving(true)
-    setSaved(false)
     setError('')
     try {
-      const response = await saveSenseDrafts(reviewId, senses)
+      const response = await saveSenseDrafts(reviewId, nextSenses)
       setSenses(response.senses)
+      setSavedSenses(response.senses)
+      setEditingIndex(null)
       onReviewUpdated(response.review)
-      setSaved(true)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Neizdevās saglabāt nozīmju melnrakstu.')
     } finally {
@@ -142,71 +146,96 @@ export function SenseDraftForm({
         return (
           <fieldset className="sense-draft" key={sense.id ?? index}>
             <legend>{senses.length === 1 ? 'Jaunā nozīme' : `Jaunā nozīme ${index + 1}`}</legend>
-            <label>
-              Skaidrojums
-              <textarea
-                onChange={(event) => replaceSense(index, {
-                  ...sense,
-                  gloss: event.target.value,
-                })}
-                required
-                rows={4}
-                value={sense.gloss}
-              />
-            </label>
-            {(existingSenses.length > 0 || senses.some((item) => item.id && item.id !== sense.id)) && (
-              <label>
-                Virsnozīme
-                <select value={parentValue} onChange={(event) => updateParent(index, event.target.value)}>
-                  <option value="">Nav</option>
-                  {existingSenses.map((item) => (
-                    <option key={`tezaurs-${item.id}`} value={`tezaurs:${item.id}`}>
-                      Esošā: {item.gloss || item.id}
-                    </option>
-                  ))}
-                  {senses.filter((item) => item.id && item.id !== sense.id).map((item) => (
-                    <option key={`draft-${item.id}`} value={`draft:${item.id}`}>
-                      Melnraksta: {item.gloss}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-            <FlagEditor
-              definitions={options.flags}
-              flags={sense.flags}
-              onChange={(flags) => replaceSense(index, { ...sense, flags })}
-              scope="S"
-            />
-            <RestrictionEditor
-              definitions={options.flags}
-              frequencies={options.restrictionFrequencies}
-              onChange={(structuralRestrictions) => replaceSense(index, {
-                ...sense,
-                structuralRestrictions,
-              })}
-              restriction={sense.structuralRestrictions}
-              types={options.restrictionTypes}
-            />
-            {senses.length > 1 && (
-              <button
-                type="button"
-                onClick={() => removeSense(index)}
-              >
-                Noņemt nozīmi
-              </button>
+            {editingIndex === index ? (
+              <form onSubmit={(event) => {
+                event.preventDefault()
+                void save()
+              }}>
+                <label>
+                  Skaidrojums
+                  <textarea
+                    onChange={(event) => replaceSense(index, {
+                      ...sense,
+                      gloss: event.target.value,
+                    })}
+                    required
+                    rows={4}
+                    value={sense.gloss}
+                  />
+                </label>
+                {(existingSenses.length > 0 || senses.some((item) => item.id && item.id !== sense.id)) && (
+                  <label>
+                    Virsnozīme
+                    <select value={parentValue} onChange={(event) => updateParent(index, event.target.value)}>
+                      <option value="">Nav</option>
+                      {existingSenses.map((item) => (
+                        <option key={`tezaurs-${item.id}`} value={`tezaurs:${item.id}`}>
+                          Esošā: {item.gloss || item.id}
+                        </option>
+                      ))}
+                      {senses.filter((item) => item.id && item.id !== sense.id).map((item) => (
+                        <option key={`draft-${item.id}`} value={`draft:${item.id}`}>
+                          Melnraksta: {item.gloss}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+                <FlagEditor
+                  definitions={options.flags}
+                  flags={sense.flags}
+                  onChange={(flags) => replaceSense(index, { ...sense, flags })}
+                  scope="S"
+                />
+                <RestrictionEditor
+                  definitions={options.flags}
+                  frequencies={options.restrictionFrequencies}
+                  onChange={(structuralRestrictions) => replaceSense(index, {
+                    ...sense,
+                    structuralRestrictions,
+                  })}
+                  restriction={sense.structuralRestrictions}
+                  types={options.restrictionTypes}
+                />
+                <button disabled={saving} type="submit">{saving ? 'Saglabā...' : 'Saglabāt nozīmi'}</button>
+                <button disabled={saving} type="button" onClick={() => {
+                  setSenses(savedSenses)
+                  setEditingIndex(null)
+                }}>Atcelt</button>
+                {sense.id && senses.length > 1 && (
+                  <button
+                    type="button"
+                    disabled={saving}
+                    onClick={() => removeSense(index)}
+                  >
+                    Noņemt nozīmi
+                  </button>
+                )}
+              </form>
+            ) : (
+              <>
+                <p>{sense.gloss}</p>
+                {parentValue && (
+                  <p className="muted">Apakšnozīme:{' '}
+                    {sense.parentDraftSenseId
+                      ? senses.find((item) => item.id === sense.parentDraftSenseId)?.gloss
+                      : existingSenses.find((item) => item.id === sense.parentTezaursSenseId)?.gloss}
+                  </p>
+                )}
+                <DraftProperties flags={sense.flags} definitions={options.flags}
+                  restriction={sense.structuralRestrictions} />
+                <button disabled={editingIndex !== null || saving} type="button"
+                  onClick={() => setEditingIndex(index)}>Labot nozīmi</button>
+              </>
             )}
           </fieldset>
         )
       })}
-      <button type="button" onClick={addSense}>
+      {senses.length === 0 && <p className="muted">Nozīmes vēl nav pievienotas.</p>}
+      <button disabled={editingIndex !== null || saving} type="button" onClick={addSense}>
         Pievienot nozīmi
-      </button>{' '}
-      <button disabled={saving || senses.some((sense) => !sense.gloss.trim())} type="button" onClick={save}>
-        {saving ? 'Saglabā...' : 'Saglabāt nozīmju melnrakstu'}
       </button>
       {error && <p className="error">{error}</p>}
-      {saved && <p>Nozīmju melnraksts saglabāts.</p>}
     </section>
   )
 }

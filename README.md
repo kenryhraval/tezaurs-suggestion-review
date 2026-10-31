@@ -21,6 +21,9 @@ The application currently supports the review queue, duplicate linking,
 Tēzaurs entry checks, and entry, lexeme, and sense drafts. It does
 not write drafts back to the real Tēzaurs tables.
 
+Confirming that an entry is absent creates its draft and first primary lexeme.
+Drafts are displayed read-only; entry, lexeme, and sense edits have separate controls.
+
 Authentication is performed by the deployment reverse proxy. The backend reads
 the authenticated username from the proxy-validated Basic Authorization header
 through `GET /api/me`, so the backend must not be published without that proxy.

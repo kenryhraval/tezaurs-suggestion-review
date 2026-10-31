@@ -13,6 +13,7 @@ import java.util.Optional;
 import java.util.UUID;
 import lv.tezaurs.suggestions.common.error.ConflictException;
 import lv.tezaurs.suggestions.common.error.NotFoundException;
+import lv.tezaurs.suggestions.entry.service.EntryDraftService;
 import lv.tezaurs.suggestions.suggestion.dto.RecordTezaursCheckRequest;
 import lv.tezaurs.suggestions.suggestion.dto.ReviewResponse;
 import lv.tezaurs.suggestions.suggestion.dto.ReviewSort;
@@ -39,6 +40,7 @@ class ReviewServiceTest {
     private CaseSuggestionRepository reviewSourceRepository;
     private TezaursEntryRepository tezaursEntryRepository;
     private TezaursEntrySearchService tezaursEntrySearchService;
+    private EntryDraftService entryDraftService;
     private ReviewService service;
 
     @BeforeEach
@@ -49,8 +51,9 @@ class ReviewServiceTest {
                 withSettings().mockMaker(MockMakers.PROXY));
         tezaursEntryRepository = mock(TezaursEntryRepository.class);
         tezaursEntrySearchService = mock(TezaursEntrySearchService.class);
+        entryDraftService = mock(EntryDraftService.class);
         service = new ReviewService(reviewRepository, reviewSourceRepository,
-                tezaursEntryRepository, tezaursEntrySearchService);
+                tezaursEntryRepository, tezaursEntrySearchService, entryDraftService);
         when(reviewRepository.save(any(ReviewCase.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
         when(reviewSourceRepository.save(any(CaseSuggestion.class)))
@@ -156,6 +159,18 @@ class ReviewServiceTest {
         assertThatThrownBy(() -> service.recordTezaursCheck(review.getId(),
                 new RecordTezaursCheckRequest(TezaursStatus.FOUND, 99)))
                 .isInstanceOf(ConflictException.class);
+    }
+
+    @Test
+    void createsTheEntryDraftWhenTheReviewerConfirmsAnAbsentEntry() {
+        ReviewCase review = inProgressReview();
+        when(reviewRepository.findById(review.getId())).thenReturn(Optional.of(review));
+
+        service.recordTezaursCheck(review.getId(),
+                new RecordTezaursCheckRequest(TezaursStatus.NOT_FOUND, null));
+
+        verify(entryDraftService).create(review.getId());
+        assertThat(review.getTezaursStatus()).isEqualTo(TezaursStatus.NOT_FOUND);
     }
 
     private static IncubatorSuggestion source() {

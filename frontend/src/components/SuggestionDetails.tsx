@@ -179,7 +179,6 @@ export function SuggestionDetails({ item, onStatusChange, onDuplicate }: Props) 
       {review?.tezaursStatus === 'NOT_FOUND' && reviewInProgress && (
         <EntryDraftForm
           reviewId={review.id}
-          reviewedTerm={review.reviewedTerm}
           onReviewUpdated={reviewState.setReview}
         />
       )}
