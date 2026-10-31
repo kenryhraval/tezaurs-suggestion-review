@@ -9,7 +9,7 @@ import lv.tezaurs.suggestions.suggestion.dto.SuggestionResponse;
 import lv.tezaurs.suggestions.suggestion.dto.SuggestionSort;
 import lv.tezaurs.suggestions.suggestion.dto.UpdateStatusRequest;
 import lv.tezaurs.suggestions.suggestion.entity.IncubatorSuggestion;
-import lv.tezaurs.suggestions.suggestion.entity.ReviewSuggestion;
+import lv.tezaurs.suggestions.suggestion.entity.ReviewCase;
 import lv.tezaurs.suggestions.suggestion.repository.IncubatorSuggestionRepository;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -37,7 +37,7 @@ public class SuggestionService {
     @Transactional
     public ReviewResponse changeStatus(Integer sourceSuggestionId, UpdateStatusRequest request) {
         IncubatorSuggestion source = requireSourceSuggestion(sourceSuggestionId);
-        ReviewSuggestion review = reviewService.startReview(source, request.status());
+        ReviewCase review = reviewService.startReview(source, request.status());
         return ReviewResponse.from(review);
     }
 

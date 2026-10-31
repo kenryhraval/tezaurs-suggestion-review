@@ -24,8 +24,8 @@ public class ReviewSense {
     @Id
     private UUID id;
 
-    @Column(name = "suggestion_id", nullable = false, updatable = false)
-    private UUID suggestionId;
+    @Column(name = "case_id", nullable = false, updatable = false)
+    private UUID caseId;
 
     @Column(name = "parent_draft_sense_id")
     private UUID parentDraftSenseId;
@@ -55,9 +55,9 @@ public class ReviewSense {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    public ReviewSense(UUID suggestionId) {
+    public ReviewSense(UUID caseId) {
         this.id = UUID.randomUUID();
-        this.suggestionId = suggestionId;
+        this.caseId = caseId;
     }
 
     public void update(String gloss, UUID parentDraftSenseId, Integer parentTezaursSenseId,

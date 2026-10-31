@@ -52,7 +52,7 @@ public class IncubatorSuggestion {
     private Integer updatedBy;
 
     @OneToOne(mappedBy = "sourceSuggestion", fetch = FetchType.LAZY)
-    private ReviewSuggestionSource reviewSource;
+    private CaseSuggestion reviewSource;
 
     public IncubatorSuggestion(Integer id, String lemma, String gloss) {
         this.id = id;

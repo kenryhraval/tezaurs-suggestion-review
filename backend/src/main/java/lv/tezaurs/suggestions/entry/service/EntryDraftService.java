@@ -15,9 +15,9 @@ import lv.tezaurs.suggestions.entry.entity.ReviewLexeme;
 import lv.tezaurs.suggestions.entry.repository.ReviewEntryRepository;
 import lv.tezaurs.suggestions.entry.repository.ReviewLexemeRepository;
 import lv.tezaurs.suggestions.suggestion.dto.ReviewResponse;
-import lv.tezaurs.suggestions.suggestion.entity.ReviewSuggestion;
+import lv.tezaurs.suggestions.suggestion.entity.ReviewCase;
 import lv.tezaurs.suggestions.suggestion.entity.TezaursStatus;
-import lv.tezaurs.suggestions.suggestion.repository.ReviewSuggestionRepository;
+import lv.tezaurs.suggestions.suggestion.repository.ReviewCaseRepository;
 import lv.tezaurs.suggestions.tezaurs.repository.TezaursEntryRepository;
 import lv.tezaurs.suggestions.tezaurs.repository.TezaursEntryTypeRepository;
 import lv.tezaurs.suggestions.tezaurs.service.TezaursFlagService;
@@ -29,24 +29,24 @@ import org.springframework.transaction.annotation.Transactional;
 public class EntryDraftService {
     private final ReviewEntryRepository entryRepository;
     private final ReviewLexemeRepository lexemeRepository;
-    private final ReviewSuggestionRepository suggestionRepository;
+    private final ReviewCaseRepository caseRepository;
     private final TezaursEntryRepository tezaursEntryRepository;
     private final TezaursEntryTypeRepository entryTypeRepository;
     private final TezaursFlagService flagService;
     private final LexemeDraftService lexemeDraftService;
 
     @Transactional(readOnly = true)
-    public Optional<EntryDraftResponse> find(UUID suggestionId) {
-        requireSuggestion(suggestionId);
-        return entryRepository.findBySuggestionId(suggestionId)
+    public Optional<EntryDraftResponse> find(UUID caseId) {
+        requireCase(caseId);
+        return entryRepository.findByCaseId(caseId)
                 .map(entry -> EntryDraftResponse.from(entry,
                         lexemeRepository.findAllByEntryIdOrderByOrderNoAscIdAsc(entry.getId())));
     }
 
     @Transactional
-    public SaveEntryDraftResponse create(UUID suggestionId, CreateEntryDraftRequest request) {
-        ReviewSuggestion suggestion = requireSuggestionWithoutTezaursEntry(suggestionId);
-        if (entryRepository.findBySuggestionId(suggestionId).isPresent()) {
+    public SaveEntryDraftResponse create(UUID caseId, CreateEntryDraftRequest request) {
+        ReviewCase reviewCase = requireCaseWithoutTezaursEntry(caseId);
+        if (entryRepository.findByCaseId(caseId).isPresent()) {
             throw new ConflictException("An entry draft already exists for this review");
         }
 
@@ -54,29 +54,29 @@ public class EntryDraftService {
         if (!request.primaryLexeme().primary()) {
             throw new ConflictException("The first lexeme must be the primary lexeme");
         }
-        ReviewEntry entry = new ReviewEntry(suggestionId);
+        ReviewEntry entry = new ReviewEntry(caseId);
         updateEntry(entry, request.entry());
         ReviewEntry savedEntry = entryRepository.save(entry);
         ReviewLexeme primaryLexeme = lexemeDraftService.createInitial(
                 savedEntry, request.primaryLexeme());
         List<ReviewLexeme> lexemes = List.of(primaryLexeme);
-        suggestion.recordEntryDraftReadiness(savedEntry.isReady(lexemes));
+        reviewCase.recordEntryDraftReadiness(savedEntry.isReady(lexemes));
 
-        return response(savedEntry, lexemes, suggestion);
+        return response(savedEntry, lexemes, reviewCase);
     }
 
     @Transactional
-    public SaveEntryDraftResponse update(UUID suggestionId, SaveEntryDraftRequest request) {
-        ReviewSuggestion suggestion = requireSuggestionWithoutTezaursEntry(suggestionId);
-        ReviewEntry entry = entryRepository.findBySuggestionId(suggestionId)
+    public SaveEntryDraftResponse update(UUID caseId, SaveEntryDraftRequest request) {
+        ReviewCase reviewCase = requireCaseWithoutTezaursEntry(caseId);
+        ReviewEntry entry = entryRepository.findByCaseId(caseId)
                 .orElseThrow(() -> new NotFoundException("Entry draft was not found"));
         validateEntry(request);
         updateEntry(entry, request);
 
         List<ReviewLexeme> lexemes = lexemeRepository
                 .findAllByEntryIdOrderByOrderNoAscIdAsc(entry.getId());
-        suggestion.recordEntryDraftReadiness(entry.isReady(lexemes));
-        return response(entry, lexemes, suggestion);
+        reviewCase.recordEntryDraftReadiness(entry.isReady(lexemes));
+        return response(entry, lexemes, reviewCase);
     }
 
     private void updateEntry(ReviewEntry entry, SaveEntryDraftRequest request) {
@@ -107,24 +107,24 @@ public class EntryDraftService {
         return Math.max(tezaursMaximum, draftMaximum) + 1;
     }
 
-    private ReviewSuggestion requireSuggestionWithoutTezaursEntry(UUID id) {
-        ReviewSuggestion suggestion = requireSuggestion(id);
-        if (suggestion.getTezaursStatus() != TezaursStatus.NOT_FOUND) {
+    private ReviewCase requireCaseWithoutTezaursEntry(UUID id) {
+        ReviewCase reviewCase = requireCase(id);
+        if (reviewCase.getTezaursStatus() != TezaursStatus.NOT_FOUND) {
             throw new ConflictException(
                     "An entry draft can only be saved when the entry is absent from Tēzaurs");
         }
-        return suggestion;
+        return reviewCase;
     }
 
-    private ReviewSuggestion requireSuggestion(UUID id) {
-        return suggestionRepository.findById(id)
+    private ReviewCase requireCase(UUID id) {
+        return caseRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Review " + id + " was not found"));
     }
 
     private static SaveEntryDraftResponse response(
-            ReviewEntry entry, List<ReviewLexeme> lexemes, ReviewSuggestion suggestion) {
+            ReviewEntry entry, List<ReviewLexeme> lexemes, ReviewCase reviewCase) {
         return new SaveEntryDraftResponse(
-                EntryDraftResponse.from(entry, lexemes), ReviewResponse.from(suggestion));
+                EntryDraftResponse.from(entry, lexemes), ReviewResponse.from(reviewCase));
     }
 
     static String clean(String value) {

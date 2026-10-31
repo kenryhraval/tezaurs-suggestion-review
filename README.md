@@ -8,11 +8,13 @@ Tēzaurs.
 - `incubator.suggestions` is the immutable source of submitted suggestions.
 - An untouched suggestion is shown as `NEW` and is addressed by its integer
   incubator ID.
-- The first workflow action creates `review.suggestions` and links the source
-  through `review.suggestion_sources`.
+- The first workflow action creates `review.cases` and links the source
+  through `review.case_suggestions`.
 - A review has a UUID and may contain several equal source suggestions when
   duplicates are combined.
 - All later status changes and draft data belong to the review UUID.
+- Drafts reference that case through `case_id`; linked source suggestions remain
+  immutable.
 - `dict` and `incubator` are read-only; Flyway changes only the `review` schema.
 
 The application currently supports the review queue, duplicate linking,

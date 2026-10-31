@@ -16,10 +16,10 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 
 @Entity
-@Table(name = "suggestion_sources", schema = "review")
+@Table(name = "case_suggestions", schema = "review")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class ReviewSuggestionSource {
+public class CaseSuggestion {
     @Id
     @Column(name = "source_suggestion_id")
     private Integer sourceSuggestionId;
@@ -30,17 +30,17 @@ public class ReviewSuggestionSource {
     private IncubatorSuggestion sourceSuggestion;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "suggestion_id", nullable = false, updatable = false)
-    private ReviewSuggestion review;
+    @JoinColumn(name = "case_id", nullable = false, updatable = false)
+    private ReviewCase reviewCase;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
-    public ReviewSuggestionSource(
-            IncubatorSuggestion sourceSuggestion, ReviewSuggestion review) {
+    public CaseSuggestion(
+            IncubatorSuggestion sourceSuggestion, ReviewCase reviewCase) {
         this.sourceSuggestion = sourceSuggestion;
-        this.review = review;
-        review.addSource(this);
+        this.reviewCase = reviewCase;
+        reviewCase.addSource(this);
     }
 }

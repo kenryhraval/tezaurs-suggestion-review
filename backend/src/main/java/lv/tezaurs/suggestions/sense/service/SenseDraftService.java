@@ -16,9 +16,9 @@ import lv.tezaurs.suggestions.sense.dto.SenseDraftResponse;
 import lv.tezaurs.suggestions.sense.entity.ReviewSense;
 import lv.tezaurs.suggestions.sense.repository.ReviewSenseRepository;
 import lv.tezaurs.suggestions.suggestion.dto.ReviewResponse;
-import lv.tezaurs.suggestions.suggestion.entity.ReviewSuggestion;
+import lv.tezaurs.suggestions.suggestion.entity.ReviewCase;
 import lv.tezaurs.suggestions.suggestion.entity.TezaursStatus;
-import lv.tezaurs.suggestions.suggestion.repository.ReviewSuggestionRepository;
+import lv.tezaurs.suggestions.suggestion.repository.ReviewCaseRepository;
 import lv.tezaurs.suggestions.tezaurs.repository.TezaursSenseRepository;
 import lv.tezaurs.suggestions.tezaurs.service.TezaursFlagService;
 import lv.tezaurs.suggestions.tezaurs.service.TezaursRestrictionService;
@@ -29,35 +29,35 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class SenseDraftService {
     private final ReviewSenseRepository senseRepository;
-    private final ReviewSuggestionRepository suggestionRepository;
+    private final ReviewCaseRepository caseRepository;
     private final TezaursSenseRepository tezaursSenseRepository;
     private final TezaursFlagService flagService;
     private final TezaursRestrictionService restrictionService;
 
     @Transactional(readOnly = true)
-    public List<SenseDraftResponse> findAll(UUID suggestionId) {
-        requireSuggestion(suggestionId);
-        return senseRepository.findAllBySuggestionIdOrderByOrderNoAscIdAsc(suggestionId).stream()
+    public List<SenseDraftResponse> findAll(UUID caseId) {
+        requireCase(caseId);
+        return senseRepository.findAllByCaseIdOrderByOrderNoAscIdAsc(caseId).stream()
                 .map(SenseDraftResponse::from).toList();
     }
 
     @Transactional
-    public SaveSenseDraftsResponse save(UUID suggestionId, SaveSenseDraftsRequest request) {
-        ReviewSuggestion suggestion = requireSuggestion(suggestionId);
-        if (suggestion.getTezaursStatus() != TezaursStatus.NOT_FOUND
-                && suggestion.getTezaursStatus() != TezaursStatus.MEANING_NOT_FOUND) {
+    public SaveSenseDraftsResponse save(UUID caseId, SaveSenseDraftsRequest request) {
+        ReviewCase reviewCase = requireCase(caseId);
+        if (reviewCase.getTezaursStatus() != TezaursStatus.NOT_FOUND
+                && reviewCase.getTezaursStatus() != TezaursStatus.MEANING_NOT_FOUND) {
             throw new ConflictException("Sense drafts require an absent entry or meaning");
         }
 
-        validate(request, suggestion);
+        validate(request, reviewCase);
         Map<UUID, ReviewSense> existing = new HashMap<>();
-        senseRepository.findAllBySuggestionIdOrderByOrderNoAscIdAsc(suggestionId)
+        senseRepository.findAllByCaseIdOrderByOrderNoAscIdAsc(caseId)
                 .forEach(sense -> existing.put(sense.getId(), sense));
         List<ReviewSense> senses = new ArrayList<>();
         for (int index = 0; index < request.senses().size(); index++) {
             var item = request.senses().get(index);
             ReviewSense sense = item.id() == null
-                    ? new ReviewSense(suggestionId) : existing.remove(item.id());
+                    ? new ReviewSense(caseId) : existing.remove(item.id());
             if (sense == null) {
                 throw new ConflictException("A sense does not belong to this review");
             }
@@ -67,12 +67,12 @@ public class SenseDraftService {
         }
         senseRepository.deleteAll(existing.values());
         senses = senseRepository.saveAll(senses);
-        suggestion.markSenseDraftReady();
+        reviewCase.markSenseDraftReady();
         return new SaveSenseDraftsResponse(
-                senses.stream().map(SenseDraftResponse::from).toList(), ReviewResponse.from(suggestion));
+                senses.stream().map(SenseDraftResponse::from).toList(), ReviewResponse.from(reviewCase));
     }
 
-    private void validate(SaveSenseDraftsRequest request, ReviewSuggestion suggestion) {
+    private void validate(SaveSenseDraftsRequest request, ReviewCase reviewCase) {
         Set<UUID> submittedIds = new HashSet<>();
         Map<UUID, UUID> parents = new HashMap<>();
         for (var sense : request.senses()) {
@@ -89,9 +89,9 @@ public class SenseDraftService {
                 parents.put(sense.id(), sense.parentDraftSenseId());
             }
             if (sense.parentTezaursSenseId() != null
-                    && (suggestion.getMatchedEntryId() == null
+                    && (reviewCase.getMatchedEntryId() == null
                     || !tezaursSenseRepository.existsByIdAndEntryId(
-                            sense.parentTezaursSenseId(), suggestion.getMatchedEntryId()))) {
+                            sense.parentTezaursSenseId(), reviewCase.getMatchedEntryId()))) {
                 throw new ConflictException("The selected parent sense does not belong to the matched entry");
             }
             flagService.validate("S", sense.flags());
@@ -115,8 +115,8 @@ public class SenseDraftService {
         }
     }
 
-    private ReviewSuggestion requireSuggestion(UUID id) {
-        return suggestionRepository.findById(id)
+    private ReviewCase requireCase(UUID id) {
+        return caseRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Review " + id + " was not found"));
     }
 }

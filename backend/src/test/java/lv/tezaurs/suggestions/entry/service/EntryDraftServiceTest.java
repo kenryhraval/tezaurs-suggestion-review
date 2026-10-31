@@ -19,10 +19,10 @@ import lv.tezaurs.suggestions.entry.entity.ReviewEntry;
 import lv.tezaurs.suggestions.entry.entity.ReviewLexeme;
 import lv.tezaurs.suggestions.entry.repository.ReviewEntryRepository;
 import lv.tezaurs.suggestions.entry.repository.ReviewLexemeRepository;
-import lv.tezaurs.suggestions.suggestion.entity.ReviewSuggestion;
+import lv.tezaurs.suggestions.suggestion.entity.ReviewCase;
 import lv.tezaurs.suggestions.suggestion.entity.SuggestionStatus;
 import lv.tezaurs.suggestions.suggestion.entity.TezaursStatus;
-import lv.tezaurs.suggestions.suggestion.repository.ReviewSuggestionRepository;
+import lv.tezaurs.suggestions.suggestion.repository.ReviewCaseRepository;
 import lv.tezaurs.suggestions.tezaurs.entity.TezaursEntry;
 import lv.tezaurs.suggestions.tezaurs.repository.TezaursEntryRepository;
 import lv.tezaurs.suggestions.tezaurs.repository.TezaursEntryTypeRepository;
@@ -34,7 +34,7 @@ import org.mockito.MockMakers;
 class EntryDraftServiceTest {
     private ReviewEntryRepository entryRepository;
     private ReviewLexemeRepository lexemeRepository;
-    private ReviewSuggestionRepository suggestionRepository;
+    private ReviewCaseRepository caseRepository;
     private TezaursEntryRepository tezaursEntryRepository;
     private TezaursEntryTypeRepository entryTypeRepository;
     private LexemeDraftService lexemeDraftService;
@@ -44,12 +44,12 @@ class EntryDraftServiceTest {
     void setUp() {
         entryRepository = mock(ReviewEntryRepository.class, withSettings().mockMaker(MockMakers.PROXY));
         lexemeRepository = mock(ReviewLexemeRepository.class, withSettings().mockMaker(MockMakers.PROXY));
-        suggestionRepository = mock(ReviewSuggestionRepository.class, withSettings().mockMaker(MockMakers.PROXY));
+        caseRepository = mock(ReviewCaseRepository.class, withSettings().mockMaker(MockMakers.PROXY));
         tezaursEntryRepository = mock(TezaursEntryRepository.class, withSettings().mockMaker(MockMakers.PROXY));
         entryTypeRepository = mock(TezaursEntryTypeRepository.class, withSettings().mockMaker(MockMakers.PROXY));
         TezaursFlagService flagService = mock(TezaursFlagService.class);
         lexemeDraftService = mock(LexemeDraftService.class);
-        service = new EntryDraftService(entryRepository, lexemeRepository, suggestionRepository,
+        service = new EntryDraftService(entryRepository, lexemeRepository, caseRepository,
                 tezaursEntryRepository, entryTypeRepository, flagService, lexemeDraftService);
 
         when(entryRepository.save(any(ReviewEntry.class)))
@@ -58,10 +58,10 @@ class EntryDraftServiceTest {
 
     @Test
     void createsAnEntryWithItsFirstPrimaryLexeme() {
-        ReviewSuggestion review = inProgressReview();
+        ReviewCase review = inProgressReview();
         review.recordTezaursCheck(TezaursStatus.NOT_FOUND, null);
-        when(suggestionRepository.findById(review.getId())).thenReturn(Optional.of(review));
-        when(entryRepository.findBySuggestionId(review.getId())).thenReturn(Optional.empty());
+        when(caseRepository.findById(review.getId())).thenReturn(Optional.of(review));
+        when(entryRepository.findByCaseId(review.getId())).thenReturn(Optional.empty());
         when(entryTypeRepository.existsById(1)).thenReturn(true);
 
         TezaursEntry existingEntry = mock(TezaursEntry.class);
@@ -89,16 +89,16 @@ class EntryDraftServiceTest {
 
     @Test
     void rejectsEntryDraftsForExistingEntries() {
-        ReviewSuggestion review = inProgressReview();
+        ReviewCase review = inProgressReview();
         review.recordTezaursCheck(TezaursStatus.MEANING_NOT_FOUND, 42);
-        when(suggestionRepository.findById(review.getId())).thenReturn(Optional.of(review));
+        when(caseRepository.findById(review.getId())).thenReturn(Optional.of(review));
 
         assertThatThrownBy(() -> service.create(review.getId(), createRequest()))
                 .isInstanceOf(ConflictException.class);
     }
 
-    private static ReviewSuggestion inProgressReview() {
-        ReviewSuggestion review = new ReviewSuggestion("jauns vārds");
+    private static ReviewCase inProgressReview() {
+        ReviewCase review = new ReviewCase("jauns vārds");
         review.changeStatus(SuggestionStatus.IN_PROGRESS);
         return review;
     }

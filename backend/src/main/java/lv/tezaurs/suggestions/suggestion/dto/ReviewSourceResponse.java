@@ -2,7 +2,7 @@ package lv.tezaurs.suggestions.suggestion.dto;
 
 import java.time.Instant;
 import lv.tezaurs.suggestions.suggestion.entity.IncubatorSuggestion;
-import lv.tezaurs.suggestions.suggestion.entity.ReviewSuggestionSource;
+import lv.tezaurs.suggestions.suggestion.entity.CaseSuggestion;
 
 public record ReviewSourceResponse(
         Integer id,
@@ -15,7 +15,7 @@ public record ReviewSourceResponse(
         String contact,
         Instant createdAt) {
 
-    public static ReviewSourceResponse from(ReviewSuggestionSource link) {
+    public static ReviewSourceResponse from(CaseSuggestion link) {
         IncubatorSuggestion source = link.getSourceSuggestion();
         return new ReviewSourceResponse(
                 source.getId(), source.getLemma(), source.getGloss(), source.getExample(),

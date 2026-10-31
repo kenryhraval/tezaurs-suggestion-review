@@ -11,7 +11,7 @@ public record ReviewListItemResponse(
         Instant createdAt,
         long sourceCount) {
 
-    public static ReviewListItemResponse from(ReviewSuggestionListItem item) {
+    public static ReviewListItemResponse from(ReviewCaseListItem item) {
         return new ReviewListItemResponse(item.getId(), item.getReviewedTerm(),
                 item.getStatus(), item.getCreatedAt(), item.getSourceCount());
     }

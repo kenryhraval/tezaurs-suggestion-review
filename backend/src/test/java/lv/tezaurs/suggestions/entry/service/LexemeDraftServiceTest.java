@@ -17,10 +17,10 @@ import lv.tezaurs.suggestions.entry.entity.ReviewEntry;
 import lv.tezaurs.suggestions.entry.entity.ReviewLexeme;
 import lv.tezaurs.suggestions.entry.repository.ReviewEntryRepository;
 import lv.tezaurs.suggestions.entry.repository.ReviewLexemeRepository;
-import lv.tezaurs.suggestions.suggestion.entity.ReviewSuggestion;
+import lv.tezaurs.suggestions.suggestion.entity.ReviewCase;
 import lv.tezaurs.suggestions.suggestion.entity.SuggestionStatus;
 import lv.tezaurs.suggestions.suggestion.entity.TezaursStatus;
-import lv.tezaurs.suggestions.suggestion.repository.ReviewSuggestionRepository;
+import lv.tezaurs.suggestions.suggestion.repository.ReviewCaseRepository;
 import lv.tezaurs.suggestions.tezaurs.repository.TezaursLexemeRoleRepository;
 import lv.tezaurs.suggestions.tezaurs.repository.TezaursParadigmRepository;
 import lv.tezaurs.suggestions.tezaurs.service.TezaursFlagService;
@@ -32,21 +32,21 @@ import org.mockito.MockMakers;
 class LexemeDraftServiceTest {
     private ReviewEntryRepository entryRepository;
     private ReviewLexemeRepository lexemeRepository;
-    private ReviewSuggestionRepository suggestionRepository;
+    private ReviewCaseRepository caseRepository;
     private LexemeDraftService service;
 
     @BeforeEach
     void setUp() {
         entryRepository = mock(ReviewEntryRepository.class, withSettings().mockMaker(MockMakers.PROXY));
         lexemeRepository = mock(ReviewLexemeRepository.class, withSettings().mockMaker(MockMakers.PROXY));
-        suggestionRepository = mock(ReviewSuggestionRepository.class, withSettings().mockMaker(MockMakers.PROXY));
+        caseRepository = mock(ReviewCaseRepository.class, withSettings().mockMaker(MockMakers.PROXY));
         TezaursLexemeRoleRepository roleRepository = mock(
                 TezaursLexemeRoleRepository.class, withSettings().mockMaker(MockMakers.PROXY));
         TezaursParadigmRepository paradigmRepository = mock(
                 TezaursParadigmRepository.class, withSettings().mockMaker(MockMakers.PROXY));
         TezaursFlagService flagService = mock(TezaursFlagService.class);
         TezaursRestrictionService restrictionService = mock(TezaursRestrictionService.class);
-        service = new LexemeDraftService(entryRepository, lexemeRepository, suggestionRepository,
+        service = new LexemeDraftService(entryRepository, lexemeRepository, caseRepository,
                 roleRepository, paradigmRepository, flagService, restrictionService);
 
         when(roleRepository.existsById(1)).thenReturn(true);
@@ -57,7 +57,7 @@ class LexemeDraftServiceTest {
 
     @Test
     void createsLexemesSeparatelyFromTheEntry() {
-        ReviewSuggestion review = reviewWithoutTezaursEntry();
+        ReviewCase review = reviewWithoutTezaursEntry();
         ReviewEntry entry = entry(review.getId());
         ReviewLexeme primary = lexeme(entry.getId(), "jauns vārds", true, 1);
         prepare(review, entry, List.of(primary));
@@ -71,7 +71,7 @@ class LexemeDraftServiceTest {
 
     @Test
     void selectingAPrimaryLexemeDemotesThePreviousOne() {
-        ReviewSuggestion review = reviewWithoutTezaursEntry();
+        ReviewCase review = reviewWithoutTezaursEntry();
         ReviewEntry entry = entry(review.getId());
         ReviewLexeme oldPrimary = lexeme(entry.getId(), "jauns vārds", true, 1);
         ReviewLexeme newPrimary = lexeme(entry.getId(), "jaunvārds", false, 2);
@@ -87,7 +87,7 @@ class LexemeDraftServiceTest {
 
     @Test
     void doesNotDeleteThePrimaryLexeme() {
-        ReviewSuggestion review = reviewWithoutTezaursEntry();
+        ReviewCase review = reviewWithoutTezaursEntry();
         ReviewEntry entry = entry(review.getId());
         ReviewLexeme primary = lexeme(entry.getId(), "jauns vārds", true, 1);
         prepare(review, entry, List.of(primary));
@@ -99,22 +99,22 @@ class LexemeDraftServiceTest {
     }
 
     private void prepare(
-            ReviewSuggestion review, ReviewEntry entry, List<ReviewLexeme> lexemes) {
-        when(suggestionRepository.findById(review.getId())).thenReturn(Optional.of(review));
-        when(entryRepository.findBySuggestionId(review.getId())).thenReturn(Optional.of(entry));
+            ReviewCase review, ReviewEntry entry, List<ReviewLexeme> lexemes) {
+        when(caseRepository.findById(review.getId())).thenReturn(Optional.of(review));
+        when(entryRepository.findByCaseId(review.getId())).thenReturn(Optional.of(entry));
         when(lexemeRepository.findAllByEntryIdOrderByOrderNoAscIdAsc(entry.getId()))
                 .thenReturn(lexemes);
     }
 
-    private static ReviewSuggestion reviewWithoutTezaursEntry() {
-        ReviewSuggestion review = new ReviewSuggestion("jauns vārds");
+    private static ReviewCase reviewWithoutTezaursEntry() {
+        ReviewCase review = new ReviewCase("jauns vārds");
         review.changeStatus(SuggestionStatus.IN_PROGRESS);
         review.recordTezaursCheck(TezaursStatus.NOT_FOUND, null);
         return review;
     }
 
-    private static ReviewEntry entry(UUID suggestionId) {
-        ReviewEntry entry = new ReviewEntry(suggestionId);
+    private static ReviewEntry entry(UUID caseId) {
+        ReviewEntry entry = new ReviewEntry(caseId);
         entry.update("jauns vārds", 1, 1,
                 null, null, null, null, null, Map.of());
         return entry;

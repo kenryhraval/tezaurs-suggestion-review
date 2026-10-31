@@ -14,9 +14,9 @@ import lv.tezaurs.suggestions.entry.entity.ReviewLexeme;
 import lv.tezaurs.suggestions.entry.repository.ReviewEntryRepository;
 import lv.tezaurs.suggestions.entry.repository.ReviewLexemeRepository;
 import lv.tezaurs.suggestions.suggestion.dto.ReviewResponse;
-import lv.tezaurs.suggestions.suggestion.entity.ReviewSuggestion;
+import lv.tezaurs.suggestions.suggestion.entity.ReviewCase;
 import lv.tezaurs.suggestions.suggestion.entity.TezaursStatus;
-import lv.tezaurs.suggestions.suggestion.repository.ReviewSuggestionRepository;
+import lv.tezaurs.suggestions.suggestion.repository.ReviewCaseRepository;
 import lv.tezaurs.suggestions.tezaurs.repository.TezaursLexemeRoleRepository;
 import lv.tezaurs.suggestions.tezaurs.repository.TezaursParadigmRepository;
 import lv.tezaurs.suggestions.tezaurs.service.TezaursFlagService;
@@ -29,16 +29,16 @@ import org.springframework.transaction.annotation.Transactional;
 public class LexemeDraftService {
     private final ReviewEntryRepository entryRepository;
     private final ReviewLexemeRepository lexemeRepository;
-    private final ReviewSuggestionRepository suggestionRepository;
+    private final ReviewCaseRepository caseRepository;
     private final TezaursLexemeRoleRepository lexemeRoleRepository;
     private final TezaursParadigmRepository paradigmRepository;
     private final TezaursFlagService flagService;
     private final TezaursRestrictionService restrictionService;
 
     @Transactional
-    public SaveLexemeDraftResponse create(UUID suggestionId, SaveLexemeDraftRequest request) {
-        ReviewSuggestion suggestion = requireSuggestionWithoutTezaursEntry(suggestionId);
-        ReviewEntry entry = requireEntry(suggestionId);
+    public SaveLexemeDraftResponse create(UUID caseId, SaveLexemeDraftRequest request) {
+        ReviewCase reviewCase = requireCaseWithoutTezaursEntry(caseId);
+        ReviewEntry entry = requireEntry(caseId);
         validate(request);
 
         List<ReviewLexeme> existingLexemes = findLexemes(entry);
@@ -54,15 +54,15 @@ public class LexemeDraftService {
         ReviewLexeme savedLexeme = lexemeRepository.save(lexeme);
 
         existingLexemes.add(savedLexeme);
-        suggestion.recordEntryDraftReadiness(entry.isReady(existingLexemes));
-        return response(savedLexeme, suggestion);
+        reviewCase.recordEntryDraftReadiness(entry.isReady(existingLexemes));
+        return response(savedLexeme, reviewCase);
     }
 
     @Transactional
     public SaveLexemeDraftResponse update(
-            UUID suggestionId, UUID lexemeId, SaveLexemeDraftRequest request) {
-        ReviewSuggestion suggestion = requireSuggestionWithoutTezaursEntry(suggestionId);
-        ReviewEntry entry = requireEntry(suggestionId);
+            UUID caseId, UUID lexemeId, SaveLexemeDraftRequest request) {
+        ReviewCase reviewCase = requireCaseWithoutTezaursEntry(caseId);
+        ReviewEntry entry = requireEntry(caseId);
         ReviewLexeme lexeme = requireLexeme(entry.getId(), lexemeId);
         validate(request);
 
@@ -77,14 +77,14 @@ public class LexemeDraftService {
         }
         updateLexeme(lexeme, request);
 
-        suggestion.recordEntryDraftReadiness(entry.isReady(lexemes));
-        return response(lexeme, suggestion);
+        reviewCase.recordEntryDraftReadiness(entry.isReady(lexemes));
+        return response(lexeme, reviewCase);
     }
 
     @Transactional
-    public ReviewResponse delete(UUID suggestionId, UUID lexemeId) {
-        ReviewSuggestion suggestion = requireSuggestionWithoutTezaursEntry(suggestionId);
-        ReviewEntry entry = requireEntry(suggestionId);
+    public ReviewResponse delete(UUID caseId, UUID lexemeId) {
+        ReviewCase reviewCase = requireCaseWithoutTezaursEntry(caseId);
+        ReviewEntry entry = requireEntry(caseId);
         ReviewLexeme lexeme = requireLexeme(entry.getId(), lexemeId);
         if (lexeme.isPrimary()) {
             throw new ConflictException("Select another primary lexeme before deleting this one");
@@ -94,8 +94,8 @@ public class LexemeDraftService {
         List<ReviewLexeme> remainingLexemes = findLexemes(entry).stream()
                 .filter(existing -> !existing.getId().equals(lexemeId))
                 .toList();
-        suggestion.recordEntryDraftReadiness(entry.isReady(remainingLexemes));
-        return ReviewResponse.from(suggestion);
+        reviewCase.recordEntryDraftReadiness(entry.isReady(remainingLexemes));
+        return ReviewResponse.from(reviewCase);
     }
 
     ReviewLexeme createInitial(ReviewEntry entry, SaveLexemeDraftRequest request) {
@@ -126,18 +126,18 @@ public class LexemeDraftService {
         restrictionService.validate(request.structuralRestrictions());
     }
 
-    private ReviewSuggestion requireSuggestionWithoutTezaursEntry(UUID id) {
-        ReviewSuggestion suggestion = suggestionRepository.findById(id)
+    private ReviewCase requireCaseWithoutTezaursEntry(UUID id) {
+        ReviewCase reviewCase = caseRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Review " + id + " was not found"));
-        if (suggestion.getTezaursStatus() != TezaursStatus.NOT_FOUND) {
+        if (reviewCase.getTezaursStatus() != TezaursStatus.NOT_FOUND) {
             throw new ConflictException(
                     "An entry draft can only be saved when the entry is absent from Tēzaurs");
         }
-        return suggestion;
+        return reviewCase;
     }
 
-    private ReviewEntry requireEntry(UUID suggestionId) {
-        return entryRepository.findBySuggestionId(suggestionId)
+    private ReviewEntry requireEntry(UUID caseId) {
+        return entryRepository.findByCaseId(caseId)
                 .orElseThrow(() -> new NotFoundException("Entry draft was not found"));
     }
 
@@ -152,9 +152,9 @@ public class LexemeDraftService {
     }
 
     private static SaveLexemeDraftResponse response(
-            ReviewLexeme lexeme, ReviewSuggestion suggestion) {
+            ReviewLexeme lexeme, ReviewCase reviewCase) {
         return new SaveLexemeDraftResponse(
                 EntryDraftResponse.LexemeDraftResponse.from(lexeme),
-                ReviewResponse.from(suggestion));
+                ReviewResponse.from(reviewCase));
     }
 }

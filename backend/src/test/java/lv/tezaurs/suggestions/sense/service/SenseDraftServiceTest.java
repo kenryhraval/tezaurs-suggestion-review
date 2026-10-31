@@ -16,10 +16,10 @@ import lv.tezaurs.suggestions.common.error.NotFoundException;
 import lv.tezaurs.suggestions.sense.dto.SaveSenseDraftsRequest;
 import lv.tezaurs.suggestions.sense.entity.ReviewSense;
 import lv.tezaurs.suggestions.sense.repository.ReviewSenseRepository;
-import lv.tezaurs.suggestions.suggestion.entity.ReviewSuggestion;
+import lv.tezaurs.suggestions.suggestion.entity.ReviewCase;
 import lv.tezaurs.suggestions.suggestion.entity.SuggestionStatus;
 import lv.tezaurs.suggestions.suggestion.entity.TezaursStatus;
-import lv.tezaurs.suggestions.suggestion.repository.ReviewSuggestionRepository;
+import lv.tezaurs.suggestions.suggestion.repository.ReviewCaseRepository;
 import lv.tezaurs.suggestions.tezaurs.repository.TezaursSenseRepository;
 import lv.tezaurs.suggestions.tezaurs.service.TezaursFlagService;
 import lv.tezaurs.suggestions.tezaurs.service.TezaursRestrictionService;
@@ -29,32 +29,32 @@ import org.mockito.MockMakers;
 
 class SenseDraftServiceTest {
     private ReviewSenseRepository senseRepository;
-    private ReviewSuggestionRepository suggestionRepository;
+    private ReviewCaseRepository caseRepository;
     private TezaursSenseRepository tezaursSenseRepository;
     private SenseDraftService service;
 
     @BeforeEach
     void setUp() {
         senseRepository = mock(ReviewSenseRepository.class, withSettings().mockMaker(MockMakers.PROXY));
-        suggestionRepository = mock(
-                ReviewSuggestionRepository.class, withSettings().mockMaker(MockMakers.PROXY));
+        caseRepository = mock(
+                ReviewCaseRepository.class, withSettings().mockMaker(MockMakers.PROXY));
         tezaursSenseRepository = mock(
                 TezaursSenseRepository.class, withSettings().mockMaker(MockMakers.PROXY));
         TezaursFlagService flagService = mock(TezaursFlagService.class);
         TezaursRestrictionService restrictionService = mock(TezaursRestrictionService.class);
         service = new SenseDraftService(
-                senseRepository, suggestionRepository, tezaursSenseRepository,
+                senseRepository, caseRepository, tezaursSenseRepository,
                 flagService, restrictionService);
         when(senseRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
     @Test
     void savesAFullSenseDraftAndAllowsCompletion() {
-        ReviewSuggestion review = new ReviewSuggestion("vārds");
+        ReviewCase review = new ReviewCase("vārds");
         review.changeStatus(SuggestionStatus.IN_PROGRESS);
         review.recordTezaursCheck(TezaursStatus.MEANING_NOT_FOUND, 42);
-        when(suggestionRepository.findById(review.getId())).thenReturn(Optional.of(review));
-        when(senseRepository.findAllBySuggestionIdOrderByOrderNoAscIdAsc(review.getId()))
+        when(caseRepository.findById(review.getId())).thenReturn(Optional.of(review));
+        when(senseRepository.findAllByCaseIdOrderByOrderNoAscIdAsc(review.getId()))
                 .thenReturn(List.of());
 
         var response = service.save(review.getId(), request(null, null));
@@ -67,11 +67,11 @@ class SenseDraftServiceTest {
 
     @Test
     void rejectsASenseThatIsItsOwnParent() {
-        ReviewSuggestion review = new ReviewSuggestion("vārds");
+        ReviewCase review = new ReviewCase("vārds");
         review.changeStatus(SuggestionStatus.IN_PROGRESS);
         review.recordTezaursCheck(TezaursStatus.MEANING_NOT_FOUND, 42);
         UUID senseId = UUID.randomUUID();
-        when(suggestionRepository.findById(review.getId())).thenReturn(Optional.of(review));
+        when(caseRepository.findById(review.getId())).thenReturn(Optional.of(review));
 
         assertThatThrownBy(() -> service.save(review.getId(), request(senseId, senseId)))
                 .isInstanceOf(ConflictException.class);
@@ -79,11 +79,11 @@ class SenseDraftServiceTest {
 
     @Test
     void returnsExistingDraftSenses() {
-        ReviewSuggestion review = reviewWithMissingMeaning();
+        ReviewCase review = reviewWithMissingMeaning();
         ReviewSense sense = new ReviewSense(review.getId());
         sense.update("Nozīme", null, null, 1, Map.of(), null);
-        when(suggestionRepository.findById(review.getId())).thenReturn(Optional.of(review));
-        when(senseRepository.findAllBySuggestionIdOrderByOrderNoAscIdAsc(review.getId()))
+        when(caseRepository.findById(review.getId())).thenReturn(Optional.of(review));
+        when(senseRepository.findAllByCaseIdOrderByOrderNoAscIdAsc(review.getId()))
                 .thenReturn(List.of(sense));
 
         assertThat(service.findAll(review.getId())).singleElement()
@@ -94,14 +94,14 @@ class SenseDraftServiceTest {
     @Test
     void rejectsMissingReviewsAndReviewsWithoutAMissingSense() {
         UUID missingId = UUID.randomUUID();
-        when(suggestionRepository.findById(missingId)).thenReturn(Optional.empty());
+        when(caseRepository.findById(missingId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.findAll(missingId))
                 .isInstanceOf(NotFoundException.class);
 
-        ReviewSuggestion unchecked = new ReviewSuggestion("vārds");
+        ReviewCase unchecked = new ReviewCase("vārds");
         unchecked.changeStatus(SuggestionStatus.IN_PROGRESS);
-        when(suggestionRepository.findById(unchecked.getId())).thenReturn(Optional.of(unchecked));
+        when(caseRepository.findById(unchecked.getId())).thenReturn(Optional.of(unchecked));
 
         assertThatThrownBy(() -> service.save(unchecked.getId(), request(null, null)))
                 .isInstanceOf(ConflictException.class);
@@ -109,10 +109,10 @@ class SenseDraftServiceTest {
 
     @Test
     void validatesDraftAndTezaursParentReferences() {
-        ReviewSuggestion review = reviewWithMissingMeaning();
-        when(suggestionRepository.findById(review.getId())).thenReturn(Optional.of(review));
+        ReviewCase review = reviewWithMissingMeaning();
+        when(caseRepository.findById(review.getId())).thenReturn(Optional.of(review));
         when(tezaursSenseRepository.existsByIdAndEntryId(7, 42)).thenReturn(true);
-        when(senseRepository.findAllBySuggestionIdOrderByOrderNoAscIdAsc(review.getId()))
+        when(senseRepository.findAllByCaseIdOrderByOrderNoAscIdAsc(review.getId()))
                 .thenReturn(List.of());
 
         var validParent = item(null, null, 7);
@@ -133,8 +133,8 @@ class SenseDraftServiceTest {
 
     @Test
     void rejectsDuplicateMissingAndCyclicDraftParents() {
-        ReviewSuggestion review = reviewWithMissingMeaning();
-        when(suggestionRepository.findById(review.getId())).thenReturn(Optional.of(review));
+        ReviewCase review = reviewWithMissingMeaning();
+        when(caseRepository.findById(review.getId())).thenReturn(Optional.of(review));
 
         UUID firstId = UUID.randomUUID();
         UUID secondId = UUID.randomUUID();
@@ -160,10 +160,10 @@ class SenseDraftServiceTest {
 
     @Test
     void rejectsAnExistingSenseFromAnotherReview() {
-        ReviewSuggestion review = reviewWithMissingMeaning();
+        ReviewCase review = reviewWithMissingMeaning();
         UUID foreignSenseId = UUID.randomUUID();
-        when(suggestionRepository.findById(review.getId())).thenReturn(Optional.of(review));
-        when(senseRepository.findAllBySuggestionIdOrderByOrderNoAscIdAsc(review.getId()))
+        when(caseRepository.findById(review.getId())).thenReturn(Optional.of(review));
+        when(senseRepository.findAllByCaseIdOrderByOrderNoAscIdAsc(review.getId()))
                 .thenReturn(List.of());
 
         assertThatThrownBy(() -> service.save(review.getId(), request(foreignSenseId, null)))
@@ -182,8 +182,8 @@ class SenseDraftServiceTest {
                 parentTezaursSenseId, Map.of(), null);
     }
 
-    private static ReviewSuggestion reviewWithMissingMeaning() {
-        ReviewSuggestion review = new ReviewSuggestion("vārds");
+    private static ReviewCase reviewWithMissingMeaning() {
+        ReviewCase review = new ReviewCase("vārds");
         review.changeStatus(SuggestionStatus.IN_PROGRESS);
         review.recordTezaursCheck(TezaursStatus.MEANING_NOT_FOUND, 42);
         return review;

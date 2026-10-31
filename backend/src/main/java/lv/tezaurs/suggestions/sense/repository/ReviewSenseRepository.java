@@ -6,5 +6,5 @@ import lv.tezaurs.suggestions.sense.entity.ReviewSense;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface ReviewSenseRepository extends JpaRepository<ReviewSense, UUID> {
-    List<ReviewSense> findAllBySuggestionIdOrderByOrderNoAscIdAsc(UUID suggestionId);
+    List<ReviewSense> findAllByCaseIdOrderByOrderNoAscIdAsc(UUID caseId);
 }

@@ -4,7 +4,7 @@ import java.time.Instant;
 import java.util.UUID;
 import lv.tezaurs.suggestions.suggestion.entity.SuggestionStatus;
 
-public interface ReviewSuggestionListItem {
+public interface ReviewCaseListItem {
     UUID getId();
 
     String getReviewedTerm();

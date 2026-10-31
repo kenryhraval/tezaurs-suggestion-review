@@ -1,4 +1,4 @@
-CREATE TABLE suggestions (
+CREATE TABLE cases (
     id UUID PRIMARY KEY,
     reviewed_term VARCHAR(255) NOT NULL,
     status VARCHAR(32) NOT NULL,
@@ -9,35 +9,35 @@ CREATE TABLE suggestions (
     version BIGINT NOT NULL DEFAULT 0,
     created_at TIMESTAMPTZ NOT NULL,
     updated_at TIMESTAMPTZ NOT NULL,
-    CONSTRAINT ck_review_suggestions_status CHECK (
+    CONSTRAINT ck_review_cases_status CHECK (
         status IN (
             'NEW', 'READY_FOR_REVIEW', 'GARBAGE', 'COMPLETED', 'IN_PROGRESS',
             'INVENTED', 'ALREADY_EXISTS', 'INSUFFICIENT_DATA', 'NEEDS_EXPERT'
         )
     ),
-    CONSTRAINT ck_review_suggestions_tezaurs_status CHECK (
+    CONSTRAINT ck_review_cases_tezaurs_status CHECK (
         tezaurs_status IN (
             'NOT_CHECKED', 'FOUND', 'MEANING_FOUND', 'MEANING_NOT_FOUND', 'NOT_FOUND'
         )
     ),
-    CONSTRAINT ck_review_suggestions_tezaurs_match CHECK (
+    CONSTRAINT ck_review_cases_tezaurs_match CHECK (
         matched_entry_id IS NULL
         OR tezaurs_status IN ('FOUND', 'MEANING_FOUND', 'MEANING_NOT_FOUND')
     )
 );
 
-CREATE TABLE suggestion_sources (
+CREATE TABLE case_suggestions (
     source_suggestion_id INTEGER PRIMARY KEY,
-    suggestion_id UUID NOT NULL REFERENCES suggestions (id) ON DELETE CASCADE,
+    case_id UUID NOT NULL REFERENCES cases (id) ON DELETE CASCADE,
     created_at TIMESTAMPTZ NOT NULL
 );
 
-CREATE INDEX ix_review_suggestion_sources_suggestion
-    ON suggestion_sources (suggestion_id);
+CREATE INDEX ix_review_case_suggestions_case
+    ON case_suggestions (case_id);
 
 CREATE TABLE entries (
     id UUID PRIMARY KEY,
-    suggestion_id UUID NOT NULL UNIQUE REFERENCES suggestions (id) ON DELETE CASCADE,
+    case_id UUID NOT NULL UNIQUE REFERENCES cases (id) ON DELETE CASCADE,
     heading VARCHAR(255) NOT NULL,
     homonym_no INTEGER NOT NULL,
     type_id INTEGER NOT NULL,
@@ -78,7 +78,7 @@ CREATE INDEX ix_review_lexemes_entry
 
 CREATE TABLE senses (
     id UUID PRIMARY KEY,
-    suggestion_id UUID NOT NULL REFERENCES suggestions (id) ON DELETE CASCADE,
+    case_id UUID NOT NULL REFERENCES cases (id) ON DELETE CASCADE,
     parent_draft_sense_id UUID REFERENCES senses (id) ON DELETE CASCADE,
     parent_tezaurs_sense_id INTEGER,
     gloss TEXT NOT NULL,
@@ -93,5 +93,5 @@ CREATE TABLE senses (
     )
 );
 
-CREATE INDEX ix_review_senses_suggestion
-    ON senses (suggestion_id, order_no);
+CREATE INDEX ix_review_senses_case
+    ON senses (case_id, order_no);

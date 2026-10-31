@@ -16,7 +16,7 @@ import lv.tezaurs.suggestions.suggestion.dto.SuggestionResponse;
 import lv.tezaurs.suggestions.suggestion.dto.SuggestionSort;
 import lv.tezaurs.suggestions.suggestion.dto.UpdateStatusRequest;
 import lv.tezaurs.suggestions.suggestion.entity.IncubatorSuggestion;
-import lv.tezaurs.suggestions.suggestion.entity.ReviewSuggestion;
+import lv.tezaurs.suggestions.suggestion.entity.ReviewCase;
 import lv.tezaurs.suggestions.suggestion.entity.SuggestionStatus;
 import lv.tezaurs.suggestions.suggestion.repository.IncubatorSuggestionRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -53,7 +53,7 @@ class SuggestionServiceTest {
     @Test
     void delegatesTheFirstStatusChangeToReviewCreation() {
         IncubatorSuggestion source = source(42);
-        ReviewSuggestion review = new ReviewSuggestion("term");
+        ReviewCase review = new ReviewCase("term");
         review.changeStatus(SuggestionStatus.GARBAGE);
         when(sourceSuggestionRepository.findById(42)).thenReturn(Optional.of(source));
         when(reviewService.startReview(source, SuggestionStatus.GARBAGE)).thenReturn(review);

@@ -8,7 +8,7 @@ import java.util.Set;
 import lv.tezaurs.suggestions.common.error.ConflictException;
 import org.junit.jupiter.api.Test;
 
-class ReviewSuggestionTest {
+class ReviewCaseTest {
     @Test
     void enforcesTheTezaursWorkflowGraph() {
         Map<SuggestionStatus, Set<SuggestionStatus>> expected = Map.of(
@@ -39,7 +39,7 @@ class ReviewSuggestionTest {
 
     @Test
     void startsNewAndOwnsItsWorkflowState() {
-        ReviewSuggestion review = new ReviewSuggestion("submitted");
+        ReviewCase review = new ReviewCase("submitted");
 
         assertThat(review.getStatus()).isEqualTo(SuggestionStatus.NEW);
         review.changeStatus(SuggestionStatus.IN_PROGRESS);
@@ -48,7 +48,7 @@ class ReviewSuggestionTest {
 
     @Test
     void recordsReviewData() {
-        ReviewSuggestion review = inProgressReview();
+        ReviewCase review = inProgressReview();
         review.correctTerm("corrected");
         review.recordTezaursCheck(TezaursStatus.MEANING_NOT_FOUND, 42);
 
@@ -58,12 +58,12 @@ class ReviewSuggestionTest {
 
     @Test
     void validatesStatusAndEvidenceTransitions() {
-        ReviewSuggestion review = new ReviewSuggestion("submitted");
+        ReviewCase review = new ReviewCase("submitted");
         review.changeStatus(SuggestionStatus.READY_FOR_REVIEW);
         assertThatThrownBy(() -> review.changeStatus(SuggestionStatus.GARBAGE))
                 .isInstanceOf(ConflictException.class);
 
-        ReviewSuggestion inProgress = inProgressReview();
+        ReviewCase inProgress = inProgressReview();
         assertThatThrownBy(() -> inProgress.changeStatus(SuggestionStatus.ALREADY_EXISTS))
                 .isInstanceOf(ConflictException.class);
         inProgress.recordTezaursCheck(TezaursStatus.MEANING_FOUND, 42);
@@ -73,7 +73,7 @@ class ReviewSuggestionTest {
 
     @Test
     void requiresReviewChecksBeforeCompletion() {
-        ReviewSuggestion review = inProgressReview();
+        ReviewCase review = inProgressReview();
 
         assertThatThrownBy(() -> review.changeStatus(SuggestionStatus.COMPLETED))
                 .isInstanceOf(ConflictException.class);
@@ -90,7 +90,7 @@ class ReviewSuggestionTest {
 
     @Test
     void requiresANewMeaningDraftForAnExistingEntry() {
-        ReviewSuggestion review = inProgressReview();
+        ReviewCase review = inProgressReview();
         review.recordTezaursCheck(TezaursStatus.MEANING_NOT_FOUND, 42);
 
         assertThat(review.completionBlockReason()).isEqualTo(CompletionBlockReason.SENSE_DRAFT_REQUIRED);
@@ -102,7 +102,7 @@ class ReviewSuggestionTest {
 
     @Test
     void reportsThePendingTezaursAndMeaningChecks() {
-        ReviewSuggestion review = inProgressReview();
+        ReviewCase review = inProgressReview();
 
         assertThat(review.completionBlockReason())
                 .isEqualTo(CompletionBlockReason.TEZAURS_CHECK_REQUIRED);
@@ -115,7 +115,7 @@ class ReviewSuggestionTest {
 
     @Test
     void acceptsCompletionWhenTheMeaningAlreadyExists() {
-        ReviewSuggestion review = inProgressReview();
+        ReviewCase review = inProgressReview();
         review.recordTezaursCheck(TezaursStatus.MEANING_FOUND, 42);
 
         assertThat(review.canComplete()).isTrue();
@@ -125,7 +125,7 @@ class ReviewSuggestionTest {
 
     @Test
     void rejectsReviewDataThatDoesNotMatchTheTezaursCheck() {
-        ReviewSuggestion review = inProgressReview();
+        ReviewCase review = inProgressReview();
 
         assertThatThrownBy(() -> review.recordTezaursCheck(TezaursStatus.NOT_FOUND, 42))
                 .isInstanceOf(ConflictException.class);
@@ -136,8 +136,8 @@ class ReviewSuggestionTest {
 
     }
 
-    private static ReviewSuggestion inProgressReview() {
-        ReviewSuggestion review = new ReviewSuggestion("submitted");
+    private static ReviewCase inProgressReview() {
+        ReviewCase review = new ReviewCase("submitted");
         review.changeStatus(SuggestionStatus.IN_PROGRESS);
         return review;
     }

@@ -14,11 +14,11 @@ import lv.tezaurs.suggestions.suggestion.dto.ReviewResponse;
 import lv.tezaurs.suggestions.suggestion.dto.ReviewSort;
 import lv.tezaurs.suggestions.suggestion.dto.UpdateStatusRequest;
 import lv.tezaurs.suggestions.suggestion.entity.IncubatorSuggestion;
-import lv.tezaurs.suggestions.suggestion.entity.ReviewSuggestion;
-import lv.tezaurs.suggestions.suggestion.entity.ReviewSuggestionSource;
+import lv.tezaurs.suggestions.suggestion.entity.ReviewCase;
+import lv.tezaurs.suggestions.suggestion.entity.CaseSuggestion;
 import lv.tezaurs.suggestions.suggestion.entity.SuggestionStatus;
-import lv.tezaurs.suggestions.suggestion.repository.ReviewSuggestionRepository;
-import lv.tezaurs.suggestions.suggestion.repository.ReviewSuggestionSourceRepository;
+import lv.tezaurs.suggestions.suggestion.repository.ReviewCaseRepository;
+import lv.tezaurs.suggestions.suggestion.repository.CaseSuggestionRepository;
 import lv.tezaurs.suggestions.tezaurs.dto.TezaursEntryCandidateResponse;
 import lv.tezaurs.suggestions.tezaurs.repository.TezaursEntryRepository;
 import lv.tezaurs.suggestions.tezaurs.service.TezaursEntrySearchService;
@@ -30,8 +30,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class ReviewService {
-    private final ReviewSuggestionRepository reviewRepository;
-    private final ReviewSuggestionSourceRepository reviewSourceRepository;
+    private final ReviewCaseRepository reviewRepository;
+    private final CaseSuggestionRepository reviewSourceRepository;
     private final TezaursEntryRepository tezaursEntryRepository;
     private final TezaursEntrySearchService tezaursEntrySearchService;
 
@@ -57,18 +57,18 @@ public class ReviewService {
     }
 
     @Transactional
-    public ReviewSuggestion startReview(IncubatorSuggestion source, SuggestionStatus status) {
+    public ReviewCase startReview(IncubatorSuggestion source, SuggestionStatus status) {
         if (reviewSourceRepository.existsById(source.getId())) {
             throw new ConflictException("The source suggestion already belongs to a review");
         }
-        ReviewSuggestion review = create(source);
+        ReviewCase review = create(source);
         review.changeStatus(status);
         return review;
     }
 
     @Transactional
     public ReviewResponse changeStatus(UUID reviewId, UpdateStatusRequest request) {
-        ReviewSuggestion review = requireReview(reviewId);
+        ReviewCase review = requireReview(reviewId);
         review.changeStatus(request.status());
         return ReviewResponse.from(review);
     }
@@ -82,7 +82,7 @@ public class ReviewService {
                         query.trim(), PageRequest.of(0, 5, Sort.by("reviewedTerm")))
                 .stream()
                 .map(review -> DuplicateReviewCandidateResponse.from(
-                        review, reviewSourceRepository.countByReviewId(review.getId())))
+                        review, reviewSourceRepository.countByReviewCaseId(review.getId())))
                 .toList();
     }
 
@@ -91,21 +91,21 @@ public class ReviewService {
         if (reviewSourceRepository.existsById(source.getId())) {
             throw new ConflictException("The source suggestion already belongs to a review");
         }
-        ReviewSuggestion review = requireReview(reviewId);
+        ReviewCase review = requireReview(reviewId);
         reviewSourceRepository.save(
-                new ReviewSuggestionSource(source, review));
+                new CaseSuggestion(source, review));
     }
 
     @Transactional
     public ReviewResponse correctTerm(UUID reviewId, CorrectTermRequest request) {
-        ReviewSuggestion review = requireReview(reviewId);
+        ReviewCase review = requireReview(reviewId);
         review.correctTerm(request.reviewedTerm().trim());
         return ReviewResponse.from(review);
     }
 
     @Transactional
     public ReviewResponse recordTezaursCheck(UUID reviewId, RecordTezaursCheckRequest request) {
-        ReviewSuggestion review = requireReview(reviewId);
+        ReviewCase review = requireReview(reviewId);
         if (request.status().entryExists()
                 && (request.matchedEntryId() == null
                 || !tezaursEntryRepository.existsById(request.matchedEntryId()))) {
@@ -117,22 +117,22 @@ public class ReviewService {
 
     @Transactional(readOnly = true)
     public List<TezaursEntryCandidateResponse> findTezaursCandidates(UUID reviewId, String query) {
-        ReviewSuggestion review = requireReview(reviewId);
+        ReviewCase review = requireReview(reviewId);
         String searchTerm = query == null || query.isBlank()
                 ? review.getReviewedTerm() : query.trim();
         return tezaursEntrySearchService.findMatches(searchTerm);
     }
 
-    private ReviewSuggestion requireReview(UUID id) {
+    private ReviewCase requireReview(UUID id) {
         return reviewRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Review " + id + " was not found"));
     }
 
-    private ReviewSuggestion create(IncubatorSuggestion source) {
-        ReviewSuggestion review = reviewRepository.save(
-                new ReviewSuggestion(source.getLemma()));
+    private ReviewCase create(IncubatorSuggestion source) {
+        ReviewCase review = reviewRepository.save(
+                new ReviewCase(source.getLemma()));
         reviewSourceRepository.save(
-                new ReviewSuggestionSource(source, review));
+                new CaseSuggestion(source, review));
         return review;
     }
 }

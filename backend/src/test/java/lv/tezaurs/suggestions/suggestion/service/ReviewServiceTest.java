@@ -16,15 +16,15 @@ import lv.tezaurs.suggestions.common.error.NotFoundException;
 import lv.tezaurs.suggestions.suggestion.dto.RecordTezaursCheckRequest;
 import lv.tezaurs.suggestions.suggestion.dto.ReviewResponse;
 import lv.tezaurs.suggestions.suggestion.dto.ReviewSort;
-import lv.tezaurs.suggestions.suggestion.dto.ReviewSuggestionListItem;
+import lv.tezaurs.suggestions.suggestion.dto.ReviewCaseListItem;
 import lv.tezaurs.suggestions.suggestion.dto.UpdateStatusRequest;
 import lv.tezaurs.suggestions.suggestion.entity.IncubatorSuggestion;
-import lv.tezaurs.suggestions.suggestion.entity.ReviewSuggestion;
-import lv.tezaurs.suggestions.suggestion.entity.ReviewSuggestionSource;
+import lv.tezaurs.suggestions.suggestion.entity.ReviewCase;
+import lv.tezaurs.suggestions.suggestion.entity.CaseSuggestion;
 import lv.tezaurs.suggestions.suggestion.entity.SuggestionStatus;
 import lv.tezaurs.suggestions.suggestion.entity.TezaursStatus;
-import lv.tezaurs.suggestions.suggestion.repository.ReviewSuggestionRepository;
-import lv.tezaurs.suggestions.suggestion.repository.ReviewSuggestionSourceRepository;
+import lv.tezaurs.suggestions.suggestion.repository.ReviewCaseRepository;
+import lv.tezaurs.suggestions.suggestion.repository.CaseSuggestionRepository;
 import lv.tezaurs.suggestions.tezaurs.repository.TezaursEntryRepository;
 import lv.tezaurs.suggestions.tezaurs.service.TezaursEntrySearchService;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,25 +35,25 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 
 class ReviewServiceTest {
-    private ReviewSuggestionRepository reviewRepository;
-    private ReviewSuggestionSourceRepository reviewSourceRepository;
+    private ReviewCaseRepository reviewRepository;
+    private CaseSuggestionRepository reviewSourceRepository;
     private TezaursEntryRepository tezaursEntryRepository;
     private TezaursEntrySearchService tezaursEntrySearchService;
     private ReviewService service;
 
     @BeforeEach
     void setUp() {
-        reviewRepository = mock(ReviewSuggestionRepository.class,
+        reviewRepository = mock(ReviewCaseRepository.class,
                 withSettings().mockMaker(MockMakers.PROXY));
-        reviewSourceRepository = mock(ReviewSuggestionSourceRepository.class,
+        reviewSourceRepository = mock(CaseSuggestionRepository.class,
                 withSettings().mockMaker(MockMakers.PROXY));
         tezaursEntryRepository = mock(TezaursEntryRepository.class);
         tezaursEntrySearchService = mock(TezaursEntrySearchService.class);
         service = new ReviewService(reviewRepository, reviewSourceRepository,
                 tezaursEntryRepository, tezaursEntrySearchService);
-        when(reviewRepository.save(any(ReviewSuggestion.class)))
+        when(reviewRepository.save(any(ReviewCase.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
-        when(reviewSourceRepository.save(any(ReviewSuggestionSource.class)))
+        when(reviewSourceRepository.save(any(CaseSuggestion.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
     }
 
@@ -70,13 +70,13 @@ class ReviewServiceTest {
     void theFirstStatusChangeCreatesTheLinkedReview() {
         IncubatorSuggestion source = source();
 
-        ReviewSuggestion review = service.startReview(source, SuggestionStatus.READY_FOR_REVIEW);
+        ReviewCase review = service.startReview(source, SuggestionStatus.READY_FOR_REVIEW);
 
         assertThat(review.getStatus()).isEqualTo(SuggestionStatus.READY_FOR_REVIEW);
-        ArgumentCaptor<ReviewSuggestionSource> link = ArgumentCaptor.forClass(ReviewSuggestionSource.class);
+        ArgumentCaptor<CaseSuggestion> link = ArgumentCaptor.forClass(CaseSuggestion.class);
         verify(reviewSourceRepository).save(link.capture());
         assertThat(link.getValue().getSourceSuggestion()).isSameAs(source);
-        assertThat(link.getValue().getReview()).isSameAs(review);
+        assertThat(link.getValue().getReviewCase()).isSameAs(review);
         assertThat(ReviewResponse.from(review).sources()).singleElement()
                 .satisfies(item -> {
                     assertThat(item.id()).isEqualTo(source.getId());
@@ -96,12 +96,12 @@ class ReviewServiceTest {
     @Test
     void findsExistingReviewsAndLinksDuplicateSources() {
         IncubatorSuggestion source = source();
-        ReviewSuggestion review = new ReviewSuggestion("term");
+        ReviewCase review = new ReviewCase("term");
         review.changeStatus(SuggestionStatus.READY_FOR_REVIEW);
         when(reviewRepository.findByReviewedTermContainingIgnoreCase(
                 org.mockito.ArgumentMatchers.eq("term"), any(Pageable.class)))
                 .thenReturn(List.of(review));
-        when(reviewSourceRepository.countByReviewId(review.getId())).thenReturn(2L);
+        when(reviewSourceRepository.countByReviewCaseId(review.getId())).thenReturn(2L);
         when(reviewRepository.findById(review.getId())).thenReturn(Optional.of(review));
 
         var candidates = service.findDuplicateCandidates("  term  ");
@@ -109,17 +109,17 @@ class ReviewServiceTest {
 
         assertThat(candidates).hasSize(1);
         assertThat(candidates.getFirst().sourceCount()).isEqualTo(2);
-        ArgumentCaptor<ReviewSuggestionSource> link = ArgumentCaptor.forClass(ReviewSuggestionSource.class);
+        ArgumentCaptor<CaseSuggestion> link = ArgumentCaptor.forClass(CaseSuggestion.class);
         verify(reviewSourceRepository).save(link.capture());
         assertThat(link.getValue().getSourceSuggestion()).isSameAs(source);
-        assertThat(link.getValue().getReview()).isSameAs(review);
+        assertThat(link.getValue().getReviewCase()).isSameAs(review);
     }
 
     @Test
     void listsAndChangesReviewsByReviewId() {
-        ReviewSuggestion review = new ReviewSuggestion("term");
+        ReviewCase review = new ReviewCase("term");
         review.changeStatus(SuggestionStatus.READY_FOR_REVIEW);
-        ReviewSuggestionListItem item = mock(ReviewSuggestionListItem.class);
+        ReviewCaseListItem item = mock(ReviewCaseListItem.class);
         when(item.getId()).thenReturn(review.getId());
         when(item.getReviewedTerm()).thenReturn("term");
         when(item.getStatus()).thenReturn(SuggestionStatus.READY_FOR_REVIEW);
@@ -142,7 +142,7 @@ class ReviewServiceTest {
 
     @Test
     void validatesTezaursEntriesAndSearchesByTheReviewTerm() {
-        ReviewSuggestion review = inProgressReview();
+        ReviewCase review = inProgressReview();
         review.correctTerm("corrected");
         review.recordTezaursCheck(TezaursStatus.FOUND, 42);
         when(reviewRepository.findById(review.getId())).thenReturn(Optional.of(review));
@@ -162,8 +162,8 @@ class ReviewServiceTest {
         return new IncubatorSuggestion(42, "term", "definition");
     }
 
-    private static ReviewSuggestion inProgressReview() {
-        ReviewSuggestion review = new ReviewSuggestion("term");
+    private static ReviewCase inProgressReview() {
+        ReviewCase review = new ReviewCase("term");
         review.changeStatus(SuggestionStatus.IN_PROGRESS);
         return review;
     }

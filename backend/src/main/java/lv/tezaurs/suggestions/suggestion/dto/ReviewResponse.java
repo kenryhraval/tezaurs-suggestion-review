@@ -5,8 +5,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import lv.tezaurs.suggestions.suggestion.entity.CompletionBlockReason;
-import lv.tezaurs.suggestions.suggestion.entity.ReviewSuggestion;
-import lv.tezaurs.suggestions.suggestion.entity.ReviewSuggestionSource;
+import lv.tezaurs.suggestions.suggestion.entity.ReviewCase;
+import lv.tezaurs.suggestions.suggestion.entity.CaseSuggestion;
 import lv.tezaurs.suggestions.suggestion.entity.SuggestionStatus;
 import lv.tezaurs.suggestions.suggestion.entity.TezaursStatus;
 
@@ -21,13 +21,13 @@ public record ReviewResponse(
         Instant createdAt,
         List<ReviewSourceResponse> sources) {
 
-    public static ReviewResponse from(ReviewSuggestion review) {
+    public static ReviewResponse from(ReviewCase review) {
         return new ReviewResponse(review.getId(), review.getReviewedTerm(), review.getStatus(),
                 review.getTezaursStatus(), review.getMatchedEntryId(),
                 review.canComplete(), review.completionBlockReason(), review.getCreatedAt(),
                 review.getSources().stream()
                         .sorted(Comparator.comparingInt(
-                                ReviewSuggestionSource::getSourceSuggestionId))
+                                CaseSuggestion::getSourceSuggestionId))
                         .map(ReviewSourceResponse::from)
                         .toList());
     }

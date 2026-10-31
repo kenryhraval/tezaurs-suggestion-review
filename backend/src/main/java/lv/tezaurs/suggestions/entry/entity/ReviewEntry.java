@@ -26,8 +26,8 @@ public class ReviewEntry {
     @Id
     private UUID id;
 
-    @Column(name = "suggestion_id", nullable = false, unique = true, updatable = false)
-    private UUID suggestionId;
+    @Column(name = "case_id", nullable = false, unique = true, updatable = false)
+    private UUID caseId;
 
     @Column(nullable = false)
     private String heading;
@@ -69,9 +69,9 @@ public class ReviewEntry {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    public ReviewEntry(UUID suggestionId) {
+    public ReviewEntry(UUID caseId) {
         this.id = UUID.randomUUID();
-        this.suggestionId = suggestionId;
+        this.caseId = caseId;
     }
 
     public void update(String heading, int homonymNo, Integer typeId,

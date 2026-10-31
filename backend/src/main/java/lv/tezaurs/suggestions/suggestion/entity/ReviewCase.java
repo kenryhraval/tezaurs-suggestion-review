@@ -21,10 +21,10 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 @Entity
-@Table(name = "suggestions", schema = "review")
+@Table(name = "cases", schema = "review")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class ReviewSuggestion {
+public class ReviewCase {
     @Id
     private UUID id;
 
@@ -60,17 +60,17 @@ public class ReviewSuggestion {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    @OneToMany(mappedBy = "review", fetch = FetchType.LAZY)
-    private List<ReviewSuggestionSource> sources = new ArrayList<>();
+    @OneToMany(mappedBy = "reviewCase", fetch = FetchType.LAZY)
+    private List<CaseSuggestion> sources = new ArrayList<>();
 
-    public ReviewSuggestion(String submittedTerm) {
+    public ReviewCase(String submittedTerm) {
         this.id = UUID.randomUUID();
         this.reviewedTerm = submittedTerm;
         this.status = SuggestionStatus.NEW;
         this.tezaursStatus = TezaursStatus.NOT_CHECKED;
     }
 
-    void addSource(ReviewSuggestionSource source) {
+    void addSource(CaseSuggestion source) {
         sources.add(source);
     }
 
