@@ -23,12 +23,16 @@ public record TezaursEntryDetailsResponse(
             Integer roleId,
             String role,
             Integer paradigmId,
+            Integer paradigmLegacyNo,
+            String paradigmCode,
             String paradigm,
+            Map<String, Object> paradigmData,
             String stem1,
             String stem2,
             String stem3,
             boolean hidden,
-            Map<String, Object> data) {
+            Map<String, Object> data,
+            Map<String, Object> extras) {
     }
 
     public record Sense(

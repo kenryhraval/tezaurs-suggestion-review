@@ -18,4 +18,15 @@ public interface TezaursSenseRepository extends JpaRepository<TezaursSense, Inte
                      sense.id
             """)
     List<TezaursSense> findOrderedByEntryId(@Param("entryId") Integer entryId);
+
+    @Query("""
+            SELECT sense
+            FROM TezaursSense sense
+            WHERE sense.entryId IN :entryIds
+            ORDER BY sense.entryId,
+                     sense.parentSenseId NULLS FIRST,
+                     sense.orderNo NULLS LAST,
+                     sense.id
+            """)
+    List<TezaursSense> findOrderedByEntryIdIn(@Param("entryIds") List<Integer> entryIds);
 }

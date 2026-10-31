@@ -33,18 +33,14 @@ public class ReviewSuggestionSource {
     @JoinColumn(name = "suggestion_id", nullable = false, updatable = false)
     private ReviewSuggestion review;
 
-    @Column(name = "primary_source", nullable = false, updatable = false)
-    private boolean primarySource;
-
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
     public ReviewSuggestionSource(
-            IncubatorSuggestion sourceSuggestion, ReviewSuggestion review, boolean primarySource) {
+            IncubatorSuggestion sourceSuggestion, ReviewSuggestion review) {
         this.sourceSuggestion = sourceSuggestion;
         this.review = review;
-        this.primarySource = primarySource;
         review.addSource(this);
     }
 }

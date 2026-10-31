@@ -18,6 +18,7 @@ import type {
   TezaursFormOptions,
 } from '../types'
 import { FlagEditor } from './FlagEditor'
+import { RestrictionEditor } from './RestrictionEditor'
 
 type Props = {
   reviewId: string
@@ -373,7 +374,6 @@ export function EntryDraftForm({ reviewId, reviewedTerm, onReviewUpdated }: Prop
                       .map((item) => item.trim())
                       .filter(Boolean),
                   })}
-                  placeholder="Vērtības atdaliet ar |"
                   value={lexeme.pronunciations.join(' | ')}
                 />
               </label>
@@ -382,6 +382,16 @@ export function EntryDraftForm({ reviewId, reviewedTerm, onReviewUpdated }: Prop
                 flags={lexeme.flags}
                 onChange={(flags) => replaceLexeme(index, { ...lexeme, flags })}
                 scope="L"
+              />
+              <RestrictionEditor
+                definitions={options.flags}
+                frequencies={options.restrictionFrequencies}
+                onChange={(structuralRestrictions) => replaceLexeme(index, {
+                  ...lexeme,
+                  structuralRestrictions,
+                })}
+                restriction={lexeme.structuralRestrictions}
+                types={options.restrictionTypes}
               />
               {draft && (
                 <>

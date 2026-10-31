@@ -51,10 +51,9 @@ class ReviewSuggestionTest {
         ReviewSuggestion review = inProgressReview();
         review.correctTerm("corrected");
         review.recordTezaursCheck(TezaursStatus.MEANING_NOT_FOUND, 42);
-        review.recordCorpusExample();
 
         assertThat(review.getReviewedTerm()).isEqualTo("corrected");
-        assertThat(review.getCorpusStatus()).isEqualTo(CheckStatus.FOUND);
+        assertThat(review.getTezaursStatus()).isEqualTo(TezaursStatus.MEANING_NOT_FOUND);
     }
 
     @Test
@@ -63,7 +62,6 @@ class ReviewSuggestionTest {
         review.changeStatus(SuggestionStatus.READY_FOR_REVIEW);
         assertThatThrownBy(() -> review.changeStatus(SuggestionStatus.GARBAGE))
                 .isInstanceOf(ConflictException.class);
-        assertThatThrownBy(review::recordCorpusExample).isInstanceOf(ConflictException.class);
 
         ReviewSuggestion inProgress = inProgressReview();
         assertThatThrownBy(() -> inProgress.changeStatus(SuggestionStatus.ALREADY_EXISTS))
@@ -136,9 +134,6 @@ class ReviewSuggestionTest {
         assertThatThrownBy(review::markSenseDraftReady)
                 .isInstanceOf(ConflictException.class);
 
-        review.recordTezaursCheck(TezaursStatus.FOUND, 42);
-        assertThatThrownBy(review::recordCorpusExample)
-                .isInstanceOf(ConflictException.class);
     }
 
     private static ReviewSuggestion inProgressReview() {

@@ -24,6 +24,7 @@ import lv.tezaurs.suggestions.suggestion.repository.ReviewSuggestionRepository;
 import lv.tezaurs.suggestions.tezaurs.repository.TezaursLexemeRoleRepository;
 import lv.tezaurs.suggestions.tezaurs.repository.TezaursParadigmRepository;
 import lv.tezaurs.suggestions.tezaurs.service.TezaursFlagService;
+import lv.tezaurs.suggestions.tezaurs.service.TezaursRestrictionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockMakers;
@@ -44,8 +45,9 @@ class LexemeDraftServiceTest {
         TezaursParadigmRepository paradigmRepository = mock(
                 TezaursParadigmRepository.class, withSettings().mockMaker(MockMakers.PROXY));
         TezaursFlagService flagService = mock(TezaursFlagService.class);
+        TezaursRestrictionService restrictionService = mock(TezaursRestrictionService.class);
         service = new LexemeDraftService(entryRepository, lexemeRepository, suggestionRepository,
-                roleRepository, paradigmRepository, flagService);
+                roleRepository, paradigmRepository, flagService, restrictionService);
 
         when(roleRepository.existsById(1)).thenReturn(true);
         when(paradigmRepository.existsById(10)).thenReturn(true);

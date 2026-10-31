@@ -4,25 +4,25 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.withSettings;
 
-import java.util.Optional;
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 import lv.tezaurs.suggestions.common.error.ConflictException;
-import lv.tezaurs.suggestions.suggestion.dto.AddCorpusExampleRequest;
+import lv.tezaurs.suggestions.common.error.NotFoundException;
 import lv.tezaurs.suggestions.suggestion.dto.RecordTezaursCheckRequest;
-import lv.tezaurs.suggestions.suggestion.entity.ReviewCorpusExample;
+import lv.tezaurs.suggestions.suggestion.dto.ReviewResponse;
+import lv.tezaurs.suggestions.suggestion.dto.ReviewSort;
+import lv.tezaurs.suggestions.suggestion.dto.ReviewSuggestionListItem;
+import lv.tezaurs.suggestions.suggestion.dto.UpdateStatusRequest;
 import lv.tezaurs.suggestions.suggestion.entity.IncubatorSuggestion;
 import lv.tezaurs.suggestions.suggestion.entity.ReviewSuggestion;
 import lv.tezaurs.suggestions.suggestion.entity.ReviewSuggestionSource;
 import lv.tezaurs.suggestions.suggestion.entity.SuggestionStatus;
 import lv.tezaurs.suggestions.suggestion.entity.TezaursStatus;
-import lv.tezaurs.suggestions.suggestion.repository.ReviewCorpusExampleRepository;
-import lv.tezaurs.suggestions.suggestion.repository.IncubatorSuggestionRepository;
 import lv.tezaurs.suggestions.suggestion.repository.ReviewSuggestionRepository;
 import lv.tezaurs.suggestions.suggestion.repository.ReviewSuggestionSourceRepository;
 import lv.tezaurs.suggestions.tezaurs.repository.TezaursEntryRepository;
@@ -31,60 +31,66 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.MockMakers;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 
 class ReviewServiceTest {
-    private IncubatorSuggestionRepository sourceSuggestionRepository;
     private ReviewSuggestionRepository reviewRepository;
     private ReviewSuggestionSourceRepository reviewSourceRepository;
-    private ReviewCorpusExampleRepository corpusExampleRepository;
     private TezaursEntryRepository tezaursEntryRepository;
     private TezaursEntrySearchService tezaursEntrySearchService;
     private ReviewService service;
 
     @BeforeEach
     void setUp() {
-        sourceSuggestionRepository = mock(IncubatorSuggestionRepository.class,
-                withSettings().mockMaker(MockMakers.PROXY));
         reviewRepository = mock(ReviewSuggestionRepository.class,
                 withSettings().mockMaker(MockMakers.PROXY));
         reviewSourceRepository = mock(ReviewSuggestionSourceRepository.class,
                 withSettings().mockMaker(MockMakers.PROXY));
-        corpusExampleRepository = mock(ReviewCorpusExampleRepository.class,
-                withSettings().mockMaker(MockMakers.PROXY));
         tezaursEntryRepository = mock(TezaursEntryRepository.class);
         tezaursEntrySearchService = mock(TezaursEntrySearchService.class);
-        service = new ReviewService(sourceSuggestionRepository, reviewRepository, reviewSourceRepository,
-                corpusExampleRepository, tezaursEntryRepository, tezaursEntrySearchService);
+        service = new ReviewService(reviewRepository, reviewSourceRepository,
+                tezaursEntryRepository, tezaursEntrySearchService);
         when(reviewRepository.save(any(ReviewSuggestion.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
         when(reviewSourceRepository.save(any(ReviewSuggestionSource.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
-        when(corpusExampleRepository.saveAndFlush(any(ReviewCorpusExample.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
     }
 
     @Test
-    void openingAnUnstartedSuggestionDoesNotCreateAReview() {
-        IncubatorSuggestion source = source();
-        when(sourceSuggestionRepository.findById(42)).thenReturn(Optional.of(source));
+    void reviewLookupUsesTheReviewId() {
+        UUID missingId = UUID.randomUUID();
+        when(reviewRepository.findById(missingId)).thenReturn(Optional.empty());
 
-        assertThat(service.findBySourceSuggestionId(42)).isEmpty();
-        verify(reviewRepository, never()).save(any(ReviewSuggestion.class));
+        assertThatThrownBy(() -> service.find(missingId))
+                .isInstanceOf(NotFoundException.class);
     }
 
     @Test
     void theFirstStatusChangeCreatesTheLinkedReview() {
         IncubatorSuggestion source = source();
 
-        ReviewSuggestion review = service.changeStatus(source, SuggestionStatus.READY_FOR_REVIEW);
+        ReviewSuggestion review = service.startReview(source, SuggestionStatus.READY_FOR_REVIEW);
 
         assertThat(review.getStatus()).isEqualTo(SuggestionStatus.READY_FOR_REVIEW);
         ArgumentCaptor<ReviewSuggestionSource> link = ArgumentCaptor.forClass(ReviewSuggestionSource.class);
         verify(reviewSourceRepository).save(link.capture());
         assertThat(link.getValue().getSourceSuggestion()).isSameAs(source);
         assertThat(link.getValue().getReview()).isSameAs(review);
-        assertThat(link.getValue().isPrimarySource()).isTrue();
+        assertThat(ReviewResponse.from(review).sources()).singleElement()
+                .satisfies(item -> {
+                    assertThat(item.id()).isEqualTo(source.getId());
+                    assertThat(item.submittedDefinition()).isEqualTo(source.getGloss());
+                });
+    }
+
+    @Test
+    void anExistingReviewCannotBeChangedThroughItsSourceSuggestionId() {
+        IncubatorSuggestion source = source();
+        when(reviewSourceRepository.existsById(source.getId())).thenReturn(true);
+
+        assertThatThrownBy(() -> service.startReview(source, SuggestionStatus.GARBAGE))
+                .isInstanceOf(ConflictException.class);
     }
 
     @Test
@@ -107,7 +113,31 @@ class ReviewServiceTest {
         verify(reviewSourceRepository).save(link.capture());
         assertThat(link.getValue().getSourceSuggestion()).isSameAs(source);
         assertThat(link.getValue().getReview()).isSameAs(review);
-        assertThat(link.getValue().isPrimarySource()).isFalse();
+    }
+
+    @Test
+    void listsAndChangesReviewsByReviewId() {
+        ReviewSuggestion review = new ReviewSuggestion("term");
+        review.changeStatus(SuggestionStatus.READY_FOR_REVIEW);
+        ReviewSuggestionListItem item = mock(ReviewSuggestionListItem.class);
+        when(item.getId()).thenReturn(review.getId());
+        when(item.getReviewedTerm()).thenReturn("term");
+        when(item.getStatus()).thenReturn(SuggestionStatus.READY_FOR_REVIEW);
+        when(item.getSourceCount()).thenReturn(2L);
+        when(reviewRepository.findForReviewQueue(
+                org.mockito.ArgumentMatchers.eq(SuggestionStatus.READY_FOR_REVIEW),
+                org.mockito.ArgumentMatchers.eq("term"), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(item)));
+        when(reviewRepository.findById(review.getId())).thenReturn(Optional.of(review));
+
+        var page = service.list(SuggestionStatus.READY_FOR_REVIEW,
+                " term ", 0, 20, ReviewSort.MOST_SUGGESTIONS);
+        var changed = service.changeStatus(review.getId(),
+                new UpdateStatusRequest(SuggestionStatus.IN_PROGRESS));
+
+        assertThat(page.items()).singleElement()
+                .satisfies(result -> assertThat(result.id()).isEqualTo(review.getId()));
+        assertThat(changed.status()).isEqualTo(SuggestionStatus.IN_PROGRESS);
     }
 
     @Test
@@ -122,24 +152,10 @@ class ReviewServiceTest {
 
         service.findTezaursCandidates(review.getId(), "  another term  ");
         verify(tezaursEntrySearchService).findMatches("another term");
-        verifyNoInteractions(sourceSuggestionRepository);
-
         when(tezaursEntryRepository.existsById(99)).thenReturn(false);
         assertThatThrownBy(() -> service.recordTezaursCheck(review.getId(),
                 new RecordTezaursCheckRequest(TezaursStatus.FOUND, 99)))
                 .isInstanceOf(ConflictException.class);
-    }
-
-    @Test
-    void usesReviewIdsForCorpusEvidence() {
-        ReviewSuggestion review = inProgressReview();
-        review.recordTezaursCheck(TezaursStatus.NOT_FOUND, null);
-        when(reviewRepository.findById(review.getId())).thenReturn(Optional.of(review));
-
-        var response = service.addCorpusExample(review.getId(),
-                new AddCorpusExampleRequest("https://korpuss.lv/id/42"));
-
-        assertThat(response.reviewId()).isEqualTo(review.getId());
     }
 
     private static IncubatorSuggestion source() {

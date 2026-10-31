@@ -21,6 +21,7 @@ import lv.tezaurs.suggestions.suggestion.entity.TezaursStatus;
 import lv.tezaurs.suggestions.suggestion.repository.ReviewSuggestionRepository;
 import lv.tezaurs.suggestions.tezaurs.repository.TezaursSenseRepository;
 import lv.tezaurs.suggestions.tezaurs.service.TezaursFlagService;
+import lv.tezaurs.suggestions.tezaurs.service.TezaursRestrictionService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,6 +32,7 @@ public class SenseDraftService {
     private final ReviewSuggestionRepository suggestionRepository;
     private final TezaursSenseRepository tezaursSenseRepository;
     private final TezaursFlagService flagService;
+    private final TezaursRestrictionService restrictionService;
 
     @Transactional(readOnly = true)
     public List<SenseDraftResponse> findAll(UUID suggestionId) {
@@ -93,6 +95,7 @@ public class SenseDraftService {
                 throw new ConflictException("The selected parent sense does not belong to the matched entry");
             }
             flagService.validate("S", sense.flags());
+            restrictionService.validate(sense.structuralRestrictions());
         }
         for (var sense : request.senses()) {
             if (sense.parentDraftSenseId() != null

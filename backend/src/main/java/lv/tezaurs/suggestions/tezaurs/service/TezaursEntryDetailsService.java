@@ -15,6 +15,8 @@ import lv.tezaurs.suggestions.tezaurs.repository.TezaursEntryRepository;
 import lv.tezaurs.suggestions.tezaurs.repository.TezaursEntryTypeRepository;
 import lv.tezaurs.suggestions.tezaurs.repository.TezaursExampleRepository;
 import lv.tezaurs.suggestions.tezaurs.repository.TezaursGrammarFlagRepository;
+import lv.tezaurs.suggestions.tezaurs.repository.TezaursGrammarRestrictionFrequencyRepository;
+import lv.tezaurs.suggestions.tezaurs.repository.TezaursGrammarRestrictionTypeRepository;
 import lv.tezaurs.suggestions.tezaurs.repository.TezaursLexemeRepository;
 import lv.tezaurs.suggestions.tezaurs.repository.TezaursLexemeRoleRepository;
 import lv.tezaurs.suggestions.tezaurs.repository.TezaursParadigmRepository;
@@ -36,6 +38,8 @@ public class TezaursEntryDetailsService {
     private final TezaursEntryTypeRepository entryTypeRepository;
     private final TezaursLexemeRoleRepository lexemeRoleRepository;
     private final TezaursParadigmRepository paradigmRepository;
+    private final TezaursGrammarRestrictionTypeRepository restrictionTypeRepository;
+    private final TezaursGrammarRestrictionFrequencyRepository restrictionFrequencyRepository;
 
     @Transactional(readOnly = true)
     public TezaursFormOptionsResponse formOptions() {
@@ -59,7 +63,16 @@ public class TezaursEntryDetailsService {
                         flag.getValues().stream().filter(value -> !value.isDeprecated())
                                 .map(value -> value.getValue()).toList()))
                 .toList();
-        return new TezaursFormOptionsResponse(entryTypes, roles, paradigms, flags);
+        var restrictionTypes = restrictionTypeRepository.findAll(Sort.by("id")).stream()
+                .map(type -> new TezaursFormOptionsResponse.Option(
+                        type.getId(), type.getName(), type.getCaption()))
+                .toList();
+        var restrictionFrequencies = restrictionFrequencyRepository.findAll(Sort.by("id")).stream()
+                .map(frequency -> new TezaursFormOptionsResponse.Option(
+                        frequency.getId(), frequency.getName(), frequency.getCaption()))
+                .toList();
+        return new TezaursFormOptionsResponse(entryTypes, roles, paradigms, flags,
+                restrictionTypes, restrictionFrequencies);
     }
 
     @Transactional(readOnly = true)
@@ -86,8 +99,12 @@ public class TezaursEntryDetailsService {
             return new TezaursEntryDetailsResponse.Lexeme(
                     lexeme.getId(), lexeme.getLemma(), lexeme.getRoleId(),
                     role == null ? null : role.getDescription(), lexeme.getParadigmId(),
-                    paradigm == null ? null : paradigm.getHumanKey() + ": " + paradigm.getCaption(),
-                    lexeme.getStem1(), lexeme.getStem2(), lexeme.getStem3(), lexeme.isHidden(), lexeme.getData());
+                    paradigm == null ? null : paradigm.getLegacyNo(),
+                    paradigm == null ? null : paradigm.getHumanKey(),
+                    paradigm == null ? null : paradigm.getCaption(),
+                    paradigm == null ? null : paradigm.getData(),
+                    lexeme.getStem1(), lexeme.getStem2(), lexeme.getStem3(), lexeme.isHidden(),
+                    lexeme.getData(), lexeme.getExtras());
         }).toList();
         var senseResponses = senses.stream().map(sense -> new TezaursEntryDetailsResponse.Sense(
                 sense.getId(), sense.getParentSenseId(), sense.getOrderNo(), sense.getSenseTag(),

@@ -22,6 +22,7 @@ import lv.tezaurs.suggestions.suggestion.entity.TezaursStatus;
 import lv.tezaurs.suggestions.suggestion.repository.ReviewSuggestionRepository;
 import lv.tezaurs.suggestions.tezaurs.repository.TezaursSenseRepository;
 import lv.tezaurs.suggestions.tezaurs.service.TezaursFlagService;
+import lv.tezaurs.suggestions.tezaurs.service.TezaursRestrictionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockMakers;
@@ -40,8 +41,10 @@ class SenseDraftServiceTest {
         tezaursSenseRepository = mock(
                 TezaursSenseRepository.class, withSettings().mockMaker(MockMakers.PROXY));
         TezaursFlagService flagService = mock(TezaursFlagService.class);
+        TezaursRestrictionService restrictionService = mock(TezaursRestrictionService.class);
         service = new SenseDraftService(
-                senseRepository, suggestionRepository, tezaursSenseRepository, flagService);
+                senseRepository, suggestionRepository, tezaursSenseRepository,
+                flagService, restrictionService);
         when(senseRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
     }
 

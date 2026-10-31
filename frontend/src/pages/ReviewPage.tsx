@@ -1,13 +1,33 @@
 import { useEffect, useState } from 'react'
-import { changeSuggestionStatus, getSuggestions, linkDuplicateSuggestion } from '../api'
+import {
+  changeReviewStatus,
+  changeSuggestionStatus,
+  getQueueItems,
+  linkDuplicateSuggestion,
+} from '../api'
 import { SuggestionDetails } from '../components/SuggestionDetails'
 import { SuggestionList } from '../components/SuggestionList'
-import type { Suggestion, SuggestionSort, SuggestionStatus } from '../types'
+import type { QueueItem, Review, SuggestionSort, SuggestionStatus } from '../types'
 
 const PAGE_SIZE = 20
 
+function itemKey(item: QueueItem) {
+  return `${item.itemType}:${item.id}`
+}
+
+function itemFromReview(review: Review): QueueItem {
+  return {
+    itemType: 'REVIEW',
+    id: review.id,
+    reviewedTerm: review.reviewedTerm,
+    status: review.status,
+    createdAt: review.createdAt,
+    sourceCount: review.sources.length,
+  }
+}
+
 export function ReviewPage() {
-  const [suggestions, setSuggestions] = useState<Suggestion[]>([])
+  const [items, setItems] = useState<QueueItem[]>([])
   const [status, setStatus] = useState<SuggestionStatus>('NEW')
   const [sort, setSort] = useState<SuggestionSort>('NEWEST')
   const [search, setSearch] = useState('')
@@ -15,7 +35,7 @@ export function ReviewPage() {
   const [page, setPage] = useState(0)
   const [totalPages, setTotalPages] = useState(0)
   const [totalItems, setTotalItems] = useState(0)
-  const [selected, setSelected] = useState<Suggestion | null>(null)
+  const [selected, setSelected] = useState<QueueItem | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [reload, setReload] = useState(0)
@@ -35,19 +55,19 @@ export function ReviewPage() {
   useEffect(() => {
     let active = true
 
-    getSuggestions(status, query, page, PAGE_SIZE, sort)
+    getQueueItems(status, query, page, PAGE_SIZE, sort)
       .then((result) => {
         if (!active) return
         if (result.totalPages > 0 && page >= result.totalPages) {
           setPage(result.totalPages - 1)
           return
         }
-        setSuggestions(result.items)
+        setItems(result.items)
         setTotalPages(result.totalPages)
         setTotalItems(result.totalItems)
         setSelected((current) => {
           if (current && current.status !== status) return current
-          return result.items.find((item) => item.id === current?.id)
+          return result.items.find((item) => current && itemKey(item) === itemKey(current))
             ?? result.items[0]
             ?? null
         })
@@ -88,44 +108,33 @@ export function ReviewPage() {
     setPage(nextPage)
   }
 
-  function updateSuggestion(updated: Suggestion) {
-    if (updated.status !== status) {
-      removeSuggestion(updated.id, updated)
-      return
-    }
-    if (!suggestions.some((item) => item.id === updated.id)) {
-      setSelected(updated)
-      setReload((value) => value + 1)
-      return
-    }
-    setSuggestions((items) =>
-      items.map((item) => (item.id === updated.id ? updated : item)),
-    )
-    setSelected(updated)
-  }
+  function removeItem(item: QueueItem, keepOpen?: QueueItem) {
+    const key = itemKey(item)
+    const index = items.findIndex((candidate) => itemKey(candidate) === key)
+    const next = items[index + 1] ?? items[index - 1] ?? null
 
-  function removeSuggestion(id: number, keepOpen?: Suggestion) {
-    const index = suggestions.findIndex((suggestion) => suggestion.id === id)
-    const next = suggestions[index + 1] ?? suggestions[index - 1] ?? null
-
-    setSuggestions((items) => items.filter((item) => item.id !== id))
+    setItems((currentItems) => currentItems.filter((candidate) => itemKey(candidate) !== key))
     setTotalItems((count) => Math.max(0, count - 1))
     setSelected(keepOpen ?? next)
     setReload((value) => value + 1)
   }
 
   async function changeStatus(
-    id: number,
+    item: QueueItem,
     nextStatus: SuggestionStatus,
     keepOpen = false,
-  ) {
+  ): Promise<Review | null> {
     setError('')
     try {
-      const updated = await changeSuggestionStatus(id, nextStatus)
-      if (updated.status === status) updateSuggestion(updated)
-      else removeSuggestion(id, keepOpen ? updated : undefined)
+      const review = item.itemType === 'SUGGESTION'
+        ? await changeSuggestionStatus(item.id, nextStatus)
+        : await changeReviewStatus(item.id, nextStatus)
+      const updated = itemFromReview(review)
+      removeItem(item, keepOpen ? updated : undefined)
+      return review
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Neizdevās mainīt statusu.')
+      return null
     }
   }
 
@@ -133,7 +142,8 @@ export function ReviewPage() {
     setError('')
     try {
       await linkDuplicateSuggestion(id, reviewId)
-      removeSuggestion(id)
+      const source = items.find((item) => item.itemType === 'SUGGESTION' && item.id === id)
+      if (source) removeItem(source)
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : 'Neizdevās piesaistīt dublikātu.'
       setError(message)
@@ -151,23 +161,22 @@ export function ReviewPage() {
 
       <div className="layout">
         <SuggestionList
-          suggestions={suggestions}
+          items={items}
           status={status}
           sort={sort}
           search={search}
-          selectedId={selected?.id ?? null}
+          selectedKey={selected ? itemKey(selected) : null}
           loading={loading}
           page={page}
           totalPages={totalPages}
           totalItems={totalItems}
-          onSelect={(id) => setSelected(
-            suggestions.find((suggestion) => suggestion.id === id) ?? null,
+          onSelect={(key) => setSelected(
+            items.find((item) => itemKey(item) === key) ?? null,
           )}
           onFilterStatusChange={changeFilterStatus}
           onSortChange={changeSort}
           onSearchChange={setSearch}
           onPageChange={changePage}
-          onSuggestionStatusChange={changeStatus}
         />
 
         {!selected && !loading && (
@@ -178,9 +187,9 @@ export function ReviewPage() {
 
         {selected && (
           <SuggestionDetails
-            key={selected.id}
-            suggestion={selected}
-            onStatusChange={(nextStatus) => changeStatus(selected.id, nextStatus, true)}
+            key={itemKey(selected)}
+            item={selected}
+            onStatusChange={(nextStatus) => changeStatus(selected, nextStatus, true)}
             onDuplicate={linkDuplicate}
           />
         )}

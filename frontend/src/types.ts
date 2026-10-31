@@ -11,8 +11,6 @@ export type SuggestionStatus =
 
 export type SuggestionSort = 'NEWEST' | 'OLDEST' | 'MOST_SUGGESTIONS'
 
-export type CheckStatus = 'NOT_CHECKED' | 'FOUND' | 'NOT_FOUND'
-
 export type TezaursStatus =
   | 'NOT_CHECKED'
   | 'FOUND'
@@ -23,7 +21,6 @@ export type TezaursStatus =
 export type CompletionBlockReason =
   | 'TEZAURS_CHECK_REQUIRED'
   | 'MEANING_CHECK_REQUIRED'
-  | 'CORPUS_CHECK_REQUIRED'
   | 'ENTRY_DRAFT_REQUIRED'
   | 'SENSE_DRAFT_REQUIRED'
 
@@ -36,9 +33,7 @@ export type Suggestion = {
   flagInfo: string | null
   notes: string | null
   contact: string | null
-  status: SuggestionStatus
   createdAt: string
-  sourceCount: number
 }
 
 export type SuggestionPage = {
@@ -48,16 +43,51 @@ export type SuggestionPage = {
   totalItems: number
 }
 
+export type ReviewListItem = {
+  id: string
+  reviewedTerm: string
+  status: SuggestionStatus
+  createdAt: string
+  sourceCount: number
+}
+
+export type QueueItem =
+  | (Suggestion & {
+      itemType: 'SUGGESTION'
+      status: 'NEW'
+      sourceCount: 1
+    })
+  | (ReviewListItem & { itemType: 'REVIEW' })
+
+export type QueuePage = {
+  items: QueueItem[]
+  page: number
+  totalPages: number
+  totalItems: number
+}
+
 export type Review = {
   id: string
   reviewedTerm: string
+  status: SuggestionStatus
   tezaursStatus: TezaursStatus
   matchedEntryId: number | null
-  corpusStatus: CheckStatus
   canComplete: boolean
   completionBlockReason: CompletionBlockReason | null
   createdAt: string
-  updatedAt: string | null
+  sources: ReviewSource[]
+}
+
+export type ReviewSource = {
+  id: number
+  submittedTerm: string
+  submittedDefinition: string
+  usageExample: string | null
+  source: string | null
+  flagInfo: string | null
+  notes: string | null
+  contact: string | null
+  createdAt: string
 }
 
 export type DuplicateReviewCandidate = {
@@ -79,13 +109,6 @@ export type TezaursEntryCandidate = {
   heading: string
   humanKey: string
   senses: TezaursSense[]
-}
-
-export type CorpusExample = {
-  id: string
-  reviewId: string
-  url: string
-  createdAt: string
 }
 
 export type FlagValue = string | string[] | null
@@ -175,6 +198,8 @@ export type TezaursFormOptions = {
     scopes: string[]
     values: string[]
   }>
+  restrictionTypes: Array<{ id: number; code: string; label: string }>
+  restrictionFrequencies: Array<{ id: number; code: string; label: string | null }>
 }
 
 export type TezaursEntryDetails = {
@@ -192,12 +217,16 @@ export type TezaursEntryDetails = {
     roleId: number
     role: string | null
     paradigmId: number | null
+    paradigmLegacyNo: number | null
+    paradigmCode: string | null
     paradigm: string | null
+    paradigmData: Record<string, unknown> | null
     stem1: string | null
     stem2: string | null
     stem3: string | null
     hidden: boolean
     data: Record<string, unknown> | null
+    extras: Record<string, unknown> | null
   }>
   senses: Array<{
     id: number

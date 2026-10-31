@@ -56,26 +56,30 @@ small, .muted, .empty-group { color: #666; }
   text-align: left;
 }
 
-.suggestion-select strong, .suggestion-definition {
+.suggestion-select strong {
   display: block;
   overflow-wrap: anywhere;
 }
 
-.suggestion-definition {
-  color: #555;
-  font-size: 0.85rem;
-}
-
-.suggestion-quick-actions, .suggestion-pagination,
+.suggestion-pagination,
 .review-return, .tezaurs-answer-actions {
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
-.suggestion-quick-actions { padding-right: 6px; }
 .suggestion-pagination { justify-content: space-between; margin-top: 12px; }
 .review-return { justify-content: flex-end; }
+
+.suggestion-sources-table { overflow-x: auto; }
+.suggestion-sources table { width: 100%; border-collapse: collapse; }
+.suggestion-sources th, .suggestion-sources td {
+  border: 1px solid #ddd;
+  padding: 6px;
+  text-align: left;
+  vertical-align: top;
+}
+.suggestion-sources td small { display: block; margin-top: 4px; }
 
 .title-form input {
   border: 0;
@@ -146,11 +150,22 @@ small, .muted, .empty-group { color: #666; }
 .flag-editor { display: grid; gap: 8px; }
 .flag-row { display: grid; grid-template-columns: 1fr 2fr auto; align-items: center; gap: 8px; }
 .selected-flag-values { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.restriction-editor { display: grid; gap: 8px; margin-top: 8px; border-left: 3px solid #ccc; padding-left: 10px; }
 .existing-entry dl { display: grid; grid-template-columns: 180px 1fr; gap: 4px 12px; }
 .existing-entry dt { font-weight: bold; }
 .existing-entry dd { margin: 0; }
 .existing-entry details, .existing-sense { margin: 8px 0; padding: 8px; border: 1px solid #ddd; }
 .existing-entry details dl div { display: contents; }
+.existing-data { margin: 8px 0; }
+.existing-data ul { margin: 4px 0; }
+.existing-subsenses { margin-left: 24px; }
+.sense-metadata { color: #777; font-weight: bold; }
+.existing-lexeme { margin: 8px 0; }
+.lexeme-metadata { color: #777; font-weight: bold; }
+.lexeme-symbol { margin-left: 6px; color: #777; cursor: help; }
+.usage-frequency { color: #777; font-size: 0.9em; }
+.usage-frequency span { margin-left: 2px; color: #ddd; }
+.usage-frequency span.active { color: #777; }
 
 .visually-hidden {
   position: absolute;

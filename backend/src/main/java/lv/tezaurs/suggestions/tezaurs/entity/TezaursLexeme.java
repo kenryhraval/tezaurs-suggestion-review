@@ -53,6 +53,10 @@ public class TezaursLexeme {
     @Column(columnDefinition = "jsonb", updatable = false)
     private Map<String, Object> data;
 
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "jsonb", updatable = false)
+    private Map<String, Object> extras;
+
     @Column(updatable = false)
     private boolean hidden;
 

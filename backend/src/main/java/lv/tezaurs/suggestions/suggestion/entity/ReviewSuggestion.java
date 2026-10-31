@@ -42,10 +42,6 @@ public class ReviewSuggestion {
     @Column(name = "matched_entry_id")
     private Integer matchedEntryId;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "corpus_status", nullable = false, length = 32)
-    private CheckStatus corpusStatus;
-
     @Column(name = "entry_draft_ready", nullable = false)
     private boolean entryDraftReady;
 
@@ -72,7 +68,6 @@ public class ReviewSuggestion {
         this.reviewedTerm = submittedTerm;
         this.status = SuggestionStatus.NEW;
         this.tezaursStatus = TezaursStatus.NOT_CHECKED;
-        this.corpusStatus = CheckStatus.NOT_CHECKED;
     }
 
     void addSource(ReviewSuggestionSource source) {
@@ -100,16 +95,8 @@ public class ReviewSuggestion {
             case NOT_CHECKED -> CompletionBlockReason.TEZAURS_CHECK_REQUIRED;
             case FOUND -> CompletionBlockReason.MEANING_CHECK_REQUIRED;
             case MEANING_FOUND -> null;
-            case MEANING_NOT_FOUND -> {
-                if (corpusStatus == CheckStatus.NOT_CHECKED) {
-                    yield CompletionBlockReason.CORPUS_CHECK_REQUIRED;
-                }
-                yield senseDraftReady ? null : CompletionBlockReason.SENSE_DRAFT_REQUIRED;
-            }
+            case MEANING_NOT_FOUND -> senseDraftReady ? null : CompletionBlockReason.SENSE_DRAFT_REQUIRED;
             case NOT_FOUND -> {
-                if (corpusStatus == CheckStatus.NOT_CHECKED) {
-                    yield CompletionBlockReason.CORPUS_CHECK_REQUIRED;
-                }
                 if (!entryDraftReady) {
                     yield CompletionBlockReason.ENTRY_DRAFT_REQUIRED;
                 }
@@ -128,20 +115,6 @@ public class ReviewSuggestion {
         }
         tezaursStatus = checkStatus;
         matchedEntryId = entryId;
-
-        if ((checkStatus == TezaursStatus.MEANING_NOT_FOUND
-                || checkStatus == TezaursStatus.NOT_FOUND)
-                && corpusStatus == CheckStatus.NOT_CHECKED) {
-            corpusStatus = CheckStatus.NOT_FOUND;
-        }
-    }
-
-    public void recordCorpusExample() {
-        if (tezaursStatus != TezaursStatus.MEANING_NOT_FOUND
-                && tezaursStatus != TezaursStatus.NOT_FOUND) {
-            throw new ConflictException("Corpus evidence is only applicable when the submitted meaning is absent");
-        }
-        corpusStatus = CheckStatus.FOUND;
     }
 
     public void recordEntryDraftReadiness(boolean ready) {

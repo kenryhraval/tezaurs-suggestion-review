@@ -1,7 +1,7 @@
 import type { FlagMap, FlagValue, TezaursFormOptions } from '../types'
 
 type Props = {
-  scope: 'E' | 'L' | 'S'
+  scope: 'E' | 'L' | 'R' | 'S'
   definitions: TezaursFormOptions['flags']
   flags: FlagMap
   onChange: (value: FlagMap) => void

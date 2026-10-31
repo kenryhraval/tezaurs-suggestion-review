@@ -1,62 +1,41 @@
 # Tēzaurs suggestion review
 
-A Spring Boot and React application for reviewing existing Tēzaurs.lv user suggestions.
+Spring Boot and React application for reviewing user suggestions submitted to
+Tēzaurs.
 
-The application:
+## Data model
 
-- reads source suggestions from the immutable `incubator.suggestions` table;
-- stores this service's workflow status and richer review data in the separate `review` schema;
-- validates the agreed human-selected status transitions;
-- records whether an entry was found in Tēzaurs;
-- saves links to corpus and other usage evidence;
-- reviews candidate meanings for a suggestion.
+- `incubator.suggestions` is the immutable source of submitted suggestions.
+- An untouched suggestion is shown as `NEW` and is addressed by its integer
+  incubator ID.
+- The first workflow action creates `review.suggestions` and links the source
+  through `review.suggestion_sources`.
+- A review has a UUID and may contain several equal source suggestions when
+  duplicates are combined.
+- All later status changes and draft data belong to the review UUID.
+- `dict` and `incubator` are read-only; Flyway changes only the `review` schema.
 
-Each source suggestion belongs to at most one UUID-based review through
-`review.suggestion_sources`, while one review can collect multiple duplicate
-source suggestions. Meanings and corpus evidence belong to the review. The
-application does not update `incubator.suggestions`. Unlinked suggestions are
-treated as `NEW`; the first status action creates a review, while the duplicate
-action links the source to an existing review.
+The application currently supports the review queue, duplicate linking,
+Tēzaurs entry checks, and entry, lexeme, and sense drafts. It does
+not write drafts back to the real Tēzaurs tables.
 
-The review statuses are `NEW`, `READY_FOR_REVIEW`, `GARBAGE`, `IN_PROGRESS`,
-`INVENTED`, `ALREADY_EXISTS`, `INSUFFICIENT_DATA`, `NEEDS_EXPERT` and
-`COMPLETED`. `dict` is read-only from the application's perspective; Flyway owns
-only the `review` schema.
-
-Each suggestion has one current meaning and a linear revision history. The
-submitted definition is preserved as the first `SUBMITTER` version. Revising it
-creates a new `REVIEWER` version, marks the previous version as `SUPERSEDED` and
-links the new version to the one it replaced; text is never overwritten. There
-are no submeanings, additional meaning branches or meaning-level approval states.
-
-Credential validation is performed by the deployment's reverse proxy. `GET /api/me`
-returns the username from the proxy-validated HTTP Basic Authorization header. The
-backend must therefore not be exposed directly. There is currently no reviewer
-management, review history, external Tēzaurs or corpus connection, evidence source
-classification or export process. These can be introduced later as separate,
-understandable increments.
+Authentication is performed by the deployment reverse proxy. The backend reads
+the authenticated username from the proxy-validated Basic Authorization header
+through `GET /api/me`, so the backend must not be published without that proxy.
 
 ## Run locally
 
-Requirements: Java 21 or newer and Docker with Docker Compose.
-
-The Compose file starts PostgreSQL only. The Spring Boot application is run with
-Maven so the backend remains easy to develop and debug.
+Requirements: Java 21+, Node.js, Docker, and Docker Compose.
 
 Place the `dict` and `incubator.suggestions` dumps next to the repository as
 `tezaurs_2026_03-public.pgsql.gz` and `suggestions-2026-09-04.pgsql.gz`. They are
-restored automatically when the PostgreSQL volume is first created. Then:
+imported only when the PostgreSQL volume is first created.
 
 ```bash
 cp backend/.env.example backend/.env
-# Replace the example password in backend/.env.
+# Set DATABASE_PASSWORD in backend/.env.
 docker compose --env-file backend/.env up -d postgres
-docker compose --env-file backend/.env ps
-```
 
-Then start the application:
-
-```bash
 cd backend
 set -a
 source .env
@@ -64,55 +43,31 @@ set +a
 ./mvnw spring-boot:run
 ```
 
-The backend is available at `http://localhost:8080`.
-
-Interactive Swagger documentation is available at
-`http://localhost:8080/swagger-ui.html`. The generated OpenAPI document is
-available at `http://localhost:8080/v3/api-docs`.
-
-To inspect PostgreSQL logs or stop it later, run these commands from the repository
-root:
+In another terminal:
 
 ```bash
-docker compose --env-file backend/.env logs -f postgres
-docker compose --env-file backend/.env down
+cd frontend
+npm install
+npm run dev
 ```
 
-The database is stored in the named Docker volume `tezaurs-postgres`, so ordinary
-`docker compose down` does not delete or re-import it.
+Swagger is available at `http://localhost:8080/swagger-ui.html`.
 
-## Deploy to Hetzner
-
-The repository includes a production Docker image, Compose configuration with
-PostgreSQL and automatic HTTPS, and a GitHub Actions deployment workflow. See
-[deploy/README.md](deploy/README.md) for the one-time Hetzner and GitHub setup.
-
-## API
-
-- `GET /api/me`
-- `GET /api/suggestions?status={status}&query={query}&page={page}&size={size}&sort={sort}`
-- `POST /api/suggestions/{id}/status`
-- `POST /api/suggestions/{id}/duplicate`
-- `GET /api/reviews/by-source-suggestion/{sourceSuggestionId}`
-- `GET /api/reviews/duplicate-candidates`
-- `POST /api/reviews/{reviewId}/term-correction`
-- `POST /api/reviews/{reviewId}/tezaurs-check`
-- `GET /api/reviews/{reviewId}/tezaurs-candidates`
-- `GET /api/reviews/{reviewId}/corpus-examples`
-- `POST /api/reviews/{reviewId}/corpus-examples`
-- `GET /api/reviews/{reviewId}/meanings`
-- `POST /api/reviews/{reviewId}/meanings/{meaningId}/revision`
-- `GET /actuator/health`
-- `GET /swagger-ui.html`
-- `GET /v3/api-docs`
-
-## Tests
-
-Run the small unit-test suite and generate the JaCoCo report:
+Because the initial migration is still intentionally kept as one clean file,
+drop the disposable review schema before running a changed migration:
 
 ```bash
-cd backend
-./mvnw clean verify
+docker compose --env-file backend/.env exec -T postgres \
+  psql -U tezaurs -d tezaurs_suggestions -c 'DROP SCHEMA review CASCADE;'
 ```
 
-Flyway owns the PostgreSQL `review` schema.
+This does not change `dict` or `incubator`.
+
+## Verify
+
+```bash
+cd backend && ./mvnw clean verify
+cd ../frontend && npm run lint && npm run build
+```
+
+Deployment setup is documented in [deploy/README.md](deploy/README.md).

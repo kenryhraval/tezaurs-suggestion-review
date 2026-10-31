@@ -6,7 +6,7 @@ type Props = {
   reviewId: string
   status: TezaursStatus
   matchedEntryId: number | null
-  onSave: (status: TezaursStatus, entryId: number | null) => Promise<void>
+  onSave: (status: TezaursStatus, entryId: number | null) => Promise<boolean>
 }
 
 const NOT_FOUND = 'not-found'
@@ -174,17 +174,17 @@ export function TezaursCheckForm({
     setSearching(value.trim().length >= 2)
   }
 
-  function chooseCandidate(candidate: TezaursEntryCandidate) {
+  async function chooseCandidate(candidate: TezaursEntryCandidate) {
+    if (!await onSave('FOUND', candidate.id)) return
     setCustomSelection(candidate)
     setSelection(String(candidate.id))
     closeDropdown()
-    void onSave('FOUND', candidate.id)
   }
 
-  function chooseNotFound() {
+  async function chooseNotFound() {
+    if (!await onSave('NOT_FOUND', null)) return
     setSelection(NOT_FOUND)
     closeDropdown()
-    void onSave('NOT_FOUND', null)
   }
 
   function recordMeaning(status: 'MEANING_FOUND' | 'MEANING_NOT_FOUND') {
@@ -255,7 +255,7 @@ export function TezaursCheckForm({
                 <button
                   aria-pressed={candidate.id === selectedEntryId}
                   key={candidate.id}
-                  onClick={() => chooseCandidate(candidate)}
+                  onClick={() => void chooseCandidate(candidate)}
                   onFocus={() => setPreviewEntryId(candidate.id)}
                   onMouseEnter={() => setPreviewEntryId(candidate.id)}
                   type="button"
@@ -267,7 +267,7 @@ export function TezaursCheckForm({
               <button
                 aria-pressed={selection === NOT_FOUND}
                 className="tezaurs-dropdown-special"
-                onClick={chooseNotFound}
+                onClick={() => void chooseNotFound()}
                 onFocus={() => setPreviewEntryId(null)}
                 onMouseEnter={() => setPreviewEntryId(null)}
                 type="button"

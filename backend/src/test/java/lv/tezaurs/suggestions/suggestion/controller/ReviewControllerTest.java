@@ -6,14 +6,14 @@ import static org.mockito.Mockito.when;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
-import lv.tezaurs.suggestions.suggestion.dto.AddCorpusExampleRequest;
-import lv.tezaurs.suggestions.suggestion.dto.CorpusExampleResponse;
 import lv.tezaurs.suggestions.suggestion.dto.ReviewResponse;
-import lv.tezaurs.suggestions.suggestion.entity.CheckStatus;
+import lv.tezaurs.suggestions.suggestion.dto.ReviewSort;
+import lv.tezaurs.suggestions.suggestion.dto.ReviewPageResponse;
+import lv.tezaurs.suggestions.suggestion.dto.UpdateStatusRequest;
 import lv.tezaurs.suggestions.suggestion.entity.CompletionBlockReason;
 import lv.tezaurs.suggestions.suggestion.entity.TezaursStatus;
+import lv.tezaurs.suggestions.suggestion.entity.SuggestionStatus;
 import lv.tezaurs.suggestions.suggestion.service.ReviewService;
 import lv.tezaurs.suggestions.tezaurs.dto.TezaursEntryCandidateResponse;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,34 +30,35 @@ class ReviewControllerTest {
     }
 
     @Test
-    void looksUpAReviewByItsSourceSuggestion() {
+    void looksUpAReviewByItsOwnId() {
         ReviewResponse response = response();
-        when(service.findBySourceSuggestionId(42)).thenReturn(Optional.of(response));
+        ReviewPageResponse page = new ReviewPageResponse(List.of(), 0, 0, 0);
+        UpdateStatusRequest request = new UpdateStatusRequest(SuggestionStatus.IN_PROGRESS);
+        when(service.find(response.id())).thenReturn(response);
+        when(service.list(SuggestionStatus.READY_FOR_REVIEW, "term", 0, 20,
+                ReviewSort.NEWEST)).thenReturn(page);
+        when(service.changeStatus(response.id(), request)).thenReturn(response);
 
-        assertThat(controller.findBySourceSuggestionId(42).getBody()).isEqualTo(response);
-        assertThat(controller.findBySourceSuggestionId(999).getStatusCode().value()).isEqualTo(204);
+        assertThat(controller.find(response.id())).isEqualTo(response);
+        assertThat(controller.list(SuggestionStatus.READY_FOR_REVIEW, "term", 0, 20,
+                ReviewSort.NEWEST)).isEqualTo(page);
+        assertThat(controller.changeStatus(response.id(), request)).isEqualTo(response);
     }
 
     @Test
-    void delegatesCorpusAndTezaursCandidateActions() {
+    void delegatesTezaursCandidateSearch() {
         ReviewResponse review = response();
-        AddCorpusExampleRequest request = new AddCorpusExampleRequest("https://korpuss.lv/id/42");
-        CorpusExampleResponse example = new CorpusExampleResponse(
-                UUID.randomUUID(), review.id(), request.url(), Instant.EPOCH);
         TezaursEntryCandidateResponse candidate = new TezaursEntryCandidateResponse(
                 42, "vārds", "vārds:1", List.of());
-        when(service.listCorpusExamples(review.id())).thenReturn(List.of(example));
-        when(service.addCorpusExample(review.id(), request)).thenReturn(example);
         when(service.findTezaursCandidates(review.id(), "cits")).thenReturn(List.of(candidate));
 
-        assertThat(controller.listCorpusExamples(review.id())).containsExactly(example);
-        assertThat(controller.addCorpusExample(review.id(), request).getStatusCode().value()).isEqualTo(201);
         assertThat(controller.findTezaursCandidates(review.id(), "cits")).containsExactly(candidate);
     }
 
     private static ReviewResponse response() {
-        return new ReviewResponse(UUID.randomUUID(), "term", TezaursStatus.NOT_CHECKED, null,
-                CheckStatus.NOT_CHECKED, false, CompletionBlockReason.TEZAURS_CHECK_REQUIRED,
-                Instant.EPOCH, Instant.EPOCH);
+        return new ReviewResponse(UUID.randomUUID(), "term", SuggestionStatus.IN_PROGRESS,
+                TezaursStatus.NOT_CHECKED, null,
+                false, CompletionBlockReason.TEZAURS_CHECK_REQUIRED,
+                Instant.EPOCH, List.of());
     }
 }

@@ -16,6 +16,8 @@ import lv.tezaurs.suggestions.tezaurs.entity.TezaursEntryType;
 import lv.tezaurs.suggestions.tezaurs.entity.TezaursExample;
 import lv.tezaurs.suggestions.tezaurs.entity.TezaursGrammarFlag;
 import lv.tezaurs.suggestions.tezaurs.entity.TezaursGrammarFlagValue;
+import lv.tezaurs.suggestions.tezaurs.entity.TezaursGrammarRestrictionFrequency;
+import lv.tezaurs.suggestions.tezaurs.entity.TezaursGrammarRestrictionType;
 import lv.tezaurs.suggestions.tezaurs.entity.TezaursLexeme;
 import lv.tezaurs.suggestions.tezaurs.entity.TezaursLexemeRole;
 import lv.tezaurs.suggestions.tezaurs.entity.TezaursParadigm;
@@ -26,6 +28,8 @@ import lv.tezaurs.suggestions.tezaurs.repository.TezaursEntryRepository;
 import lv.tezaurs.suggestions.tezaurs.repository.TezaursEntryTypeRepository;
 import lv.tezaurs.suggestions.tezaurs.repository.TezaursExampleRepository;
 import lv.tezaurs.suggestions.tezaurs.repository.TezaursGrammarFlagRepository;
+import lv.tezaurs.suggestions.tezaurs.repository.TezaursGrammarRestrictionFrequencyRepository;
+import lv.tezaurs.suggestions.tezaurs.repository.TezaursGrammarRestrictionTypeRepository;
 import lv.tezaurs.suggestions.tezaurs.repository.TezaursLexemeRepository;
 import lv.tezaurs.suggestions.tezaurs.repository.TezaursLexemeRoleRepository;
 import lv.tezaurs.suggestions.tezaurs.repository.TezaursParadigmRepository;
@@ -46,6 +50,8 @@ class TezaursEntryDetailsServiceTest {
     private TezaursEntryTypeRepository entryTypeRepository;
     private TezaursLexemeRoleRepository lexemeRoleRepository;
     private TezaursParadigmRepository paradigmRepository;
+    private TezaursGrammarRestrictionTypeRepository restrictionTypeRepository;
+    private TezaursGrammarRestrictionFrequencyRepository restrictionFrequencyRepository;
     private TezaursEntryDetailsService service;
 
     @BeforeEach
@@ -59,9 +65,12 @@ class TezaursEntryDetailsServiceTest {
         entryTypeRepository = repository(TezaursEntryTypeRepository.class);
         lexemeRoleRepository = repository(TezaursLexemeRoleRepository.class);
         paradigmRepository = repository(TezaursParadigmRepository.class);
+        restrictionTypeRepository = repository(TezaursGrammarRestrictionTypeRepository.class);
+        restrictionFrequencyRepository = repository(TezaursGrammarRestrictionFrequencyRepository.class);
         service = new TezaursEntryDetailsService(entryRepository, lexemeRepository,
                 senseRepository, exampleRepository, sourceLinkRepository, grammarFlagRepository,
-                entryTypeRepository, lexemeRoleRepository, paradigmRepository);
+                entryTypeRepository, lexemeRoleRepository, paradigmRepository,
+                restrictionTypeRepository, restrictionFrequencyRepository);
     }
 
     @Test
@@ -77,7 +86,9 @@ class TezaursEntryDetailsServiceTest {
         TezaursParadigm paradigm = mock(TezaursParadigm.class);
         when(paradigm.getId()).thenReturn(3);
         when(paradigm.getHumanKey()).thenReturn("noun-1");
+        when(paradigm.getLegacyNo()).thenReturn(15);
         when(paradigm.getCaption()).thenReturn("Lietvārds");
+        when(paradigm.getData()).thenReturn(Map.of("Vārdšķira", "Lietvārds"));
         when(paradigm.getStems()).thenReturn(1);
 
         TezaursGrammarFlagValue activeValue = flagValue("Jā", false);
@@ -90,12 +101,22 @@ class TezaursEntryDetailsServiceTest {
         when(flag.getPermittedValues()).thenReturn("E");
         when(flag.getScope()).thenReturn(new String[]{"L", "R"});
         when(flag.getValues()).thenReturn(List.of(activeValue, deprecatedValue));
+        TezaursGrammarRestrictionType restrictionType = mock(TezaursGrammarRestrictionType.class);
+        when(restrictionType.getId()).thenReturn(1);
+        when(restrictionType.getName()).thenReturn("inForm");
+        when(restrictionType.getCaption()).thenReturn("Formā/atvasinājumā");
+        TezaursGrammarRestrictionFrequency frequency = mock(TezaursGrammarRestrictionFrequency.class);
+        when(frequency.getId()).thenReturn(1);
+        when(frequency.getName()).thenReturn("usually");
+        when(frequency.getCaption()).thenReturn("Parasti");
 
         when(entryTypeRepository.findAll(any(Sort.class))).thenReturn(List.of(entryType));
         when(lexemeRoleRepository.findAll(any(Sort.class))).thenReturn(List.of(role));
         when(paradigmRepository.findAll(any(Sort.class))).thenReturn(List.of(paradigm));
         when(grammarFlagRepository.findAllByDeprecatedFalseOrderByOrderNoAscNameAsc())
                 .thenReturn(List.of(flag));
+        when(restrictionTypeRepository.findAll(any(Sort.class))).thenReturn(List.of(restrictionType));
+        when(restrictionFrequencyRepository.findAll(any(Sort.class))).thenReturn(List.of(frequency));
 
         var result = service.formOptions();
 
@@ -118,6 +139,12 @@ class TezaursEntryDetailsServiceTest {
             assertThat(option.scopes()).containsExactly("L", "R");
             assertThat(option.values()).containsExactly("Jā");
         });
+        assertThat(result.restrictionTypes()).singleElement()
+                .extracting("code", "label")
+                .containsExactly("inForm", "Formā/atvasinājumā");
+        assertThat(result.restrictionFrequencies()).singleElement()
+                .extracting("code", "label")
+                .containsExactly("usually", "Parasti");
     }
 
     @Test
@@ -139,7 +166,9 @@ class TezaursEntryDetailsServiceTest {
         TezaursParadigm paradigm = mock(TezaursParadigm.class);
         when(paradigm.getId()).thenReturn(3);
         when(paradigm.getHumanKey()).thenReturn("noun-1");
+        when(paradigm.getLegacyNo()).thenReturn(15);
         when(paradigm.getCaption()).thenReturn("Lietvārds");
+        when(paradigm.getData()).thenReturn(Map.of("Vārdšķira", "Lietvārds"));
 
         TezaursSense sense = mock(TezaursSense.class);
         when(sense.getId()).thenReturn(30);
@@ -181,7 +210,13 @@ class TezaursEntryDetailsServiceTest {
         assertThat(result.type()).isEqualTo("Vārds");
         assertThat(result.lexemes()).hasSize(2);
         assertThat(result.lexemes().getFirst().role()).isEqualTo("Pamatvārds");
-        assertThat(result.lexemes().getFirst().paradigm()).isEqualTo("noun-1: Lietvārds");
+        assertThat(result.lexemes().getFirst().paradigmCode()).isEqualTo("noun-1");
+        assertThat(result.lexemes().getFirst().paradigmLegacyNo()).isEqualTo(15);
+        assertThat(result.lexemes().getFirst().paradigm()).isEqualTo("Lietvārds");
+        assertThat(result.lexemes().getFirst().paradigmData())
+                .containsEntry("Vārdšķira", "Lietvārds");
+        assertThat(result.lexemes().getFirst().extras())
+                .containsEntry("ratioPerMille", 0.1);
         assertThat(result.lexemes().get(1).role()).isNull();
         assertThat(result.lexemes().get(1).paradigm()).isNull();
         assertThat(result.senses()).singleElement().satisfies(mappedSense -> {
@@ -215,6 +250,7 @@ class TezaursEntryDetailsServiceTest {
         when(lexeme.getParadigmId()).thenReturn(paradigmId);
         when(lexeme.getStem1()).thenReturn("celms");
         when(lexeme.getData()).thenReturn(Map.of("Gram", Map.of()));
+        when(lexeme.getExtras()).thenReturn(Map.of("ratioPerMille", 0.1));
         return lexeme;
     }
 

@@ -15,14 +15,8 @@ npm run dev
 Vite opens the frontend locally and proxies `/api` requests to
 `http://localhost:8080`.
 
-## Pages
-
-- `/` contains the reviewer interface.
-- `/import` contains the temporary manual import form. It is deliberately not
-  linked from the reviewer interface.
-
-The import page is hidden from navigation, but it is not protected. Real access
-control must be implemented in the backend before this application is public.
+The `/` page contains the reviewer interface. Deployment authentication is
+handled by the reverse proxy, as described in the root README.
 
 ## Source structure
 

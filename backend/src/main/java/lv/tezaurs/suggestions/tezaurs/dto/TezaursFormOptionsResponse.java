@@ -6,7 +6,9 @@ public record TezaursFormOptionsResponse(
         List<Option> entryTypes,
         List<Option> lexemeRoles,
         List<ParadigmOption> paradigms,
-        List<FlagOption> flags) {
+        List<FlagOption> flags,
+        List<Option> restrictionTypes,
+        List<Option> restrictionFrequencies) {
 
     public record Option(Integer id, String code, String label) {
     }

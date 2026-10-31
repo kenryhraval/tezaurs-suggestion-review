@@ -12,6 +12,7 @@ import type {
   TezaursSense,
 } from '../types'
 import { FlagEditor } from './FlagEditor'
+import { RestrictionEditor } from './RestrictionEditor'
 
 type Props = {
   reviewId: string
@@ -176,6 +177,16 @@ export function SenseDraftForm({
               flags={sense.flags}
               onChange={(flags) => replaceSense(index, { ...sense, flags })}
               scope="S"
+            />
+            <RestrictionEditor
+              definitions={options.flags}
+              frequencies={options.restrictionFrequencies}
+              onChange={(structuralRestrictions) => replaceSense(index, {
+                ...sense,
+                structuralRestrictions,
+              })}
+              restriction={sense.structuralRestrictions}
+              types={options.restrictionTypes}
             />
             {senses.length > 1 && (
               <button

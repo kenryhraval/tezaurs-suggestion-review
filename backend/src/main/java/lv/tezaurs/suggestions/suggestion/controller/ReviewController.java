@@ -1,19 +1,21 @@
 package lv.tezaurs.suggestions.suggestion.controller;
 
 import jakarta.validation.Valid;
-import java.net.URI;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import lv.tezaurs.suggestions.suggestion.dto.AddCorpusExampleRequest;
-import lv.tezaurs.suggestions.suggestion.dto.CorpusExampleResponse;
 import lv.tezaurs.suggestions.suggestion.dto.CorrectTermRequest;
 import lv.tezaurs.suggestions.suggestion.dto.DuplicateReviewCandidateResponse;
 import lv.tezaurs.suggestions.suggestion.dto.RecordTezaursCheckRequest;
+import lv.tezaurs.suggestions.suggestion.dto.ReviewPageResponse;
 import lv.tezaurs.suggestions.suggestion.dto.ReviewResponse;
+import lv.tezaurs.suggestions.suggestion.dto.ReviewSort;
+import lv.tezaurs.suggestions.suggestion.dto.UpdateStatusRequest;
+import lv.tezaurs.suggestions.suggestion.entity.SuggestionStatus;
 import lv.tezaurs.suggestions.suggestion.service.ReviewService;
 import lv.tezaurs.suggestions.tezaurs.dto.TezaursEntryCandidateResponse;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -28,11 +30,25 @@ import org.springframework.web.bind.annotation.RestController;
 public class ReviewController {
     private final ReviewService service;
 
-    @GetMapping("/by-source-suggestion/{sourceSuggestionId}")
-    ResponseEntity<ReviewResponse> findBySourceSuggestionId(@PathVariable Integer sourceSuggestionId) {
-        return service.findBySourceSuggestionId(sourceSuggestionId)
-                .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.noContent().build());
+    @GetMapping
+    ReviewPageResponse list(
+            @RequestParam SuggestionStatus status,
+            @RequestParam(defaultValue = "") String query,
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
+            @RequestParam(defaultValue = "NEWEST") ReviewSort sort) {
+        return service.list(status, query, page, size, sort);
+    }
+
+    @GetMapping("/{reviewId}")
+    ReviewResponse find(@PathVariable UUID reviewId) {
+        return service.find(reviewId);
+    }
+
+    @PostMapping("/{reviewId}/status")
+    ReviewResponse changeStatus(
+            @PathVariable UUID reviewId, @Valid @RequestBody UpdateStatusRequest request) {
+        return service.changeStatus(reviewId, request);
     }
 
     @GetMapping("/duplicate-candidates")
@@ -59,16 +75,4 @@ public class ReviewController {
         return service.findTezaursCandidates(reviewId, query);
     }
 
-    @GetMapping("/{reviewId}/corpus-examples")
-    List<CorpusExampleResponse> listCorpusExamples(@PathVariable UUID reviewId) {
-        return service.listCorpusExamples(reviewId);
-    }
-
-    @PostMapping("/{reviewId}/corpus-examples")
-    ResponseEntity<CorpusExampleResponse> addCorpusExample(
-            @PathVariable UUID reviewId, @Valid @RequestBody AddCorpusExampleRequest request) {
-        CorpusExampleResponse response = service.addCorpusExample(reviewId, request);
-        return ResponseEntity.created(URI.create("/api/reviews/" + reviewId
-                + "/corpus-examples/" + response.id())).body(response);
-    }
 }

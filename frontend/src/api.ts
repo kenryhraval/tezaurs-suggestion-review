@@ -1,11 +1,11 @@
 import type {
-  CorpusExample,
   DuplicateReviewCandidate,
   EntryDraft,
   Review,
+  ReviewListItem,
+  QueuePage,
   SaveSenseDraft,
   SenseDraft,
-  Suggestion,
   SuggestionPage,
   SuggestionSort,
   SuggestionStatus,
@@ -41,14 +41,12 @@ async function request(path: string, options?: RequestInit): Promise<Response> {
 }
 
 export async function getSuggestions(
-  status: SuggestionStatus,
   query: string,
   page: number,
   size: number,
   sort: SuggestionSort,
 ): Promise<SuggestionPage> {
   const parameters = new URLSearchParams({
-    status,
     query,
     page: String(page),
     size: String(size),
@@ -58,11 +56,67 @@ export async function getSuggestions(
   return response.json()
 }
 
+async function getReviews(
+  status: SuggestionStatus,
+  query: string,
+  page: number,
+  size: number,
+  sort: SuggestionSort,
+): Promise<{ items: ReviewListItem[]; page: number; totalPages: number; totalItems: number }> {
+  const parameters = new URLSearchParams({
+    status,
+    query,
+    page: String(page),
+    size: String(size),
+    sort,
+  })
+  const response = await request(`/api/reviews?${parameters}`)
+  return response.json()
+}
+
+export async function getQueueItems(
+  status: SuggestionStatus,
+  query: string,
+  page: number,
+  size: number,
+  sort: SuggestionSort,
+): Promise<QueuePage> {
+  if (status === 'NEW') {
+    const result = await getSuggestions(query, page, size, sort)
+    return {
+      ...result,
+      items: result.items.map((item) => ({
+        ...item,
+        itemType: 'SUGGESTION' as const,
+        status: 'NEW' as const,
+        sourceCount: 1 as const,
+      })),
+    }
+  }
+
+  const result = await getReviews(status, query, page, size, sort)
+  return {
+    ...result,
+    items: result.items.map((item) => ({ ...item, itemType: 'REVIEW' as const })),
+  }
+}
+
 export async function changeSuggestionStatus(
   id: number,
   status: SuggestionStatus,
-): Promise<Suggestion> {
+): Promise<Review> {
   const response = await request(`/api/suggestions/${id}/status`, {
+    method: 'POST',
+    body: JSON.stringify({ status }),
+  })
+  return response.json()
+}
+
+export async function changeReviewStatus(
+  id: string,
+  status: SuggestionStatus,
+): Promise<Review> {
+  const response = await request(`/api/reviews/${id}/status`, {
     method: 'POST',
     body: JSON.stringify({ status }),
   })
@@ -85,9 +139,8 @@ export async function linkDuplicateSuggestion(id: number, reviewId: string): Pro
   })
 }
 
-export async function getReview(sourceSuggestionId: number): Promise<Review | null> {
-  const response = await request(`/api/reviews/by-source-suggestion/${sourceSuggestionId}`)
-  if (response.status === 204) return null
+export async function getReview(reviewId: string): Promise<Review> {
+  const response = await request(`/api/reviews/${reviewId}`)
   return response.json()
 }
 
@@ -120,19 +173,6 @@ export async function getTezaursCandidates(
 ): Promise<TezaursEntryCandidate[]> {
   const search = query ? `?query=${encodeURIComponent(query)}` : ''
   const response = await request(`/api/reviews/${reviewId}/tezaurs-candidates${search}`)
-  return response.json()
-}
-
-export async function getCorpusExamples(reviewId: string): Promise<CorpusExample[]> {
-  const response = await request(`/api/reviews/${reviewId}/corpus-examples`)
-  return response.json()
-}
-
-export async function addCorpusExample(reviewId: string, url: string): Promise<CorpusExample> {
-  const response = await request(`/api/reviews/${reviewId}/corpus-examples`, {
-    method: 'POST',
-    body: JSON.stringify({ url }),
-  })
   return response.json()
 }
 

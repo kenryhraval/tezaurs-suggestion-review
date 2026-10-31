@@ -20,6 +20,7 @@ import lv.tezaurs.suggestions.suggestion.repository.ReviewSuggestionRepository;
 import lv.tezaurs.suggestions.tezaurs.repository.TezaursLexemeRoleRepository;
 import lv.tezaurs.suggestions.tezaurs.repository.TezaursParadigmRepository;
 import lv.tezaurs.suggestions.tezaurs.service.TezaursFlagService;
+import lv.tezaurs.suggestions.tezaurs.service.TezaursRestrictionService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,6 +33,7 @@ public class LexemeDraftService {
     private final TezaursLexemeRoleRepository lexemeRoleRepository;
     private final TezaursParadigmRepository paradigmRepository;
     private final TezaursFlagService flagService;
+    private final TezaursRestrictionService restrictionService;
 
     @Transactional
     public SaveLexemeDraftResponse create(UUID suggestionId, SaveLexemeDraftRequest request) {
@@ -121,6 +123,7 @@ public class LexemeDraftService {
             throw new ConflictException("The selected paradigm does not exist");
         }
         flagService.validate("L", request.flags());
+        restrictionService.validate(request.structuralRestrictions());
     }
 
     private ReviewSuggestion requireSuggestionWithoutTezaursEntry(UUID id) {

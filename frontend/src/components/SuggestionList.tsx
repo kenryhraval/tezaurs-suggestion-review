@@ -1,5 +1,5 @@
 import { suggestionStatusLabels } from '../labels'
-import type { Suggestion, SuggestionSort, SuggestionStatus } from '../types'
+import type { QueueItem, SuggestionSort, SuggestionStatus } from '../types'
 
 const statuses: SuggestionStatus[] = [
   'NEW',
@@ -14,29 +14,36 @@ const statuses: SuggestionStatus[] = [
 ]
 
 type Props = {
-  suggestions: Suggestion[]
+  items: QueueItem[]
   status: SuggestionStatus
   sort: SuggestionSort
   search: string
-  selectedId: number | null
+  selectedKey: string | null
   loading: boolean
   page: number
   totalPages: number
   totalItems: number
-  onSelect: (id: number) => void
+  onSelect: (key: string) => void
   onFilterStatusChange: (status: SuggestionStatus) => void
   onSortChange: (sort: SuggestionSort) => void
   onSearchChange: (search: string) => void
   onPageChange: (page: number) => void
-  onSuggestionStatusChange: (id: number, status: SuggestionStatus) => Promise<void>
+}
+
+function itemKey(item: QueueItem) {
+  return `${item.itemType}:${item.id}`
+}
+
+function itemTerm(item: QueueItem) {
+  return item.itemType === 'SUGGESTION' ? item.submittedTerm : item.reviewedTerm
 }
 
 export function SuggestionList({
-  suggestions,
+  items,
   status,
   sort,
   search,
-  selectedId,
+  selectedKey,
   loading,
   page,
   totalPages,
@@ -46,7 +53,6 @@ export function SuggestionList({
   onSortChange,
   onSearchChange,
   onPageChange,
-  onSuggestionStatusChange,
 }: Props) {
   return (
     <aside>
@@ -98,54 +104,28 @@ export function SuggestionList({
       </div>
 
       {loading && <p>Ielādē...</p>}
-      {!loading && suggestions.length === 0 && <p className="empty-group">Nav ieteikumu.</p>}
+      {!loading && items.length === 0 && <p className="empty-group">Nav ieteikumu.</p>}
 
-      {!loading && suggestions.length > 0 && (
+      {!loading && items.length > 0 && (
         <ul className="suggestion-list">
-          {suggestions.map((suggestion) => (
+          {items.map((item) => (
             <li
-              className={suggestion.id === selectedId ? 'selected' : undefined}
-              key={suggestion.id}
+              className={itemKey(item) === selectedKey ? 'selected' : undefined}
+              key={itemKey(item)}
             >
               <button
                 className="suggestion-select"
-                onClick={() => onSelect(suggestion.id)}
+                onClick={() => onSelect(itemKey(item))}
                 type="button"
               >
-                <strong>{suggestion.submittedTerm}</strong>
-                <span className="suggestion-definition">
-                  {suggestion.submittedDefinition}
-                </span>
-                {status !== 'NEW' && (
+                <strong>{itemTerm(item)}</strong>
+                {item.itemType === 'REVIEW' && (
                   <small>
-                    {suggestion.sourceCount}{' '}
-                    {suggestion.sourceCount === 1 ? 'ieteikums' : 'ieteikumi'}
+                    {item.sourceCount}{' '}
+                    {item.sourceCount === 1 ? 'ieteikums' : 'ieteikumi'}
                   </small>
                 )}
               </button>
-
-              {status === 'NEW' && (
-                <div className="suggestion-quick-actions">
-                  <button
-                    aria-label={`Sākt izskatīt ${suggestion.submittedTerm}`}
-                    onClick={() => void onSuggestionStatusChange(
-                      suggestion.id, 'READY_FOR_REVIEW',
-                    )}
-                    title="Pārvietot uz Skatāms"
-                    type="button"
-                  >
-                    ✓
-                  </button>
-                  <button
-                    aria-label={`Pārvietot ${suggestion.submittedTerm} uz miskasti`}
-                    onClick={() => void onSuggestionStatusChange(suggestion.id, 'GARBAGE')}
-                    title="Pārvietot uz Miskasti"
-                    type="button"
-                  >
-                    Miskastē
-                  </button>
-                </div>
-              )}
             </li>
           ))}
         </ul>

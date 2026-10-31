@@ -4,7 +4,6 @@ CREATE TABLE suggestions (
     status VARCHAR(32) NOT NULL,
     tezaurs_status VARCHAR(32) NOT NULL,
     matched_entry_id INTEGER,
-    corpus_status VARCHAR(32) NOT NULL,
     entry_draft_ready BOOLEAN NOT NULL DEFAULT FALSE,
     sense_draft_ready BOOLEAN NOT NULL DEFAULT FALSE,
     version BIGINT NOT NULL DEFAULT 0,
@@ -21,9 +20,6 @@ CREATE TABLE suggestions (
             'NOT_CHECKED', 'FOUND', 'MEANING_FOUND', 'MEANING_NOT_FOUND', 'NOT_FOUND'
         )
     ),
-    CONSTRAINT ck_review_suggestions_corpus_status CHECK (
-        corpus_status IN ('NOT_CHECKED', 'FOUND', 'NOT_FOUND')
-    ),
     CONSTRAINT ck_review_suggestions_tezaurs_match CHECK (
         matched_entry_id IS NULL
         OR tezaurs_status IN ('FOUND', 'MEANING_FOUND', 'MEANING_NOT_FOUND')
@@ -33,16 +29,11 @@ CREATE TABLE suggestions (
 CREATE TABLE suggestion_sources (
     source_suggestion_id INTEGER PRIMARY KEY,
     suggestion_id UUID NOT NULL REFERENCES suggestions (id) ON DELETE CASCADE,
-    primary_source BOOLEAN NOT NULL,
     created_at TIMESTAMPTZ NOT NULL
 );
 
 CREATE INDEX ix_review_suggestion_sources_suggestion
     ON suggestion_sources (suggestion_id);
-
-CREATE UNIQUE INDEX uq_review_suggestion_sources_primary
-    ON suggestion_sources (suggestion_id)
-    WHERE primary_source;
 
 CREATE TABLE entries (
     id UUID PRIMARY KEY,
@@ -104,14 +95,3 @@ CREATE TABLE senses (
 
 CREATE INDEX ix_review_senses_suggestion
     ON senses (suggestion_id, order_no);
-
-CREATE TABLE corpus_examples (
-    id UUID PRIMARY KEY,
-    suggestion_id UUID NOT NULL REFERENCES suggestions (id) ON DELETE CASCADE,
-    url TEXT NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL,
-    CONSTRAINT uq_review_corpus_examples_url UNIQUE (suggestion_id, url)
-);
-
-CREATE INDEX ix_review_corpus_examples_suggestion_created
-    ON corpus_examples (suggestion_id, created_at, id);

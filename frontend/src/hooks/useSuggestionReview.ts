@@ -1,19 +1,22 @@
 import { useEffect, useState } from 'react'
 import { getReview } from '../api'
-import type { Review, SuggestionStatus } from '../types'
+import type { Review } from '../types'
 
-export function useSuggestionReview(sourceSuggestionId: number, status: SuggestionStatus) {
+export function useSuggestionReview(reviewId: string | null) {
   const [review, setReview] = useState<Review | null>(null)
   const [error, setError] = useState('')
 
   useEffect(() => {
-    if (status === 'NEW') return
+    if (!reviewId) {
+      return
+    }
+    const id = reviewId
 
     let active = true
 
     async function load() {
       try {
-        const loaded = await getReview(sourceSuggestionId)
+        const loaded = await getReview(id)
         if (active) {
           setReview(loaded)
           setError('')
@@ -29,7 +32,7 @@ export function useSuggestionReview(sourceSuggestionId: number, status: Suggesti
     return () => {
       active = false
     }
-  }, [sourceSuggestionId, status])
+  }, [reviewId])
 
   return { review, setReview, error }
 }
