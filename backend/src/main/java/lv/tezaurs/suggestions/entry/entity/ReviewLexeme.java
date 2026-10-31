@@ -13,6 +13,7 @@ import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -32,6 +33,7 @@ public class ReviewLexeme {
     @Column(nullable = false)
     private String lemma;
 
+    @Setter
     @Column(name = "primary_lexeme", nullable = false)
     private boolean primary;
 
@@ -95,9 +97,5 @@ public class ReviewLexeme {
         this.structuralRestrictions = structuralRestrictions == null
                 ? null : new HashMap<>(structuralRestrictions);
         this.orderNo = orderNo;
-    }
-
-    public void setPrimary(boolean primary) {
-        this.primary = primary;
     }
 }

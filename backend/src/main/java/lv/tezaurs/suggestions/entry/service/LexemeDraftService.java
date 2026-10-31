@@ -14,8 +14,8 @@ import lv.tezaurs.suggestions.entry.entity.ReviewLexeme;
 import lv.tezaurs.suggestions.entry.repository.ReviewEntryRepository;
 import lv.tezaurs.suggestions.entry.repository.ReviewLexemeRepository;
 import lv.tezaurs.suggestions.suggestion.dto.ReviewResponse;
+import lv.tezaurs.suggestions.suggestion.service.ReviewCompletionService;
 import lv.tezaurs.suggestions.suggestion.entity.ReviewCase;
-import lv.tezaurs.suggestions.suggestion.entity.TezaursStatus;
 import lv.tezaurs.suggestions.suggestion.repository.ReviewCaseRepository;
 import lv.tezaurs.suggestions.tezaurs.repository.TezaursLexemeRoleRepository;
 import lv.tezaurs.suggestions.tezaurs.repository.TezaursParadigmRepository;
@@ -27,6 +27,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class LexemeDraftService {
+    private static final String LEXEME_SCOPE = "L";
+
+    private final ReviewCompletionService completionService;
     private final ReviewEntryRepository entryRepository;
     private final ReviewLexemeRepository lexemeRepository;
     private final ReviewCaseRepository caseRepository;
@@ -37,8 +40,8 @@ public class LexemeDraftService {
 
     @Transactional
     public SaveLexemeDraftResponse create(UUID caseId, SaveLexemeDraftRequest request) {
-        ReviewCase reviewCase = requireCaseWithoutTezaursEntry(caseId);
-        ReviewEntry entry = requireEntry(caseId);
+        ReviewCase reviewCase = requireEditableCase(caseId);
+        ReviewEntry entry = requireEntry(reviewCase);
         validate(request);
 
         List<ReviewLexeme> existingLexemes = findLexemes(entry);
@@ -53,18 +56,20 @@ public class LexemeDraftService {
         updateLexeme(lexeme, request);
         ReviewLexeme savedLexeme = lexemeRepository.save(lexeme);
 
-        existingLexemes.add(savedLexeme);
-        reviewCase.recordEntryDraftReadiness(entry.isReady(existingLexemes));
         return response(savedLexeme, reviewCase);
     }
 
     @Transactional
     public SaveLexemeDraftResponse update(
             UUID caseId, UUID lexemeId, SaveLexemeDraftRequest request) {
-        ReviewCase reviewCase = requireCaseWithoutTezaursEntry(caseId);
-        ReviewEntry entry = requireEntry(caseId);
+        ReviewCase reviewCase = requireEditableCase(caseId);
+        ReviewEntry entry = requireEntry(reviewCase);
         ReviewLexeme lexeme = requireLexeme(entry.getId(), lexemeId);
-        validate(request);
+        validateReferences(request);
+        flagService.validateChanges(LEXEME_SCOPE, request.flags(), lexeme.getFlags());
+        if (!java.util.Objects.equals(request.structuralRestrictions(), lexeme.getStructuralRestrictions())) {
+            restrictionService.validate(request.structuralRestrictions());
+        }
 
         List<ReviewLexeme> lexemes = findLexemes(entry);
         if (!request.primary() && lexeme.isPrimary()) {
@@ -77,25 +82,20 @@ public class LexemeDraftService {
         }
         updateLexeme(lexeme, request);
 
-        reviewCase.recordEntryDraftReadiness(entry.isReady(lexemes));
         return response(lexeme, reviewCase);
     }
 
     @Transactional
     public ReviewResponse delete(UUID caseId, UUID lexemeId) {
-        ReviewCase reviewCase = requireCaseWithoutTezaursEntry(caseId);
-        ReviewEntry entry = requireEntry(caseId);
+        ReviewCase reviewCase = requireEditableCase(caseId);
+        ReviewEntry entry = requireEntry(reviewCase);
         ReviewLexeme lexeme = requireLexeme(entry.getId(), lexemeId);
         if (lexeme.isPrimary()) {
             throw new ConflictException("Select another primary lexeme before deleting this one");
         }
 
         lexemeRepository.delete(lexeme);
-        List<ReviewLexeme> remainingLexemes = findLexemes(entry).stream()
-                .filter(existing -> !existing.getId().equals(lexemeId))
-                .toList();
-        reviewCase.recordEntryDraftReadiness(entry.isReady(remainingLexemes));
-        return ReviewResponse.from(reviewCase);
+        return completionService.response(reviewCase);
     }
 
     ReviewLexeme createInitial(ReviewEntry entry, SaveLexemeDraftRequest request) {
@@ -116,28 +116,32 @@ public class LexemeDraftService {
     }
 
     private void validate(SaveLexemeDraftRequest request) {
+        validateReferences(request);
+        flagService.validate(LEXEME_SCOPE, request.flags());
+        restrictionService.validate(request.structuralRestrictions());
+    }
+
+    private void validateReferences(SaveLexemeDraftRequest request) {
         if (!lexemeRoleRepository.existsById(request.roleId())) {
             throw new ConflictException("The selected lexeme role does not exist");
         }
         if (request.paradigmId() != null && !paradigmRepository.existsById(request.paradigmId())) {
             throw new ConflictException("The selected paradigm does not exist");
         }
-        flagService.validate("L", request.flags());
-        restrictionService.validate(request.structuralRestrictions());
     }
 
-    private ReviewCase requireCaseWithoutTezaursEntry(UUID id) {
+    private ReviewCase requireEditableCase(UUID id) {
         ReviewCase reviewCase = caseRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Review " + id + " was not found"));
-        if (reviewCase.getTezaursStatus() != TezaursStatus.NOT_FOUND) {
+        if (!reviewCase.canEditEntryDraft()) {
             throw new ConflictException(
-                    "An entry draft can only be saved when the entry is absent from Tēzaurs");
+                    "Only new entry drafts can be edited");
         }
         return reviewCase;
     }
 
-    private ReviewEntry requireEntry(UUID caseId) {
-        return entryRepository.findByCaseId(caseId)
+    private ReviewEntry requireEntry(ReviewCase reviewCase) {
+        return entryRepository.findByCaseId(reviewCase.getId())
                 .orElseThrow(() -> new NotFoundException("Entry draft was not found"));
     }
 
@@ -151,10 +155,10 @@ public class LexemeDraftService {
                 lexemeRepository.findAllByEntryIdOrderByOrderNoAscIdAsc(entry.getId()));
     }
 
-    private static SaveLexemeDraftResponse response(
+    private SaveLexemeDraftResponse response(
             ReviewLexeme lexeme, ReviewCase reviewCase) {
         return new SaveLexemeDraftResponse(
                 EntryDraftResponse.LexemeDraftResponse.from(lexeme),
-                ReviewResponse.from(reviewCase));
+                completionService.response(reviewCase));
     }
 }

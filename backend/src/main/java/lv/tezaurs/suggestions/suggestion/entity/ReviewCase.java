@@ -42,12 +42,6 @@ public class ReviewCase {
     @Column(name = "matched_entry_id")
     private Integer matchedEntryId;
 
-    @Column(name = "entry_draft_ready", nullable = false)
-    private boolean entryDraftReady;
-
-    @Column(name = "sense_draft_ready", nullable = false)
-    private boolean senseDraftReady;
-
     @Version
     @Column(nullable = false)
     private long version;
@@ -76,59 +70,40 @@ public class ReviewCase {
 
     public void changeStatus(SuggestionStatus newStatus) {
         status.requireTransitionTo(newStatus);
-        if (newStatus == SuggestionStatus.COMPLETED && !canComplete()) {
-            throw new ConflictException("The required review checks must be completed first");
-        }
-        if (newStatus == SuggestionStatus.ALREADY_EXISTS
-                && tezaursStatus != TezaursStatus.MEANING_FOUND) {
-            throw new ConflictException("The submitted meaning must be confirmed in Tēzaurs first");
+        if (newStatus == SuggestionStatus.ALREADY_EXISTS) {
+            if (matchedEntryId == null) {
+                throw new ConflictException("Select the matching Tēzaurs entry");
+            }
+            tezaursStatus = TezaursStatus.MEANING_ALREADY_EXISTS;
         }
         status = newStatus;
-    }
-
-    public boolean canComplete() {
-        return completionBlockReason() == null;
-    }
-
-    public CompletionBlockReason completionBlockReason() {
-        return switch (tezaursStatus) {
-            case NOT_CHECKED -> CompletionBlockReason.TEZAURS_CHECK_REQUIRED;
-            case FOUND -> CompletionBlockReason.MEANING_CHECK_REQUIRED;
-            case MEANING_FOUND -> null;
-            case MEANING_NOT_FOUND -> senseDraftReady ? null : CompletionBlockReason.SENSE_DRAFT_REQUIRED;
-            case NOT_FOUND -> {
-                if (!entryDraftReady) {
-                    yield CompletionBlockReason.ENTRY_DRAFT_REQUIRED;
-                }
-                yield senseDraftReady ? null : CompletionBlockReason.SENSE_DRAFT_REQUIRED;
-            }
-        };
     }
 
     public void correctTerm(String term) {
         reviewedTerm = term;
     }
 
-    public void recordTezaursCheck(TezaursStatus checkStatus, Integer entryId) {
-        if (!checkStatus.entryExists() && entryId != null) {
+    public void recordTezaursCheck(TezaursStatus newTezaursStatus, Integer selectedEntryId) {
+        if (newTezaursStatus.entryExists() && selectedEntryId == null) {
+            throw new ConflictException("Select the matching Tēzaurs entry");
+        }
+        if (!newTezaursStatus.entryExists() && selectedEntryId != null) {
             throw new ConflictException("An entry ID is only allowed when a Tēzaurs entry was found");
         }
-        tezaursStatus = checkStatus;
-        matchedEntryId = entryId;
+        boolean shouldReopenCase = this.status == SuggestionStatus.ALREADY_EXISTS
+                && newTezaursStatus != TezaursStatus.MEANING_ALREADY_EXISTS;
+        if (shouldReopenCase) {
+            status = SuggestionStatus.IN_PROGRESS;
+        }
+        this.tezaursStatus = newTezaursStatus;
+        this.matchedEntryId = selectedEntryId;
+        if (newTezaursStatus == TezaursStatus.MEANING_ALREADY_EXISTS
+                && status != SuggestionStatus.ALREADY_EXISTS) {
+            changeStatus(SuggestionStatus.ALREADY_EXISTS);
+        }
     }
 
-    public void recordEntryDraftReadiness(boolean ready) {
-        if (tezaursStatus != TezaursStatus.NOT_FOUND) {
-            throw new ConflictException("An entry draft is only applicable when the entry is absent from Tēzaurs");
-        }
-        entryDraftReady = ready;
-    }
-
-    public void markSenseDraftReady() {
-        if (tezaursStatus != TezaursStatus.MEANING_NOT_FOUND
-                && tezaursStatus != TezaursStatus.NOT_FOUND) {
-            throw new ConflictException("A sense draft requires an absent entry or meaning");
-        }
-        senseDraftReady = true;
+    public boolean canEditEntryDraft() {
+        return status == SuggestionStatus.IN_PROGRESS && tezaursStatus == TezaursStatus.NOT_FOUND;
     }
 }

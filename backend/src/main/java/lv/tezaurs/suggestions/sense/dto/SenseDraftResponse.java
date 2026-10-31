@@ -6,6 +6,7 @@ import lv.tezaurs.suggestions.sense.entity.ReviewSense;
 
 public record SenseDraftResponse(
         UUID id,
+        Integer sourceSenseId,
         String gloss,
         UUID parentDraftSenseId,
         Integer parentTezaursSenseId,
@@ -14,7 +15,7 @@ public record SenseDraftResponse(
         Map<String, Object> structuralRestrictions) {
 
     public static SenseDraftResponse from(ReviewSense sense) {
-        return new SenseDraftResponse(sense.getId(), sense.getGloss(),
+        return new SenseDraftResponse(sense.getId(), sense.getSourceSenseId(), sense.getGloss(),
                 sense.getParentDraftSenseId(), sense.getParentTezaursSenseId(),
                 sense.getOrderNo(), sense.getFlags(), sense.getStructuralRestrictions());
     }

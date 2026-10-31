@@ -113,8 +113,10 @@ export function ReviewPage() {
     const index = items.findIndex((candidate) => itemKey(candidate) === key)
     const next = items[index + 1] ?? items[index - 1] ?? null
 
-    setItems((currentItems) => currentItems.filter((candidate) => itemKey(candidate) !== key))
-    setTotalItems((count) => Math.max(0, count - 1))
+    if (index >= 0) {
+      setItems((currentItems) => currentItems.filter((candidate) => itemKey(candidate) !== key))
+      setTotalItems((count) => Math.max(0, count - 1))
+    }
     setSelected(keepOpen ?? next)
     setReload((value) => value + 1)
   }
@@ -141,13 +143,25 @@ export function ReviewPage() {
   async function linkDuplicate(id: number, reviewId: string) {
     setError('')
     try {
-      await linkDuplicateSuggestion(id, reviewId)
-      const source = items.find((item) => item.itemType === 'SUGGESTION' && item.id === id)
-      if (source) removeItem(source)
+      const target = await linkDuplicateSuggestion(id, reviewId)
+      const source = selected?.itemType === 'REVIEW'
+        ? selected : items.find((item) => item.itemType === 'SUGGESTION' && item.id === id)
+      if (source) removeItem(source, itemFromReview(target))
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : 'Neizdevās piesaistīt dublikātu.'
       setError(message)
       throw cause
+    }
+  }
+
+  function handleReviewUpdated(review: Review) {
+    if (selected && review.status !== selected.status) {
+      removeItem(selected, itemFromReview(review))
+    } else {
+      const updated = itemFromReview(review)
+      setItems((current) => current.map((item) => itemKey(item) === itemKey(updated) ? updated : item))
+      setSelected(updated)
+      setReload((value) => value + 1)
     }
   }
 
@@ -190,6 +204,7 @@ export function ReviewPage() {
             key={itemKey(selected)}
             item={selected}
             onStatusChange={(nextStatus) => changeStatus(selected, nextStatus, true)}
+            onReviewUpdated={handleReviewUpdated}
             onDuplicate={linkDuplicate}
           />
         )}

@@ -25,6 +25,7 @@ import lv.tezaurs.suggestions.tezaurs.repository.TezaursLexemeRoleRepository;
 import lv.tezaurs.suggestions.tezaurs.repository.TezaursParadigmRepository;
 import lv.tezaurs.suggestions.tezaurs.service.TezaursFlagService;
 import lv.tezaurs.suggestions.tezaurs.service.TezaursRestrictionService;
+import lv.tezaurs.suggestions.suggestion.service.ReviewCompletionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockMakers;
@@ -46,7 +47,8 @@ class LexemeDraftServiceTest {
                 TezaursParadigmRepository.class, withSettings().mockMaker(MockMakers.PROXY));
         TezaursFlagService flagService = mock(TezaursFlagService.class);
         TezaursRestrictionService restrictionService = mock(TezaursRestrictionService.class);
-        service = new LexemeDraftService(entryRepository, lexemeRepository, caseRepository,
+        service = new LexemeDraftService(new ReviewCompletionService(entryRepository,
+                lexemeRepository, mock(lv.tezaurs.suggestions.sense.repository.ReviewSenseRepository.class)), entryRepository, lexemeRepository, caseRepository,
                 roleRepository, paradigmRepository, flagService, restrictionService);
 
         when(roleRepository.existsById(1)).thenReturn(true);
@@ -106,8 +108,18 @@ class LexemeDraftServiceTest {
                 .thenReturn(lexemes);
     }
 
+    @Test
+    void completedCasesDoNotAllowLexemeChanges() {
+        ReviewCase review = reviewWithoutTezaursEntry();
+        review.changeStatus(SuggestionStatus.COMPLETED);
+        when(caseRepository.findById(review.getId())).thenReturn(Optional.of(review));
+        assertThatThrownBy(() -> service.create(review.getId(), request("vārds", false)))
+                .isInstanceOf(ConflictException.class);
+    }
+
     private static ReviewCase reviewWithoutTezaursEntry() {
         ReviewCase review = new ReviewCase("jauns vārds");
+        review.changeStatus(SuggestionStatus.READY_FOR_REVIEW);
         review.changeStatus(SuggestionStatus.IN_PROGRESS);
         review.recordTezaursCheck(TezaursStatus.NOT_FOUND, null);
         return review;

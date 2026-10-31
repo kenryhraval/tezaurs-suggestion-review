@@ -16,7 +16,7 @@ aside, .details {
   padding: 16px;
 }
 
-form, label, .suggestion-filters, .tezaurs-check {
+form, label, .suggestion-filters {
   display: grid;
   gap: 8px;
 }
@@ -81,12 +81,10 @@ small, .muted, .empty-group { color: #666; }
 }
 .suggestion-sources td small { display: block; margin-top: 4px; }
 
-.title-form input {
-  border: 0;
-  border-bottom: 1px solid #aaa;
-  font-size: 1.5rem;
-  font-weight: bold;
-}
+.review-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.review-heading h2 { margin: 0; overflow-wrap: anywhere; }
+.icon-button { display: inline-flex; padding: 4px; border: 1px solid transparent; background: transparent; cursor: pointer; }
+.icon-button:hover, .icon-button:focus-visible { border-color: #aaa; background: #eee; }
 
 .tezaurs-dropdown { position: relative; }
 
@@ -114,6 +112,11 @@ small, .muted, .empty-group { color: #666; }
 }
 
 .tezaurs-dropdown-options { display: grid; }
+.tezaurs-option, .tezaurs-check .tezaurs-dropdown-control { display: flex; align-items: center; }
+.tezaurs-option button, .tezaurs-check .tezaurs-dropdown-toggle { flex: 1; min-width: 0; }
+.tezaurs-option-label { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.tezaurs-entry-link { flex-shrink: 0; padding: 6px 10px; text-decoration: none; }
+.tezaurs-entry-link:hover, .tezaurs-entry-link:focus-visible { background: #eee; }
 
 .tezaurs-dropdown-options button {
   border: 0;
@@ -124,16 +127,27 @@ small, .muted, .empty-group { color: #666; }
 .tezaurs-dropdown-options button:hover,
 .tezaurs-dropdown-options button:focus { background: #eee; }
 
-.tezaurs-combobox-search, .tezaurs-dropdown-preview,
-.tezaurs-dropdown-selected-details { padding: 8px; }
+.tezaurs-combobox-search, .tezaurs-dropdown-preview { padding: 8px; }
+summary { cursor: pointer; }
+.tezaurs-check summary.confirmed, .initial-review summary.confirmed { color: #237333; }
+.confirmation-dialog { max-width: 420px; width: calc(100% - 64px); border: 1px solid #ccc; border-radius: 6px; padding: 20px; }
+.confirmation-dialog::backdrop { background: rgb(0 0 0 / 35%); }
+.edit-dialog { max-width: 720px; max-height: calc(100vh - 64px); overflow-y: auto; }
+.confirmation-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.draft-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 12px 0 6px; }
+.confirmation-confirm { color: #a32838; }
+.tezaurs-answer-actions button[aria-pressed="true"] { background: #dcecff; }
 
-.checks, .initial-review,
+.tezaurs-check, .initial-review,
 .meaning-existence-check, .review-return,
-.entry-draft-section, .sense-draft-section, .existing-entry {
-  margin-top: 20px;
+.entry-draft-section, .existing-entry {
+  margin-top: 16px;
   border-top: 1px solid #ccc;
-  padding-top: 16px;
+  padding-top: 12px;
 }
+
+.initial-review p, .tezaurs-check p { margin: 8px 0; }
+.initial-review .meaning-existence-check, .tezaurs-check .meaning-existence-check { margin-top: 12px; padding-top: 8px; }
 
 .entry-draft-form fieldset {
   display: grid;
@@ -144,7 +158,6 @@ small, .muted, .empty-group { color: #666; }
 }
 
 .entry-draft-form textarea { resize: vertical; }
-.lexeme-draft, .sense-draft { margin: 8px 0; border: 1px solid #ddd; padding: 10px; }
 .checkbox-label { display: flex; align-items: center; }
 .checkbox-label input { width: auto; }
 .flag-editor { display: grid; gap: 8px; }
@@ -154,7 +167,28 @@ small, .muted, .empty-group { color: #666; }
 .existing-entry dl { display: grid; grid-template-columns: 180px 1fr; gap: 4px 12px; }
 .existing-entry dt { font-weight: bold; }
 .existing-entry dd { margin: 0; }
-.existing-entry details, .existing-sense { margin: 8px 0; padding: 8px; border: 1px solid #ddd; }
+.existing-entry details { margin: 8px 0; padding: 8px; border: 1px solid #ddd; }
+.existing-sense { margin: 8px 0; }
+.existing-sense p { margin: 6px 0; }
+.existing-sense .icon-button, .existing-lexeme .icon-button { margin-right: 6px; vertical-align: middle; }
+.tezaurs-entry-display > .draft-heading > strong { font-size: 1.2rem; }
+.draft-label { margin-left: 6px; }
+.entity-actions { display: inline-flex; position: relative; align-items: stretch; border: 1px solid #aaa; border-radius: 3px; vertical-align: middle; }
+.entity-actions-entry { background: #0d6efd; color: white; }
+.entity-actions-lexeme { background: #ffc107; color: #222; }
+.entity-actions-sense { background: #198754; color: white; }
+.entity-actions > .icon-button, .entity-actions > .action-toggle { margin: 0; border: 0; background: transparent; color: inherit; }
+.edit-button { padding: 3px; }
+.entity-actions > .action-toggle { border-left: 1px solid rgb(0 0 0 / 20%); padding: 2px 5px; font-size: 12px; cursor: pointer; }
+.entity-actions > button:enabled:hover, .entity-actions > button:focus-visible { background: rgb(0 0 0 / 12%); }
+.entity-actions > button:disabled { background: #eee; color: #999; cursor: default; }
+.existing-sense .entity-actions, .existing-lexeme .entity-actions { margin-right: 6px; }
+.entity-action-menu { position: absolute; top: 100%; left: 0; z-index: 20; width: 320px; max-width: calc(100vw - 80px); max-height: 60vh; overflow: auto; padding: 4px 0; border: 1px solid #ccc; background: white; color: #222; box-shadow: 0 3px 8px rgb(0 0 0 / 15%); }
+.entity-action-menu button, .entity-action-menu a { display: block; box-sizing: border-box; width: 100%; padding: 6px 12px; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; text-decoration: none; }
+.entity-action-menu button:enabled:hover, .entity-action-menu a:hover, .entity-action-menu button:focus-visible, .entity-action-menu a:focus-visible { background: #eee; }
+.entity-action-menu button:disabled { color: #999; cursor: default; }
+.entity-action-separator { display: block; margin: 4px 0; border-top: 1px solid #ddd; }
+.synonym-action { display: inline-flex; margin-right: 6px; padding: 3px; border: 1px solid #ccc; border-radius: 3px; background: #eee; color: #999; vertical-align: middle; }
 .existing-entry details dl div { display: contents; }
 .existing-data { margin: 8px 0; }
 .existing-data ul { margin: 4px 0; }

@@ -1,6 +1,7 @@
-import { useState, type FormEvent } from 'react'
+import { useState, type ReactNode } from 'react'
 import {
   correctReviewTerm,
+  detachSuggestion,
   saveTezaursCheck,
 } from '../api'
 import { suggestionStatusLabels, suggestionStatusTransitions } from '../labels'
@@ -14,16 +15,19 @@ import type {
 } from '../types'
 import { useSuggestionReview } from '../hooks/useSuggestionReview'
 import { TezaursCheckForm } from './TezaursCheckForm'
-import { DuplicateReviewCombobox } from './DuplicateReviewCombobox'
+import { SuggestionIntake } from './SuggestionIntake'
 import { EntryDraftForm } from './EntryDraftForm'
 import { ExistingEntryDetails } from './ExistingEntryDetails'
 import { SenseDraftForm } from './SenseDraftForm'
 import { SuggestionSourcesTable } from './SuggestionSourcesTable'
+import { ConfirmationDialog } from './ConfirmationDialog'
+import { EditButton } from './EditButton'
 
 type Props = {
   item: QueueItem
   onStatusChange: (status: SuggestionStatus) => Promise<Review | null>
-  onDuplicate: (sourceSuggestionId: number, reviewId: string) => Promise<void>
+  onDuplicate: (sourceSuggestionId: number, targetReviewId: string) => Promise<void>
+  onReviewUpdated: (review: Review) => void
 }
 
 function sourceFromSuggestion(suggestion: Suggestion): ReviewSource {
@@ -40,56 +44,101 @@ function sourceFromSuggestion(suggestion: Suggestion): ReviewSource {
   }
 }
 
-export function SuggestionDetails({ item, onStatusChange, onDuplicate }: Props) {
+export function SuggestionDetails({ item, onStatusChange, onDuplicate, onReviewUpdated }: Props) {
   const [error, setError] = useState('')
+  const [pendingStatus, setPendingStatus] = useState<SuggestionStatus | null>(null)
+  const [changingStatus, setChangingStatus] = useState(false)
+  const [statusError, setStatusError] = useState('')
+  const [editingTitle, setEditingTitle] = useState(false)
+  const [editedTitle, setEditedTitle] = useState('')
+  const [savingTitle, setSavingTitle] = useState(false)
+  const [titleError, setTitleError] = useState('')
   const suggestion = item.itemType === 'SUGGESTION' ? item : null
   const requestedReviewId = item.itemType === 'REVIEW' ? item.id : null
   const reviewState = useSuggestionReview(requestedReviewId)
   const review = reviewState.review
   const reviewLoading = item.itemType === 'REVIEW' && !review && !reviewState.error
   const reviewInProgress = item.status === 'IN_PROGRESS'
+  const needsCaseChoice = item.status === 'READY_FOR_REVIEW'
+    && review?.sources.length === 1 && review.tezaursStatus === 'NOT_CHECKED'
   const tezaursEntryExists = review?.tezaursStatus === 'FOUND'
-    || review?.tezaursStatus === 'MEANING_FOUND'
+    || review?.tezaursStatus === 'MEANING_ALREADY_EXISTS'
+    || review?.tezaursStatus === 'MEANING_NEEDS_EDITING'
     || review?.tezaursStatus === 'MEANING_NOT_FOUND'
-  const senseEditingAvailable = reviewInProgress
-    && (review?.tezaursStatus === 'NOT_FOUND'
-      || review?.tezaursStatus === 'MEANING_NOT_FOUND')
+  const senseDraftAvailable = review?.tezaursStatus === 'NOT_FOUND'
+    || review?.tezaursStatus === 'MEANING_NOT_FOUND' || review?.tezaursStatus === 'MEANING_NEEDS_EDITING'
+  const entryDraftAvailable = review?.tezaursStatus === 'NOT_FOUND'
   const visibleTransitions = suggestionStatusTransitions[item.status].filter((status) => {
-    if (status === 'ALREADY_EXISTS') return review?.tezaursStatus === 'MEANING_FOUND'
+    if (status === 'ALREADY_EXISTS') return review?.tezaursStatus === 'MEANING_ALREADY_EXISTS'
     if (status === 'COMPLETED') {
       return review?.canComplete === true
-        && review.tezaursStatus !== 'MEANING_FOUND'
+        && review.tezaursStatus !== 'MEANING_ALREADY_EXISTS'
     }
     return true
   })
 
-  async function handleStatus(status: SuggestionStatus) {
-    if (status === 'ALREADY_EXISTS'
-      && !window.confirm('Vai ieteiktā nozīme tiešām jau ir Tēzaurā un ieteikumu var slēgt kā “Jau bija”?')) {
-      return
-    }
+  async function changeStatus(status: SuggestionStatus) {
     const updatedReview = await onStatusChange(status)
     if (updatedReview) reviewState.setReview(updatedReview)
+    return updatedReview
   }
 
-  async function handleTermCorrection(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    if (!review) return
-    setError('')
-    const data = new FormData(event.currentTarget)
+  function requestStatusChange(status: SuggestionStatus) {
+    setStatusError('')
+    setPendingStatus(status)
+  }
 
+  async function confirmStatusChange() {
+    if (!pendingStatus || changingStatus) return
+    setChangingStatus(true)
+    setStatusError('')
     try {
-      reviewState.setReview(await correctReviewTerm(review.id, String(data.get('reviewedTerm'))))
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Neizdevās labot vārdu.')
+      const updatedReview = await changeStatus(pendingStatus)
+      if (updatedReview) {
+        setPendingStatus(null)
+      } else {
+        setStatusError('Neizdevās mainīt statusu. Mēģiniet vēlreiz.')
+      }
+    } finally {
+      setChangingStatus(false)
     }
+  }
+
+  async function handleTermCorrection() {
+    if (!review || savingTitle) return
+    const title = editedTitle.trim()
+    if (!title) {
+      setTitleError('Ievadiet nosaukumu.')
+      return
+    }
+    setSavingTitle(true)
+    setTitleError('')
+    try {
+      const updated = await correctReviewTerm(review.id, title)
+      reviewState.setReview(updated)
+      onReviewUpdated(updated)
+      setEditingTitle(false)
+    } catch (cause) {
+      setTitleError(cause instanceof Error ? cause.message : 'Neizdevās labot nosaukumu.')
+    } finally {
+      setSavingTitle(false)
+    }
+  }
+
+  async function handleDetach(sourceId: number) {
+    if (!review) return
+    const updated = await detachSuggestion(review.id, sourceId)
+    reviewState.setReview(updated)
+    onReviewUpdated(updated)
   }
 
   async function handleTezaursCheck(status: TezaursStatus, entryId: number | null) {
     if (!review) return false
     setError('')
     try {
-      reviewState.setReview(await saveTezaursCheck(review.id, status, entryId))
+      const updatedReview = await saveTezaursCheck(review.id, status, entryId)
+      reviewState.setReview(updatedReview)
+      onReviewUpdated(updatedReview)
       return true
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Neizdevās saglabāt pārbaudi.')
@@ -104,107 +153,120 @@ export function SuggestionDetails({ item, onStatusChange, onDuplicate }: Props) 
     ? [sourceFromSuggestion(suggestion)]
     : Array.isArray(review?.sources) ? review.sources : []
   const initialGloss = sources.length === 1 ? sources[0].submittedDefinition : ''
+  function renderEntry(senses: ReactNode, onAddSense?: () => void) {
+    if (!review) return null
+    if (entryDraftAvailable) {
+      return (
+        <EntryDraftForm reviewId={review.id} editable={reviewInProgress}
+          onReviewUpdated={reviewState.setReview} onAddSense={onAddSense}>
+          {senses}
+        </EntryDraftForm>
+      )
+    }
+    if (tezaursEntryExists && review.matchedEntryId !== null) {
+      return (
+        <ExistingEntryDetails entryId={review.matchedEntryId} onAddSense={onAddSense}>
+          {senses}
+        </ExistingEntryDetails>
+      )
+    }
+    return null
+  }
 
   return (
     <article className="details">
-      {reviewInProgress && review ? (
-        <form
-          key={review.reviewedTerm}
-          className="title-form"
-          onSubmit={handleTermCorrection}
+      {pendingStatus && (
+        <ConfirmationDialog
+          message={pendingStatus === 'ALREADY_EXISTS'
+            ? 'Ieteiktā nozīme jau ir Tēzaurā. Izskatīšana tiks slēgta ar statusu “Jau bija”.'
+            : `Ieteikuma “${displayedTerm}” statuss tiks mainīts no “${suggestionStatusLabels[item.status]}” uz “${suggestionStatusLabels[pendingStatus]}”.`}
+          busy={changingStatus}
+          error={statusError}
+          onConfirm={() => void confirmStatusChange()}
+          onCancel={() => setPendingStatus(null)}
+        />
+      )}
+      <div className="review-heading">
+        <span className="muted">{suggestionStatusLabels[item.status]}</span>
+        <h2 className="suggestion-title">{displayedTerm}</h2>
+        {reviewInProgress && review && (
+          <EditButton label="Labot izskatīšanas nosaukumu" onClick={() => {
+            setEditedTitle(displayedTerm)
+            setTitleError('')
+            setEditingTitle(true)
+          }} />
+        )}
+      </div>
+      {editingTitle && (
+        <ConfirmationDialog
+          title="Labot izskatīšanas nosaukumu"
+          message="Mainīsies tikai izskatīšanas nosaukums. Iesniegtie ieteikumi un šķirkļa melnraksts paliks nemainīti."
+          busy={savingTitle}
+          error={titleError}
+          onConfirm={() => void handleTermCorrection()}
+          onCancel={() => setEditingTitle(false)}
         >
           <label>
-            <span className="visually-hidden">Pārskatītais vārds</span>
+            Nosaukums
             <input
-              aria-label="Pārskatītais vārds"
-              name="reviewedTerm"
-              defaultValue={displayedTerm}
+              autoFocus
+              value={editedTitle}
+              onChange={(event) => setEditedTitle(event.target.value)}
+              disabled={savingTitle}
               maxLength={255}
               required
             />
           </label>
-        </form>
-      ) : (
-        <h2 className="suggestion-title">{displayedTerm}</h2>
+        </ConfirmationDialog>
       )}
 
-      {sources.length > 0 && <SuggestionSourcesTable sources={sources} />}
+      {sources.length > 0 && (
+        <SuggestionSourcesTable sources={sources} onDetach={review ? handleDetach : undefined} />
+      )}
 
       {(error || reviewState.error) && <p className="error">{error || reviewState.error}</p>}
       {reviewLoading && <p className="muted">Ielādē izskatīšanas informāciju...</p>}
 
-      {suggestion && (
-        <section className="initial-review">
-          <h3>Sākotnējā izvērtēšana</h3>
-          <p>Atzīmējiet ieteikumu izskatīšanai, pārvietojiet to uz miskasti vai piesaistiet dublikātu.</p>
-          <DuplicateReviewCombobox
-            initialQuery={suggestion.submittedTerm}
-            onSelect={(reviewId) => onDuplicate(suggestion.id, reviewId)}
-          />
-        </section>
+      {(suggestion || review) && (
+        <SuggestionIntake status={item.status} onStatusChange={changeStatus}
+          review={review} needsCaseChoice={needsCaseChoice} onDuplicate={onDuplicate} />
       )}
 
-      {item.status === 'GARBAGE' && (
-        <section className="trash-message">
-          <p>Šis ieteikums atrodas miskastē.</p>
-        </section>
-      )}
-
-      {reviewInProgress && review && (
-        <>
-          <div className="checks">
-            <TezaursCheckForm
-              key={review.reviewedTerm}
-              reviewId={review.id}
-              status={review.tezaursStatus}
-              matchedEntryId={review.matchedEntryId}
-              onSave={handleTezaursCheck}
-            />
-
-          </div>
-
-          {tezaursEntryExists && (
-            <p className="existing-entry-message">
-              {review.tezaursStatus === 'MEANING_FOUND'
-                && 'Šķirklis un ieteiktā nozīme jau ir Tēzaurā. Pabeidziet ieteikumu ar pogu “Jau bija”.'}
-              {review.tezaursStatus === 'MEANING_NOT_FOUND'
-                && 'Šķirklis ir Tēzaurā, bet ieteiktās nozīmes nav. Esošie dati zemāk ir tikai lasāmi.'}
-              {review.tezaursStatus === 'FOUND'
-                && 'Šķirklis ir Tēzaurā. Vēl jānorāda, vai ieteiktā nozīme tajā jau ir.'}
-            </p>
-          )}
-        </>
-      )}
-
-      {review?.tezaursStatus === 'NOT_FOUND' && reviewInProgress && (
-        <EntryDraftForm
+      {(reviewInProgress || item.status === 'ALREADY_EXISTS') && review && (
+        <TezaursCheckForm
+          key={review.reviewedTerm}
           reviewId={review.id}
-          onReviewUpdated={reviewState.setReview}
+          status={review.tezaursStatus}
+          matchedEntryId={review.matchedEntryId}
+          caseClosed={item.status === 'ALREADY_EXISTS'}
+          onSave={handleTezaursCheck}
         />
       )}
 
-      {tezaursEntryExists && review?.matchedEntryId !== null && (
-        <ExistingEntryDetails entryId={review.matchedEntryId} />
-      )}
-
-      {senseEditingAvailable && review && (
+      {item.status !== 'ALREADY_EXISTS' && (senseDraftAvailable && review ? (
         <SenseDraftForm
+          key={`${review.id}:${review.matchedEntryId}:${review.tezaursStatus}`}
           initialGloss={initialGloss}
           matchedEntryId={review.matchedEntryId}
           onReviewUpdated={reviewState.setReview}
           reviewId={review.id}
+          editExistingSenses={review.tezaursStatus === 'MEANING_NEEDS_EDITING'}
+          editable={reviewInProgress}
+          renderEntry={renderEntry}
         />
-      )}
+      ) : renderEntry(null))}
 
-      {(suggestion || review) && (
+      {review && !needsCaseChoice && item.status !== 'GARBAGE' && (
         <div className="review-return">
           {visibleTransitions.map((status) => (
             <button
               key={status}
               type="button"
-              onClick={() => void handleStatus(status)}
+              onClick={() => requestStatusChange(status)}
             >
-              {status === 'ALREADY_EXISTS' ? 'Jau bija' : suggestionStatusLabels[status]}
+              {item.status === 'READY_FOR_REVIEW' && status === 'IN_PROGRESS'
+                ? 'Sākt izskatīšanu'
+                : status === 'ALREADY_EXISTS' ? 'Jau bija' : suggestionStatusLabels[status]}
             </button>
           ))}
         </div>

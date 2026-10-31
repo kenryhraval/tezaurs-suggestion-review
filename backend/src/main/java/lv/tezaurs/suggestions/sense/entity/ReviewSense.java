@@ -27,6 +27,12 @@ public class ReviewSense {
     @Column(name = "case_id", nullable = false, updatable = false)
     private UUID caseId;
 
+    @Column(name = "target_entry_id", updatable = false)
+    private Integer targetEntryId;
+
+    @Column(name = "source_sense_id", updatable = false)
+    private Integer sourceSenseId;
+
     @Column(name = "parent_draft_sense_id")
     private UUID parentDraftSenseId;
 
@@ -56,8 +62,13 @@ public class ReviewSense {
     private Instant updatedAt;
 
     public ReviewSense(UUID caseId) {
+        this(caseId, null);
+    }
+
+    public ReviewSense(UUID caseId, Integer targetEntryId) {
         this.id = UUID.randomUUID();
         this.caseId = caseId;
+        this.targetEntryId = targetEntryId;
     }
 
     public void update(String gloss, UUID parentDraftSenseId, Integer parentTezaursSenseId,
@@ -70,5 +81,9 @@ public class ReviewSense {
         this.flags = new HashMap<>(flags);
         this.structuralRestrictions = structuralRestrictions == null
                 ? null : new HashMap<>(structuralRestrictions);
+    }
+
+    public void recordSource(Integer senseId) {
+        sourceSenseId = senseId;
     }
 }

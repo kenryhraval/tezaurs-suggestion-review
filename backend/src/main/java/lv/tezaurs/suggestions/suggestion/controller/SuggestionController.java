@@ -4,13 +4,12 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
-import lv.tezaurs.suggestions.suggestion.dto.LinkDuplicateRequest;
 import lv.tezaurs.suggestions.suggestion.dto.ReviewResponse;
 import lv.tezaurs.suggestions.suggestion.dto.SuggestionPageResponse;
 import lv.tezaurs.suggestions.suggestion.dto.SuggestionSort;
 import lv.tezaurs.suggestions.suggestion.dto.UpdateStatusRequest;
+import lv.tezaurs.suggestions.suggestion.dto.LinkDuplicateRequest;
 import lv.tezaurs.suggestions.suggestion.service.SuggestionService;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -40,10 +39,7 @@ public class SuggestionController {
     }
 
     @PostMapping("/{id}/duplicate")
-    ResponseEntity<Void> linkDuplicate(
-            @PathVariable Integer id, @Valid @RequestBody LinkDuplicateRequest request) {
-        service.linkDuplicate(id, request);
-        return ResponseEntity.noContent().build();
+    ReviewResponse linkDuplicate(@PathVariable Integer id, @Valid @RequestBody LinkDuplicateRequest request) {
+        return service.linkDuplicate(id, request);
     }
-
 }

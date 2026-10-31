@@ -14,7 +14,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import lv.tezaurs.suggestions.common.error.ConflictException;
+import lv.tezaurs.suggestions.entry.dto.EntryDraftResponse;
 import lv.tezaurs.suggestions.entry.dto.SaveLexemeDraftRequest;
+import lv.tezaurs.suggestions.entry.dto.SaveEntryDraftRequest;
 import lv.tezaurs.suggestions.entry.entity.ReviewEntry;
 import lv.tezaurs.suggestions.entry.entity.ReviewLexeme;
 import lv.tezaurs.suggestions.entry.repository.ReviewEntryRepository;
@@ -27,6 +29,7 @@ import lv.tezaurs.suggestions.tezaurs.entity.TezaursEntry;
 import lv.tezaurs.suggestions.tezaurs.repository.TezaursEntryRepository;
 import lv.tezaurs.suggestions.tezaurs.repository.TezaursEntryTypeRepository;
 import lv.tezaurs.suggestions.tezaurs.service.TezaursFlagService;
+import lv.tezaurs.suggestions.suggestion.service.ReviewCompletionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockMakers;
@@ -50,7 +53,8 @@ class EntryDraftServiceTest {
         entryTypeRepository = mock(TezaursEntryTypeRepository.class, withSettings().mockMaker(MockMakers.PROXY));
         TezaursFlagService flagService = mock(TezaursFlagService.class);
         lexemeDraftService = mock(LexemeDraftService.class);
-        service = new EntryDraftService(entryRepository, lexemeRepository, caseRepository,
+        service = new EntryDraftService(new ReviewCompletionService(entryRepository,
+                lexemeRepository, mock(lv.tezaurs.suggestions.sense.repository.ReviewSenseRepository.class)), entryRepository, lexemeRepository, caseRepository,
                 tezaursEntryRepository, entryTypeRepository, flagService, lexemeDraftService);
 
         when(entryRepository.save(any(ReviewEntry.class)))
@@ -84,7 +88,7 @@ class EntryDraftServiceTest {
         assertThat(response.draft().heading()).isEqualTo("jauns vārds");
         assertThat(response.draft().humanKey()).isEqualTo("jauns vārds:5");
         assertThat(response.draft().lexemes()).singleElement()
-                .extracting(lexeme -> lexeme.lemma())
+                .extracting(EntryDraftResponse.LexemeDraftResponse::lemma)
                 .isEqualTo("jauns vārds");
         var request = ArgumentCaptor.forClass(SaveLexemeDraftRequest.class);
         verify(lexemeDraftService).createInitial(any(ReviewEntry.class), request.capture());
@@ -124,6 +128,7 @@ class EntryDraftServiceTest {
 
     private static ReviewCase inProgressReview() {
         ReviewCase review = new ReviewCase("jauns vārds");
+        review.changeStatus(SuggestionStatus.READY_FOR_REVIEW);
         review.changeStatus(SuggestionStatus.IN_PROGRESS);
         return review;
     }
@@ -134,4 +139,17 @@ class EntryDraftServiceTest {
                 List.of(), Map.of(), null, 1);
         return lexeme;
     }
+
+    @Test
+    void existingEntriesStayReadOnlyEvenWhenSenseEditingWasChosen() {
+        ReviewCase review = inProgressReview();
+        review.recordTezaursCheck(TezaursStatus.MEANING_NEEDS_EDITING, 42);
+        when(caseRepository.findById(review.getId())).thenReturn(Optional.of(review));
+        assertThat(service.find(review.getId())).isEmpty();
+        assertThatThrownBy(() -> service.create(review.getId())).isInstanceOf(ConflictException.class);
+        var request = new SaveEntryDraftRequest("existing", 1, null, null, null, null, null, Map.of());
+        assertThatThrownBy(() -> service.update(review.getId(), request)).isInstanceOf(ConflictException.class);
+        verify(entryRepository, never()).save(any());
+    }
+
 }

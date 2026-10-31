@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import type { ReviewSource } from '../types'
-
-const PAGE_SIZE = 5
+import { ConfirmationDialog } from './ConfirmationDialog'
 
 type Props = {
   sources: ReviewSource[]
+  onDetach?: (sourceId: number) => Promise<void>
 }
 
 function AdditionalInformation({ source }: { source: ReviewSource }) {
@@ -18,14 +18,25 @@ function AdditionalInformation({ source }: { source: ReviewSource }) {
   )
 }
 
-export function SuggestionSourcesTable({ sources }: Props) {
-  const [page, setPage] = useState(0)
-  const totalPages = Math.max(1, Math.ceil(sources.length / PAGE_SIZE))
-  const currentPage = Math.min(page, totalPages - 1)
-  const visibleSources = sources.slice(
-    currentPage * PAGE_SIZE,
-    (currentPage + 1) * PAGE_SIZE,
-  )
+export function SuggestionSourcesTable({ sources, onDetach }: Props) {
+  const [detaching, setDetaching] = useState<ReviewSource | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const canDetach = sources.length > 1 && onDetach !== undefined
+
+  async function confirmDetach() {
+    if (!detaching || !onDetach || saving) return
+    setSaving(true)
+    setError('')
+    try {
+      await onDetach(detaching.id)
+      setDetaching(null)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Neizdevās atdalīt ieteikumu.')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <section className="suggestion-sources">
@@ -38,10 +49,11 @@ export function SuggestionSourcesTable({ sources }: Props) {
               <th>Nozīme</th>
               <th>Piemērs</th>
               <th>Papildu informācija</th>
+              {canDetach && <th>Darbības</th>}
             </tr>
           </thead>
           <tbody>
-            {visibleSources.map((source) => (
+            {sources.map((source) => (
               <tr key={source.id}>
                 <td>
                   <strong>{source.submittedTerm}</strong>
@@ -50,29 +62,31 @@ export function SuggestionSourcesTable({ sources }: Props) {
                 <td>{source.submittedDefinition}</td>
                 <td>{source.usageExample || '—'}</td>
                 <td><AdditionalInformation source={source} /></td>
+                {canDetach && (
+                  <td><button type="button" className="icon-button" title="Atdalīt ieteikumu"
+                    aria-label={`Atdalīt ieteikumu “${source.submittedTerm}”`} onClick={() => {
+                    setError('')
+                    setDetaching(source)
+                  }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+                      stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M9 7H7a5 5 0 0 0 0 10h2M15 7h2a5 5 0 0 1 0 10h-2M8 12h2m4 0h2M13 3l-2 4m2 10-2 4" />
+                    </svg>
+                  </button></td>
+                )}
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-      {totalPages > 1 && (
-        <div className="suggestion-pagination">
-          <button
-            disabled={currentPage === 0}
-            type="button"
-            onClick={() => setPage(currentPage - 1)}
-          >
-            Iepriekšējie
-          </button>
-          <span>{currentPage + 1} / {totalPages}</span>
-          <button
-            disabled={currentPage + 1 === totalPages}
-            type="button"
-            onClick={() => setPage(currentPage + 1)}
-          >
-            Nākamie
-          </button>
-        </div>
+      {detaching && (
+        <ConfirmationDialog
+          message={`Ieteikums “${detaching.submittedTerm}” tiks atdalīts un atgriezts sarakstā “Jauns”. Šīs izskatīšanas statuss un melnraksti paliks nemainīti un netiks kopēti līdzi.`}
+          busy={saving}
+          error={error}
+          onConfirm={() => void confirmDetach()}
+          onCancel={() => setDetaching(null)}
+        />
       )}
     </section>
   )

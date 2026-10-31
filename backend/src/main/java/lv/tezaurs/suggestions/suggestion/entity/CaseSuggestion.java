@@ -30,7 +30,7 @@ public class CaseSuggestion {
     private IncubatorSuggestion sourceSuggestion;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "case_id", nullable = false, updatable = false)
+    @JoinColumn(name = "case_id", nullable = false)
     private ReviewCase reviewCase;
 
     @CreationTimestamp
@@ -43,4 +43,11 @@ public class CaseSuggestion {
         this.reviewCase = reviewCase;
         reviewCase.addSource(this);
     }
+
+    public void reassignTo(ReviewCase target) {
+        reviewCase.getSources().remove(this);
+        reviewCase = target;
+        target.addSource(this);
+    }
+
 }

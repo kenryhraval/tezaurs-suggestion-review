@@ -1,19 +1,26 @@
 import { useEffect, useState, type ChangeEvent, type FocusEvent } from 'react'
 import { getDuplicateReviewCandidates } from '../api'
 import { suggestionStatusLabels } from '../labels'
-import type { DuplicateReviewCandidate } from '../types'
+import type { DuplicateReviewCandidate, Review } from '../types'
+import { ConfirmationDialog } from './ConfirmationDialog'
 
 type Props = {
+  excludedCaseId?: string
   initialQuery: string
   onSelect: (reviewId: string) => Promise<void>
+  onCreate: () => Promise<boolean>
+  selectedCase?: Review | null
 }
 
-export function DuplicateReviewCombobox({ initialQuery, onSelect }: Props) {
+export function DuplicateReviewCombobox({ excludedCaseId, initialQuery, onSelect, onCreate, selectedCase }: Props) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [candidates, setCandidates] = useState<DuplicateReviewCandidate[]>([])
   const [searching, setSearching] = useState(false)
   const [error, setError] = useState('')
+  const [confirmation, setConfirmation] = useState<DuplicateReviewCandidate | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [creating, setCreating] = useState(false)
 
   useEffect(() => {
     const term = query.trim()
@@ -22,7 +29,7 @@ export function DuplicateReviewCombobox({ initialQuery, onSelect }: Props) {
     let active = true
     const timeout = window.setTimeout(async () => {
       try {
-        const loaded = await getDuplicateReviewCandidates(term)
+        const loaded = await getDuplicateReviewCandidates(term, excludedCaseId)
         if (active) setCandidates(loaded)
       } catch (cause) {
         if (active) {
@@ -39,7 +46,7 @@ export function DuplicateReviewCombobox({ initialQuery, onSelect }: Props) {
       active = false
       window.clearTimeout(timeout)
     }
-  }, [open, query])
+  }, [open, query, excludedCaseId])
 
   function openDropdown() {
     setQuery(initialQuery)
@@ -66,19 +73,47 @@ export function DuplicateReviewCombobox({ initialQuery, onSelect }: Props) {
     setSearching(value.trim().length >= 2)
   }
 
-  async function choose(candidate: DuplicateReviewCandidate) {
+  function choose(candidate: DuplicateReviewCandidate) {
+    setError('')
+    closeDropdown()
+    setConfirmation(candidate)
+  }
+
+  async function confirmDuplicate() {
+    if ((!confirmation && !creating) || saving) return
+    setSaving(true)
     setError('')
     try {
-      await onSelect(candidate.id)
-      closeDropdown()
+      if (creating) {
+        if (!await onCreate()) {
+          setError('Neizdevās izveidot izskatīšanu. Mēģiniet vēlreiz.')
+          return
+        }
+      } else if (confirmation) {
+        await onSelect(confirmation.id)
+      }
+      setConfirmation(null)
+      setCreating(false)
     } catch (cause) {
       setError(cause instanceof Error
         ? cause.message
         : 'Neizdevās piesaistīt dublikātu.')
+    } finally {
+      setSaving(false)
     }
   }
 
   const term = query.trim()
+  const visibleCandidates = candidates.filter(
+    (candidate) => candidate.id !== excludedCaseId && candidate.id !== selectedCase?.id,
+  )
+  let confirmationMessage = 'Ieteikumam tiks izveidota jauna izskatīšana ar statusu “Apstrādē”.'
+  if (confirmation) {
+    confirmationMessage = `Ieteikums tiks pievienots izskatīšanai “${confirmation.reviewedTerm}” kā dublikāts. Mērķa izskatīšana paliks statusā “${suggestionStatusLabels[confirmation.status]}”.`
+    if (selectedCase) {
+      confirmationMessage = `Visi šīs izskatīšanas ieteikumi tiks pievienoti izskatīšanai “${confirmation.reviewedTerm}”. Mērķa izskatīšanas dati un statuss “${suggestionStatusLabels[confirmation.status]}” paliks nemainīti. Pašreizējā izskatīšana un visi tās melnraksti tiks neatgriezeniski dzēsti; atšķirīgā informācija netiks apvienota.`
+    }
+  }
 
   return (
     <div
@@ -92,10 +127,13 @@ export function DuplicateReviewCombobox({ initialQuery, onSelect }: Props) {
         <button
           aria-expanded={open}
           className="tezaurs-dropdown-toggle"
+          disabled={saving}
           onClick={() => open ? closeDropdown() : openDropdown()}
           type="button"
         >
-          <span>Piesaistīt kā dublikātu...</span>
+          <span className="tezaurs-option-label">
+            {selectedCase ? 'Jauna izskatīšana' : 'Izvēlieties izskatīšanu...'}
+          </span>
           <span aria-hidden="true">▾</span>
         </button>
       </div>
@@ -110,24 +148,41 @@ export function DuplicateReviewCombobox({ initialQuery, onSelect }: Props) {
             {term.length === 1 && <small>Ievadiet vēl vienu burtu.</small>}
             {searching && <small>Meklē...</small>}
             {error && <small className="error">{error}</small>}
-            {!searching && !error && term.length >= 2 && candidates.length === 0 && (
+            {!searching && !error && term.length >= 2 && visibleCandidates.length === 0 && (
               <small>Atbilstoša izskatīšana netika atrasta.</small>
             )}
           </div>
 
-          {candidates.length > 0 && (
-            <div className="tezaurs-dropdown-options">
-              {candidates.map((candidate) => (
-                <button key={candidate.id} onClick={() => void choose(candidate)} type="button">
-                  <strong>{candidate.reviewedTerm}</strong>
-                  <small>
-                    {suggestionStatusLabels[candidate.status]} · {candidate.sourceCount} ieteikumi
-                  </small>
+          <div className="tezaurs-dropdown-options">
+              {visibleCandidates.map((candidate) => (
+                <button key={candidate.id} onClick={() => choose(candidate)} type="button">
+                  <span className="tezaurs-option-label">
+                    <strong>{candidate.reviewedTerm}</strong>
+                    <small>
+                      {suggestionStatusLabels[candidate.status]} · {candidate.sourceCount} ieteikumi
+                    </small>
+                  </span>
                 </button>
               ))}
-            </div>
-          )}
+            <button type="button" onClick={() => {
+              closeDropdown()
+              setError('')
+              if (!selectedCase) setCreating(true)
+            }}>Jauna izskatīšana</button>
+          </div>
         </div>
+      )}
+      {(confirmation || creating) && (
+        <ConfirmationDialog
+          message={confirmationMessage}
+          busy={saving}
+          error={error}
+          onConfirm={() => void confirmDuplicate()}
+          onCancel={() => {
+            setConfirmation(null)
+            setCreating(false)
+          }}
+        />
       )}
     </div>
   )

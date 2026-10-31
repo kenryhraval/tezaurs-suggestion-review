@@ -1,6 +1,7 @@
 package lv.tezaurs.suggestions.suggestion.service;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lv.tezaurs.suggestions.entry.service.EntryDraftService;
@@ -32,6 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class ReviewService {
+    private final ReviewCompletionService completionService;
     private final ReviewCaseRepository reviewRepository;
     private final CaseSuggestionRepository reviewSourceRepository;
     private final TezaursEntryRepository tezaursEntryRepository;
@@ -56,7 +58,7 @@ public class ReviewService {
 
     @Transactional(readOnly = true)
     public ReviewResponse find(UUID reviewId) {
-        return ReviewResponse.from(requireReview(reviewId));
+        return completionService.response(requireReview(reviewId));
     }
 
     @Transactional
@@ -72,17 +74,21 @@ public class ReviewService {
     @Transactional
     public ReviewResponse changeStatus(UUID reviewId, UpdateStatusRequest request) {
         ReviewCase review = requireReview(reviewId);
+        if (request.status() == SuggestionStatus.COMPLETED) {
+            completionService.requireCompletionAllowed(review);
+        }
         review.changeStatus(request.status());
-        return ReviewResponse.from(review);
+        return completionService.response(review);
     }
 
     @Transactional(readOnly = true)
-    public List<DuplicateReviewCandidateResponse> findDuplicateCandidates(String query) {
+    public List<DuplicateReviewCandidateResponse> findDuplicateCandidates(String query, UUID excludedCaseId) {
         if (query == null || query.isBlank()) {
             return List.of();
         }
-        return reviewRepository.findByReviewedTermContainingIgnoreCase(
-                        query.trim(), PageRequest.of(0, 5, Sort.by("reviewedTerm")))
+        return reviewRepository.findDuplicateCandidates(
+                        excludedCaseId, SuggestionStatus.GARBAGE, query.trim(),
+                        PageRequest.of(0, 5, Sort.by("reviewedTerm")))
                 .stream()
                 .map(review -> DuplicateReviewCandidateResponse.from(
                         review, reviewSourceRepository.countByReviewCaseId(review.getId())))
@@ -90,20 +96,47 @@ public class ReviewService {
     }
 
     @Transactional
-    public void linkDuplicate(IncubatorSuggestion source, UUID reviewId) {
-        if (reviewSourceRepository.existsById(source.getId())) {
-            throw new ConflictException("The source suggestion already belongs to a review");
+    public ReviewResponse linkDuplicate(IncubatorSuggestion source, UUID targetCaseId) {
+        ReviewCase target = requireReview(targetCaseId);
+        Optional<CaseSuggestion> existingLink = reviewSourceRepository.findById(source.getId());
+        if (existingLink.isPresent()) {
+            ReviewCase sourceCase = existingLink.get().getReviewCase();
+            if (sourceCase.getId().equals(targetCaseId)) {
+                throw new ConflictException("A case cannot be merged into itself");
+            }
+            for (CaseSuggestion link : List.copyOf(sourceCase.getSources())) {
+                link.reassignTo(target);
+            }
+            // Persist the moved links before deleting the case with ON DELETE CASCADE.
+            reviewSourceRepository.flush();
+            reviewRepository.delete(sourceCase);
+        } else {
+            reviewSourceRepository.save(new CaseSuggestion(source, target));
         }
-        ReviewCase review = requireReview(reviewId);
-        reviewSourceRepository.save(
-                new CaseSuggestion(source, review));
+        return completionService.response(target);
+    }
+
+    @Transactional
+    public ReviewResponse detachSuggestion(UUID reviewId, Integer sourceId) {
+        ReviewCase review = reviewRepository.findLockedById(reviewId)
+                .orElseThrow(() -> new NotFoundException("Review " + reviewId + " was not found"));
+        CaseSuggestion link = review.getSources().stream()
+                .filter(item -> item.getSourceSuggestion().getId().equals(sourceId))
+                .findFirst()
+                .orElseThrow(() -> new NotFoundException("The suggestion does not belong to this review"));
+        if (review.getSources().size() <= 1) {
+            throw new ConflictException("The last suggestion cannot be detached from a case");
+        }
+        review.getSources().remove(link);
+        reviewSourceRepository.delete(link);
+        return completionService.response(review);
     }
 
     @Transactional
     public ReviewResponse correctTerm(UUID reviewId, CorrectTermRequest request) {
         ReviewCase review = requireReview(reviewId);
         review.correctTerm(request.reviewedTerm().trim());
-        return ReviewResponse.from(review);
+        return completionService.response(review);
     }
 
     @Transactional
@@ -118,7 +151,7 @@ public class ReviewService {
         if (request.status() == TezaursStatus.NOT_FOUND) {
             entryDraftService.create(reviewId);
         }
-        return ReviewResponse.from(review);
+        return completionService.response(review);
     }
 
     @Transactional(readOnly = true)

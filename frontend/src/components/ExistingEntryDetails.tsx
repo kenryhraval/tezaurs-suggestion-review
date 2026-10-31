@@ -1,9 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { getTezaursEntry } from '../api'
 import type { TezaursEntryDetails } from '../types'
+import { EntryHeading } from './EntryHeading'
+import { EntryActions, LexemeActions, SenseActions } from './TezaursActions'
 
 type Props = {
   entryId: number
+  children?: ReactNode
+  onAddSense?: () => void
 }
 
 type Sense = TezaursEntryDetails['senses'][number]
@@ -22,6 +26,10 @@ const dataLabels: Record<string, string> = {
   Restriction: 'Ierobežojums',
   StructuralRestrictions: 'Strukturālie ierobežojumi',
   Value: 'Vērtība',
+  Etymology: 'Cilme',
+  Normative: 'Normatīvais komentārs',
+  SciName: 'Zinātniskais nosaukums',
+  Source: 'Avots',
 }
 
 function label(name: string) {
@@ -227,7 +235,8 @@ function ExtraData({
     ? Object.fromEntries(Object.entries(gram).filter(
         ([name]) => name !== 'Flags' && name !== 'StructuralRestrictions'))
     : null
-  const otherData = Object.fromEntries(Object.entries(data).filter(([name]) => name !== 'Gram'))
+  const otherData = Object.fromEntries(Object.entries(data).filter(([name, value]) =>
+    name !== 'Gram' && value !== null && value !== '' && (!Array.isArray(value) || value.length > 0)))
   const hasOtherGramData = otherGramData && Object.keys(otherGramData).length > 0
   const hasOtherData = Object.keys(otherData).length > 0
 
@@ -248,7 +257,12 @@ function ExtraData({
   )
 }
 
-function SenseDetails({ number, sense }: { number: string; sense: Sense }) {
+export function SenseDetails({ number, sense, actions, isNew = false }: {
+  number: string
+  sense: Sense
+  actions?: ReactNode
+  isNew?: boolean
+}) {
   const gram = grammarData(sense.data)
   const grammar = [formatFlags(gram?.Flags), formatRestrictions(gram?.StructuralRestrictions)]
     .filter(Boolean).join('; ')
@@ -260,9 +274,11 @@ function SenseDetails({ number, sense }: { number: string; sense: Sense }) {
   return (
     <article className="existing-sense">
       <p>
-        <strong>{number}.</strong>{' '}
+        {number && <><strong>{number}.</strong>{' '}</>}
+        {actions ?? <SenseActions subsense={number.includes('.')} />}
         {grammar && <><span className="sense-metadata">{grammar}</span>{' '}</>}
         {displayedGloss}
+        {isNew && <small className="draft-label">Jauna</small>}
         {sense.hidden && ' · paslēpta'}
       </p>
       {sense.examples.length > 0 && (
@@ -275,7 +291,7 @@ function SenseDetails({ number, sense }: { number: string; sense: Sense }) {
   )
 }
 
-export function ExistingEntryDetails({ entryId }: Props) {
+export function ExistingEntryDetails({ entryId, children, onAddSense }: Props) {
   const [entry, setEntry] = useState<TezaursEntryDetails | null>(null)
   const [error, setError] = useState('')
 
@@ -298,21 +314,48 @@ export function ExistingEntryDetails({ entryId }: Props) {
   if (error) return <p className="error">{error}</p>
   if (!entry) return <p className="muted">Ielādē esošo šķirkli...</p>
 
-  const mainSenses = entry.senses.filter((sense) => sense.parentSenseId === null)
-
   return (
-    <section className="existing-entry">
-      <h3>Esošais šķirklis</h3>
-      <p>
-        <strong>{entry.heading}</strong> <small>{entry.humanKey}</small>
+    <details open className="existing-entry">
+      <summary><strong>3. Esošais šķirklis</strong></summary>
+      <EntryDisplay entry={entry} onAddSense={onAddSense}>{children}</EntryDisplay>
+    </details>
+  )
+}
+
+type DisplayProps = {
+  entry: TezaursEntryDetails
+  children?: ReactNode
+  onEditEntry?: () => void
+  onEditLexeme?: (index: number) => void
+  onAddLexeme?: () => void
+  onAddSense?: () => void
+  onDeleteLexeme?: (index: number) => void
+  canDeleteLexeme?: (index: number) => boolean
+  publicHumanKey?: string
+  lexemeControls?: ReactNode
+}
+
+export function EntryDisplay({ entry, children, onEditEntry, onEditLexeme, onAddLexeme, onAddSense,
+  onDeleteLexeme, canDeleteLexeme, publicHumanKey, lexemeControls }: DisplayProps) {
+  const mainSenses = entry.senses.filter((sense) => sense.parentSenseId === null)
+  const gram = grammarData(entry.data)
+  const entryGrammar = [formatFlags(gram?.Flags), formatRestrictions(gram?.StructuralRestrictions)]
+    .filter(Boolean).join('; ')
+  return (
+    <div className="tezaurs-entry-display">
+      <div className="draft-heading">
+        <EntryActions onEdit={onEditEntry} onAddLexeme={onAddLexeme} onAddSense={onAddSense}
+          publicHumanKey={publicHumanKey ?? (entry.id > 0 ? entry.humanKey : undefined)} />
+        <EntryHeading heading={entry.heading} humanKey={entry.humanKey} />
+        {entryGrammar && <span className="lexeme-metadata">{entryGrammar}</span>}
         {entry.hidden && ' · paslēpts'}
-      </p>
+      </div>
 
       {entry.notes && <p><strong>Piezīmes:</strong> {entry.notes}</p>}
-      <ExtraData data={entry.data} />
+      <ExtraData data={entry.data} grammarAlreadyShown />
 
-      <h4>Leksēmas</h4>
-      {entry.lexemes.map((lexeme) => {
+      {lexemeControls}
+      {entry.lexemes.map((lexeme, index) => {
         const grammar = formatLexemeGrammar(lexeme)
         const technicalInfo = lexemeTechnicalInfo(lexeme)
         const pronunciations = Array.isArray(lexeme.data?.Pronunciations)
@@ -321,6 +364,8 @@ export function ExistingEntryDetails({ entryId }: Props) {
         return (
           <div className="existing-lexeme" key={lexeme.id}>
             <div>
+              <LexemeActions onEdit={onEditLexeme ? () => onEditLexeme(index) : undefined}
+                onDelete={onDeleteLexeme && canDeleteLexeme?.(index) ? () => onDeleteLexeme(index) : undefined} />
               <strong title={lexeme.role ?? undefined}>{lexeme.lemma}</strong>{' '}
               {pronunciations.length > 0 && <span>[{pronunciations.join('], [')}] </span>}
               {grammar && <span className="lexeme-metadata">{grammar}</span>}
@@ -335,13 +380,13 @@ export function ExistingEntryDetails({ entryId }: Props) {
         )
       })}
 
-      <h4>Nozīmes</h4>
+      {children || <>
       {mainSenses.map((sense, senseIndex) => {
         const senseNumber = String(senseIndex + 1)
         const subSenses = entry.senses.filter((item) => item.parentSenseId === sense.id)
         return (
           <div key={sense.id}>
-            <SenseDetails number={senseNumber} sense={sense} />
+            <SenseDetails number={mainSenses.length > 1 || subSenses.length > 0 ? senseNumber : ''} sense={sense} />
             {subSenses.length > 0 && (
               <div className="existing-subsenses">
                 {subSenses.map((subSense, subSenseIndex) => (
@@ -356,6 +401,7 @@ export function ExistingEntryDetails({ entryId }: Props) {
           </div>
         )
       })}
+      </>}
 
       {entry.examples.length > 0 && (
         <>
@@ -378,6 +424,6 @@ export function ExistingEntryDetails({ entryId }: Props) {
           </ul>
         </>
       )}
-    </section>
+    </div>
   )
 }

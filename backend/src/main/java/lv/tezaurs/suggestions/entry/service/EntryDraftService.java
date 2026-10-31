@@ -15,10 +15,10 @@ import lv.tezaurs.suggestions.entry.entity.ReviewEntry;
 import lv.tezaurs.suggestions.entry.entity.ReviewLexeme;
 import lv.tezaurs.suggestions.entry.repository.ReviewEntryRepository;
 import lv.tezaurs.suggestions.entry.repository.ReviewLexemeRepository;
-import lv.tezaurs.suggestions.suggestion.dto.ReviewResponse;
+import lv.tezaurs.suggestions.suggestion.service.ReviewCompletionService;
 import lv.tezaurs.suggestions.suggestion.entity.ReviewCase;
-import lv.tezaurs.suggestions.suggestion.entity.TezaursStatus;
 import lv.tezaurs.suggestions.suggestion.repository.ReviewCaseRepository;
+import lv.tezaurs.suggestions.tezaurs.entity.TezaursEntry;
 import lv.tezaurs.suggestions.tezaurs.repository.TezaursEntryRepository;
 import lv.tezaurs.suggestions.tezaurs.repository.TezaursEntryTypeRepository;
 import lv.tezaurs.suggestions.tezaurs.service.TezaursFlagService;
@@ -31,6 +31,7 @@ public class EntryDraftService {
     private static final int DEFAULT_ENTRY_TYPE_ID = 1;
     private static final int DEFAULT_LEXEME_ROLE_ID = 1;
 
+    private final ReviewCompletionService completionService;
     private final ReviewEntryRepository entryRepository;
     private final ReviewLexemeRepository lexemeRepository;
     private final ReviewCaseRepository caseRepository;
@@ -41,7 +42,8 @@ public class EntryDraftService {
 
     @Transactional(readOnly = true)
     public Optional<EntryDraftResponse> find(UUID caseId) {
-        requireCase(caseId);
+        ReviewCase reviewCase = requireCase(caseId);
+        if (reviewCase.getMatchedEntryId() != null) return Optional.empty();
         return entryRepository.findByCaseId(caseId)
                 .map(entry -> EntryDraftResponse.from(entry,
                         lexemeRepository.findAllByEntryIdOrderByOrderNoAscIdAsc(entry.getId())));
@@ -49,12 +51,12 @@ public class EntryDraftService {
 
     @Transactional
     public SaveEntryDraftResponse create(UUID caseId) {
-        ReviewCase reviewCase = requireCaseWithoutTezaursEntry(caseId);
-        var existing = entryRepository.findByCaseId(caseId);
+        ReviewCase reviewCase = requireEditableCase(caseId);
+        Optional<ReviewEntry> existing = entryRepository.findByCaseId(caseId);
         if (existing.isPresent()) {
             ReviewEntry entry = existing.get();
-            return response(entry,
-                    lexemeRepository.findAllByEntryIdOrderByOrderNoAscIdAsc(entry.getId()), reviewCase);
+            List<ReviewLexeme> lexemes = lexemeRepository.findAllByEntryIdOrderByOrderNoAscIdAsc(entry.getId());
+            return response(entry, lexemes, reviewCase);
         }
 
         SaveEntryDraftRequest request = new SaveEntryDraftRequest(
@@ -68,22 +70,23 @@ public class EntryDraftService {
                 savedEntry, new SaveLexemeDraftRequest(entry.getHeading(), true, DEFAULT_LEXEME_ROLE_ID, null,
                         null, null, null, List.of(), Map.of(), null));
         List<ReviewLexeme> lexemes = List.of(primaryLexeme);
-        reviewCase.recordEntryDraftReadiness(savedEntry.isReady(lexemes));
 
         return response(savedEntry, lexemes, reviewCase);
     }
 
     @Transactional
     public SaveEntryDraftResponse update(UUID caseId, SaveEntryDraftRequest request) {
-        ReviewCase reviewCase = requireCaseWithoutTezaursEntry(caseId);
+        ReviewCase reviewCase = requireEditableCase(caseId);
         ReviewEntry entry = entryRepository.findByCaseId(caseId)
                 .orElseThrow(() -> new NotFoundException("Entry draft was not found"));
-        validateEntry(request);
+        if (!entryTypeRepository.existsById(request.typeId())) {
+            throw new ConflictException("The selected entry type does not exist");
+        }
+        flagService.validateChanges("E", request.flags(), entry.getFlags());
         updateEntry(entry, request);
 
         List<ReviewLexeme> lexemes = lexemeRepository
                 .findAllByEntryIdOrderByOrderNoAscIdAsc(entry.getId());
-        reviewCase.recordEntryDraftReadiness(entry.isReady(lexemes));
         return response(entry, lexemes, reviewCase);
     }
 
@@ -106,7 +109,7 @@ public class EntryDraftService {
     private int nextHomonymNumber(String heading, UUID currentEntryId) {
         int tezaursMaximum = tezaursEntryRepository
                 .findFirstByHeadingOrderByHomonymNoDesc(heading)
-                .map(entry -> entry.getHomonymNo())
+                .map(TezaursEntry::getHomonymNo)
                 .orElse(0);
         int draftMaximum = entryRepository
                 .findFirstByHeadingAndIdNotOrderByHomonymNoDesc(heading, currentEntryId)
@@ -115,11 +118,11 @@ public class EntryDraftService {
         return Math.max(tezaursMaximum, draftMaximum) + 1;
     }
 
-    private ReviewCase requireCaseWithoutTezaursEntry(UUID id) {
+    private ReviewCase requireEditableCase(UUID id) {
         ReviewCase reviewCase = requireCase(id);
-        if (reviewCase.getTezaursStatus() != TezaursStatus.NOT_FOUND) {
+        if (!reviewCase.canEditEntryDraft()) {
             throw new ConflictException(
-                    "An entry draft can only be saved when the entry is absent from Tēzaurs");
+                    "Only new entry drafts can be edited");
         }
         return reviewCase;
     }
@@ -129,10 +132,10 @@ public class EntryDraftService {
                 .orElseThrow(() -> new NotFoundException("Review " + id + " was not found"));
     }
 
-    private static SaveEntryDraftResponse response(
+    private SaveEntryDraftResponse response(
             ReviewEntry entry, List<ReviewLexeme> lexemes, ReviewCase reviewCase) {
         return new SaveEntryDraftResponse(
-                EntryDraftResponse.from(entry, lexemes), ReviewResponse.from(reviewCase));
+                EntryDraftResponse.from(entry, lexemes), completionService.response(reviewCase));
     }
 
     static String clean(String value) {

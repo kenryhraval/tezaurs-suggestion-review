@@ -1,6 +1,7 @@
 package lv.tezaurs.suggestions.tezaurs.dto;
 
 import java.util.List;
+import java.util.Map;
 
 public record TezaursFormOptionsResponse(
         List<Option> entryTypes,
@@ -13,7 +14,8 @@ public record TezaursFormOptionsResponse(
     public record Option(Integer id, String code, String label) {
     }
 
-    public record ParadigmOption(Integer id, String code, String label, Integer stems) {
+    public record ParadigmOption(Integer id, String code, String label, Integer stems,
+                                 Integer legacyNo, Map<String, Object> data) {
     }
 
     public record FlagOption(

@@ -35,7 +35,11 @@ class SuggestionServiceTest {
         sourceSuggestionRepository = mock(IncubatorSuggestionRepository.class,
                 withSettings().mockMaker(MockMakers.PROXY));
         reviewService = mock(ReviewService.class);
-        service = new SuggestionService(sourceSuggestionRepository, reviewService);
+        service = new SuggestionService(new ReviewCompletionService(
+                mock(lv.tezaurs.suggestions.entry.repository.ReviewEntryRepository.class),
+                mock(lv.tezaurs.suggestions.entry.repository.ReviewLexemeRepository.class),
+                mock(lv.tezaurs.suggestions.sense.repository.ReviewSenseRepository.class)),
+                sourceSuggestionRepository, reviewService);
     }
 
     @Test

@@ -27,7 +27,7 @@ public enum SuggestionStatus {
     private Set<SuggestionStatus> transitions() {
         return switch (this) {
             case NEW -> Set.of(READY_FOR_REVIEW, IN_PROGRESS, GARBAGE);
-            case READY_FOR_REVIEW -> Set.of(IN_PROGRESS, COMPLETED);
+            case READY_FOR_REVIEW -> Set.of(IN_PROGRESS, COMPLETED, GARBAGE);
             case GARBAGE -> Set.of(READY_FOR_REVIEW);
             case IN_PROGRESS -> Set.of(INVENTED, ALREADY_EXISTS, INSUFFICIENT_DATA,
                     NEEDS_EXPERT, COMPLETED, READY_FOR_REVIEW, GARBAGE);

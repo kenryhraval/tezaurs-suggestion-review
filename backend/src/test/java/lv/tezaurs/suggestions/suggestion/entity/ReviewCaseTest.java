@@ -7,6 +7,8 @@ import java.util.Map;
 import java.util.Set;
 import lv.tezaurs.suggestions.common.error.ConflictException;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 class ReviewCaseTest {
     @Test
@@ -15,7 +17,7 @@ class ReviewCaseTest {
                 SuggestionStatus.NEW, Set.of(SuggestionStatus.READY_FOR_REVIEW,
                         SuggestionStatus.IN_PROGRESS, SuggestionStatus.GARBAGE),
                 SuggestionStatus.READY_FOR_REVIEW, Set.of(SuggestionStatus.IN_PROGRESS,
-                        SuggestionStatus.COMPLETED),
+                        SuggestionStatus.COMPLETED, SuggestionStatus.GARBAGE),
                 SuggestionStatus.GARBAGE, Set.of(SuggestionStatus.READY_FOR_REVIEW),
                 SuggestionStatus.IN_PROGRESS, Set.of(SuggestionStatus.INVENTED,
                         SuggestionStatus.ALREADY_EXISTS, SuggestionStatus.INSUFFICIENT_DATA,
@@ -42,6 +44,7 @@ class ReviewCaseTest {
         ReviewCase review = new ReviewCase("submitted");
 
         assertThat(review.getStatus()).isEqualTo(SuggestionStatus.NEW);
+        review.changeStatus(SuggestionStatus.READY_FOR_REVIEW);
         review.changeStatus(SuggestionStatus.IN_PROGRESS);
         assertThat(review.getStatus()).isEqualTo(SuggestionStatus.IN_PROGRESS);
     }
@@ -60,67 +63,37 @@ class ReviewCaseTest {
     void validatesStatusAndEvidenceTransitions() {
         ReviewCase review = new ReviewCase("submitted");
         review.changeStatus(SuggestionStatus.READY_FOR_REVIEW);
-        assertThatThrownBy(() -> review.changeStatus(SuggestionStatus.GARBAGE))
-                .isInstanceOf(ConflictException.class);
 
         ReviewCase inProgress = inProgressReview();
         assertThatThrownBy(() -> inProgress.changeStatus(SuggestionStatus.ALREADY_EXISTS))
                 .isInstanceOf(ConflictException.class);
-        inProgress.recordTezaursCheck(TezaursStatus.MEANING_FOUND, 42);
-        inProgress.changeStatus(SuggestionStatus.ALREADY_EXISTS);
+        inProgress.recordTezaursCheck(TezaursStatus.MEANING_ALREADY_EXISTS, 42);
         assertThat(inProgress.getStatus()).isEqualTo(SuggestionStatus.ALREADY_EXISTS);
     }
 
-    @Test
-    void requiresReviewChecksBeforeCompletion() {
+    @ParameterizedTest
+    @EnumSource(value = TezaursStatus.class, names = {"FOUND", "MEANING_NOT_FOUND", "MEANING_NEEDS_EDITING"})
+    void closingAsAlreadyExistingAlsoRecordsTheMeaningDecision(TezaursStatus previousDecision) {
         ReviewCase review = inProgressReview();
+        review.recordTezaursCheck(previousDecision, 42);
 
-        assertThatThrownBy(() -> review.changeStatus(SuggestionStatus.COMPLETED))
-                .isInstanceOf(ConflictException.class);
+        review.changeStatus(SuggestionStatus.ALREADY_EXISTS);
 
+        assertThat(review.getStatus()).isEqualTo(SuggestionStatus.ALREADY_EXISTS);
+        assertThat(review.getTezaursStatus()).isEqualTo(TezaursStatus.MEANING_ALREADY_EXISTS);
+        assertThat(review.getMatchedEntryId()).isEqualTo(42);
+    }
+
+    @Test
+    void closingAsAlreadyExistingStillRequiresAMatchingEntry() {
+        ReviewCase review = inProgressReview();
         review.recordTezaursCheck(TezaursStatus.NOT_FOUND, null);
-        assertThat(review.completionBlockReason()).isEqualTo(CompletionBlockReason.ENTRY_DRAFT_REQUIRED);
-        review.recordEntryDraftReadiness(true);
-        assertThat(review.completionBlockReason()).isEqualTo(CompletionBlockReason.SENSE_DRAFT_REQUIRED);
-        review.markSenseDraftReady();
-        review.changeStatus(SuggestionStatus.COMPLETED);
 
-        assertThat(review.getStatus()).isEqualTo(SuggestionStatus.COMPLETED);
-    }
-
-    @Test
-    void requiresANewMeaningDraftForAnExistingEntry() {
-        ReviewCase review = inProgressReview();
-        review.recordTezaursCheck(TezaursStatus.MEANING_NOT_FOUND, 42);
-
-        assertThat(review.completionBlockReason()).isEqualTo(CompletionBlockReason.SENSE_DRAFT_REQUIRED);
-
-        review.markSenseDraftReady();
-
-        assertThat(review.canComplete()).isTrue();
-    }
-
-    @Test
-    void reportsThePendingTezaursAndMeaningChecks() {
-        ReviewCase review = inProgressReview();
-
-        assertThat(review.completionBlockReason())
-                .isEqualTo(CompletionBlockReason.TEZAURS_CHECK_REQUIRED);
-
-        review.recordTezaursCheck(TezaursStatus.FOUND, 42);
-
-        assertThat(review.completionBlockReason())
-                .isEqualTo(CompletionBlockReason.MEANING_CHECK_REQUIRED);
-    }
-
-    @Test
-    void acceptsCompletionWhenTheMeaningAlreadyExists() {
-        ReviewCase review = inProgressReview();
-        review.recordTezaursCheck(TezaursStatus.MEANING_FOUND, 42);
-
-        assertThat(review.canComplete()).isTrue();
-        review.changeStatus(SuggestionStatus.COMPLETED);
-        assertThat(review.getStatus()).isEqualTo(SuggestionStatus.COMPLETED);
+        assertThatThrownBy(() -> review.changeStatus(SuggestionStatus.ALREADY_EXISTS))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("Select the matching Tēzaurs entry");
+        assertThat(review.getStatus()).isEqualTo(SuggestionStatus.IN_PROGRESS);
+        assertThat(review.getTezaursStatus()).isEqualTo(TezaursStatus.NOT_FOUND);
     }
 
     @Test
@@ -129,16 +102,23 @@ class ReviewCaseTest {
 
         assertThatThrownBy(() -> review.recordTezaursCheck(TezaursStatus.NOT_FOUND, 42))
                 .isInstanceOf(ConflictException.class);
-        assertThatThrownBy(() -> review.recordEntryDraftReadiness(true))
-                .isInstanceOf(ConflictException.class);
-        assertThatThrownBy(review::markSenseDraftReady)
+        assertThatThrownBy(() -> review.recordTezaursCheck(TezaursStatus.FOUND, null))
                 .isInstanceOf(ConflictException.class);
 
     }
 
     private static ReviewCase inProgressReview() {
         ReviewCase review = new ReviewCase("submitted");
+        review.changeStatus(SuggestionStatus.READY_FOR_REVIEW);
         review.changeStatus(SuggestionStatus.IN_PROGRESS);
         return review;
+    }
+
+    @Test
+    void choosingSenseEditingReopensAnAlreadyExistingCase() {
+        ReviewCase review = inProgressReview();
+        review.recordTezaursCheck(TezaursStatus.MEANING_ALREADY_EXISTS, 42);
+        review.recordTezaursCheck(TezaursStatus.MEANING_NEEDS_EDITING, 42);
+        assertThat(review.getStatus()).isEqualTo(SuggestionStatus.IN_PROGRESS);
     }
 }

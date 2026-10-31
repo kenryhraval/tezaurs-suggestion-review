@@ -2,13 +2,17 @@ package lv.tezaurs.suggestions.tezaurs.service;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lv.tezaurs.suggestions.common.error.NotFoundException;
 import lv.tezaurs.suggestions.tezaurs.dto.TezaursEntryDetailsResponse;
 import lv.tezaurs.suggestions.tezaurs.dto.TezaursFormOptionsResponse;
+import lv.tezaurs.suggestions.tezaurs.entity.TezaursEntryType;
 import lv.tezaurs.suggestions.tezaurs.entity.TezaursExample;
+import lv.tezaurs.suggestions.tezaurs.entity.TezaursGrammarFlagValue;
+import lv.tezaurs.suggestions.tezaurs.entity.TezaursLexeme;
 import lv.tezaurs.suggestions.tezaurs.entity.TezaursLexemeRole;
 import lv.tezaurs.suggestions.tezaurs.entity.TezaursParadigm;
 import lv.tezaurs.suggestions.tezaurs.repository.TezaursEntryRepository;
@@ -53,7 +57,8 @@ public class TezaursEntryDetailsService {
                 .toList();
         var paradigms = paradigmRepository.findAll(Sort.by("id")).stream()
                 .map(paradigm -> new TezaursFormOptionsResponse.ParadigmOption(
-                        paradigm.getId(), paradigm.getHumanKey(), paradigm.getCaption(), paradigm.getStems()))
+                        paradigm.getId(), paradigm.getHumanKey(), paradigm.getCaption(), paradigm.getStems(),
+                        paradigm.getLegacyNo(), paradigm.getData()))
                 .toList();
         var flags = grammarFlagRepository.findAllByDeprecatedFalseOrderByOrderNoAscNameAsc().stream()
                 .map(flag -> new TezaursFormOptionsResponse.FlagOption(
@@ -61,7 +66,7 @@ public class TezaursEntryDetailsService {
                         flag.getDescription(), flag.isMultiple(), flag.getPermittedValues(),
                         List.of(flag.getScope()),
                         flag.getValues().stream().filter(value -> !value.isDeprecated())
-                                .map(value -> value.getValue()).toList()))
+                                .map(TezaursGrammarFlagValue::getValue).toList()))
                 .toList();
         var restrictionTypes = restrictionTypeRepository.findAll(Sort.by("id")).stream()
                 .map(type -> new TezaursFormOptionsResponse.Option(
@@ -83,10 +88,10 @@ public class TezaursEntryDetailsService {
         var senses = senseRepository.findOrderedByEntryId(entryId);
         var examples = exampleRepository.findAllByEntryIdOrderBySenseIdAscOrderNoAscIdAsc(entryId);
         var roles = lexemeRoleRepository.findAllById(
-                        lexemes.stream().map(lexeme -> lexeme.getRoleId()).distinct().toList())
+                        lexemes.stream().map(TezaursLexeme::getRoleId).distinct().toList())
                 .stream().collect(Collectors.toMap(TezaursLexemeRole::getId, Function.identity()));
         var paradigms = paradigmRepository.findAllById(
-                        lexemes.stream().map(lexeme -> lexeme.getParadigmId()).filter(id -> id != null)
+                        lexemes.stream().map(TezaursLexeme::getParadigmId).filter(Objects::nonNull)
                                 .distinct().toList())
                 .stream().collect(Collectors.toMap(TezaursParadigm::getId, Function.identity()));
         Map<Integer, List<TezaursExample>> examplesBySense = examples.stream()
@@ -118,7 +123,7 @@ public class TezaursEntryDetailsService {
                         link.getSource().getAbbr(), link.getSource().getTitle(), link.getSource().getUrl()))
                 .toList();
         String type = entryTypeRepository.findById(entry.getTypeId())
-                .map(value -> value.getDescription()).orElse(null);
+                .map(TezaursEntryType::getDescription).orElse(null);
 
         return new TezaursEntryDetailsResponse(entry.getId(), entry.getHeading(), entry.getHumanKey(),
                 entry.getTypeId(), type, entry.isHidden(), entry.getNotes(), entry.getData(),

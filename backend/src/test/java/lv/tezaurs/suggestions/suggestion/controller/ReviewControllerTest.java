@@ -55,10 +55,17 @@ class ReviewControllerTest {
         assertThat(controller.findTezaursCandidates(review.id(), "cits")).containsExactly(candidate);
     }
 
+    @Test
+    void detachesASuggestionFromTheSpecifiedCase() {
+        ReviewResponse response = response();
+        when(service.detachSuggestion(response.id(), 42)).thenReturn(response);
+
+        assertThat(controller.detachSuggestion(response.id(), 42)).isEqualTo(response);
+    }
+
     private static ReviewResponse response() {
         return new ReviewResponse(UUID.randomUUID(), "term", SuggestionStatus.IN_PROGRESS,
-                TezaursStatus.NOT_CHECKED, null,
-                false, CompletionBlockReason.TEZAURS_CHECK_REQUIRED,
+                TezaursStatus.NOT_CHECKED, null, false, CompletionBlockReason.TEZAURS_CHECK_REQUIRED,
                 Instant.EPOCH, List.of());
     }
 }

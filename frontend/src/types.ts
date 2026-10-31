@@ -14,7 +14,8 @@ export type SuggestionSort = 'NEWEST' | 'OLDEST' | 'MOST_SUGGESTIONS'
 export type TezaursStatus =
   | 'NOT_CHECKED'
   | 'FOUND'
-  | 'MEANING_FOUND'
+  | 'MEANING_ALREADY_EXISTS'
+  | 'MEANING_NEEDS_EDITING'
   | 'MEANING_NOT_FOUND'
   | 'NOT_FOUND'
 
@@ -168,6 +169,7 @@ export type SaveEntryDraft = {
 
 export type SenseDraft = {
   id: string
+  sourceSenseId: number | null
   gloss: string
   parentDraftSenseId: string | null
   parentTezaursSenseId: number | null
@@ -178,6 +180,7 @@ export type SenseDraft = {
 
 export type SaveSenseDraft = {
   id?: string
+  sourceSenseId?: number | null
   gloss: string
   parentDraftSenseId: string | null
   parentTezaursSenseId: number | null
@@ -188,7 +191,7 @@ export type SaveSenseDraft = {
 export type TezaursFormOptions = {
   entryTypes: Array<{ id: number; code: string; label: string }>
   lexemeRoles: Array<{ id: number; code: string; label: string }>
-  paradigms: Array<{ id: number; code: string; label: string; stems: number }>
+  paradigms: Array<{ id: number; code: string; label: string; stems: number; legacyNo: number | null; data: Record<string, unknown> | null }>
   flags: Array<{
     name: string
     label: string

@@ -17,6 +17,7 @@ import lv.tezaurs.suggestions.suggestion.entity.SuggestionStatus;
 import lv.tezaurs.suggestions.suggestion.service.ReviewService;
 import lv.tezaurs.suggestions.tezaurs.dto.TezaursEntryCandidateResponse;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -52,14 +53,20 @@ public class ReviewController {
     }
 
     @GetMapping("/duplicate-candidates")
-    List<DuplicateReviewCandidateResponse> findDuplicateCandidates(@RequestParam String query) {
-        return service.findDuplicateCandidates(query);
+    List<DuplicateReviewCandidateResponse> findDuplicateCandidates(
+            @RequestParam String query, @RequestParam(required = false) UUID excludedCaseId) {
+        return service.findDuplicateCandidates(query, excludedCaseId);
     }
 
     @PostMapping("/{reviewId}/term-correction")
     ReviewResponse correctTerm(@PathVariable UUID reviewId,
                                @Valid @RequestBody CorrectTermRequest request) {
         return service.correctTerm(reviewId, request);
+    }
+
+    @DeleteMapping("/{reviewId}/suggestions/{sourceId}")
+    ReviewResponse detachSuggestion(@PathVariable UUID reviewId, @PathVariable Integer sourceId) {
+        return service.detachSuggestion(reviewId, sourceId);
     }
 
     @PostMapping("/{reviewId}/tezaurs-check")

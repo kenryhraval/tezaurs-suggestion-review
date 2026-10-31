@@ -43,6 +43,14 @@ class TezaursFlagServiceTest {
     }
 
     @Test
+    void preservesUnchangedLegacyFlagsButValidatesAnyChanges() {
+        var legacy = Map.<String, Object>of("Veca pazīme", "vērtība");
+        assertThatCode(() -> service.validateChanges("L", legacy, legacy)).doesNotThrowAnyException();
+        assertThatThrownBy(() -> service.validateChanges("L", Map.of("Veca pazīme", "jauna vērtība"), legacy))
+                .isInstanceOf(ConflictException.class);
+    }
+
+    @Test
     void acceptsNullAndFreeTextValuesWithoutAnEnumerationLookup() {
         var definitions = List.of(flag("Piezīmes", true, "F", new String[]{"L"}));
         when(repository.findAllByDeprecatedFalseOrderByOrderNoAscNameAsc())

@@ -101,6 +101,13 @@ export async function getQueueItems(
   }
 }
 
+export async function detachSuggestion(reviewId: string, sourceId: number): Promise<Review> {
+  const response = await request(`/api/reviews/${reviewId}/suggestions/${sourceId}`, {
+    method: 'DELETE',
+  })
+  return response.json()
+}
+
 export async function changeSuggestionStatus(
   id: number,
   status: SuggestionStatus,
@@ -125,18 +132,20 @@ export async function changeReviewStatus(
 
 export async function getDuplicateReviewCandidates(
   query: string,
+  excludedCaseId?: string,
 ): Promise<DuplicateReviewCandidate[]> {
   const response = await request(
-    `/api/reviews/duplicate-candidates?query=${encodeURIComponent(query)}`,
+    `/api/reviews/duplicate-candidates?query=${encodeURIComponent(query)}${excludedCaseId ? `&excludedCaseId=${excludedCaseId}` : ''}`,
   )
   return response.json()
 }
 
-export async function linkDuplicateSuggestion(id: number, reviewId: string): Promise<void> {
-  await request(`/api/suggestions/${id}/duplicate`, {
+export async function linkDuplicateSuggestion(id: number, reviewId: string): Promise<Review> {
+  const response = await request(`/api/suggestions/${id}/duplicate`, {
     method: 'POST',
     body: JSON.stringify({ reviewId }),
   })
+  return response.json()
 }
 
 export async function getReview(reviewId: string): Promise<Review> {
@@ -256,9 +265,18 @@ export async function saveSenseDrafts(
   reviewId: string,
   senses: SaveSenseDraft[],
 ): Promise<{ senses: SenseDraft[]; review: Review }> {
+  const requestSenses = senses.map((sense) => ({
+    id: sense.id,
+    sourceSenseId: sense.sourceSenseId,
+    gloss: sense.gloss,
+    parentDraftSenseId: sense.parentDraftSenseId,
+    parentTezaursSenseId: sense.parentTezaursSenseId,
+    flags: sense.flags,
+    structuralRestrictions: sense.structuralRestrictions,
+  }))
   const response = await request(
     `/api/reviews/${reviewId}/sense-drafts`,
-    { method: 'PUT', body: JSON.stringify({ senses }) },
+    { method: 'PUT', body: JSON.stringify({ senses: requestSenses }) },
   )
   return response.json()
 }

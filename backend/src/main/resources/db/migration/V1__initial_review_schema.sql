@@ -4,8 +4,6 @@ CREATE TABLE cases (
     status VARCHAR(32) NOT NULL,
     tezaurs_status VARCHAR(32) NOT NULL,
     matched_entry_id INTEGER,
-    entry_draft_ready BOOLEAN NOT NULL DEFAULT FALSE,
-    sense_draft_ready BOOLEAN NOT NULL DEFAULT FALSE,
     version BIGINT NOT NULL DEFAULT 0,
     created_at TIMESTAMPTZ NOT NULL,
     updated_at TIMESTAMPTZ NOT NULL,
@@ -17,12 +15,13 @@ CREATE TABLE cases (
     ),
     CONSTRAINT ck_review_cases_tezaurs_status CHECK (
         tezaurs_status IN (
-            'NOT_CHECKED', 'FOUND', 'MEANING_FOUND', 'MEANING_NOT_FOUND', 'NOT_FOUND'
+            'NOT_CHECKED', 'FOUND', 'MEANING_ALREADY_EXISTS', 'MEANING_NEEDS_EDITING', 'MEANING_NOT_FOUND', 'NOT_FOUND'
         )
     ),
     CONSTRAINT ck_review_cases_tezaurs_match CHECK (
-        matched_entry_id IS NULL
-        OR tezaurs_status IN ('FOUND', 'MEANING_FOUND', 'MEANING_NOT_FOUND')
+        (tezaurs_status IN ('NOT_CHECKED', 'NOT_FOUND') AND matched_entry_id IS NULL)
+        OR (tezaurs_status IN ('FOUND', 'MEANING_ALREADY_EXISTS', 'MEANING_NEEDS_EDITING', 'MEANING_NOT_FOUND')
+            AND matched_entry_id IS NOT NULL)
     )
 );
 
@@ -79,7 +78,9 @@ CREATE INDEX ix_review_lexemes_entry
 CREATE TABLE senses (
     id UUID PRIMARY KEY,
     case_id UUID NOT NULL REFERENCES cases (id) ON DELETE CASCADE,
-    parent_draft_sense_id UUID REFERENCES senses (id) ON DELETE CASCADE,
+    target_entry_id INTEGER,
+    source_sense_id INTEGER,
+    parent_draft_sense_id UUID REFERENCES senses (id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED,
     parent_tezaurs_sense_id INTEGER,
     gloss TEXT NOT NULL,
     order_no INTEGER NOT NULL,
@@ -87,7 +88,7 @@ CREATE TABLE senses (
     structural_restrictions JSONB,
     created_at TIMESTAMPTZ NOT NULL,
     updated_at TIMESTAMPTZ NOT NULL,
-    CONSTRAINT ck_review_senses_gloss_not_blank CHECK (btrim(gloss) <> ''),
+    CONSTRAINT ck_review_senses_gloss_not_blank CHECK (source_sense_id IS NOT NULL OR btrim(gloss) <> ''),
     CONSTRAINT ck_review_senses_one_parent CHECK (
         parent_draft_sense_id IS NULL OR parent_tezaurs_sense_id IS NULL
     )
@@ -95,3 +96,6 @@ CREATE TABLE senses (
 
 CREATE INDEX ix_review_senses_case
     ON senses (case_id, order_no);
+
+CREATE UNIQUE INDEX ix_review_senses_source
+    ON senses (case_id, target_entry_id, source_sense_id);

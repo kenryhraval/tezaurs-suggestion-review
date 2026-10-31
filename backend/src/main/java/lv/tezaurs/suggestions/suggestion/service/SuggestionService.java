@@ -2,12 +2,12 @@ package lv.tezaurs.suggestions.suggestion.service;
 
 import lombok.RequiredArgsConstructor;
 import lv.tezaurs.suggestions.common.error.NotFoundException;
-import lv.tezaurs.suggestions.suggestion.dto.LinkDuplicateRequest;
 import lv.tezaurs.suggestions.suggestion.dto.ReviewResponse;
 import lv.tezaurs.suggestions.suggestion.dto.SuggestionPageResponse;
 import lv.tezaurs.suggestions.suggestion.dto.SuggestionResponse;
 import lv.tezaurs.suggestions.suggestion.dto.SuggestionSort;
 import lv.tezaurs.suggestions.suggestion.dto.UpdateStatusRequest;
+import lv.tezaurs.suggestions.suggestion.dto.LinkDuplicateRequest;
 import lv.tezaurs.suggestions.suggestion.entity.IncubatorSuggestion;
 import lv.tezaurs.suggestions.suggestion.entity.ReviewCase;
 import lv.tezaurs.suggestions.suggestion.repository.IncubatorSuggestionRepository;
@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class SuggestionService {
+    private final ReviewCompletionService completionService;
     private final IncubatorSuggestionRepository sourceSuggestionRepository;
     private final ReviewService reviewService;
 
@@ -38,12 +39,12 @@ public class SuggestionService {
     public ReviewResponse changeStatus(Integer sourceSuggestionId, UpdateStatusRequest request) {
         IncubatorSuggestion source = requireSourceSuggestion(sourceSuggestionId);
         ReviewCase review = reviewService.startReview(source, request.status());
-        return ReviewResponse.from(review);
+        return completionService.response(review);
     }
 
     @Transactional
-    public void linkDuplicate(Integer sourceSuggestionId, LinkDuplicateRequest request) {
-        reviewService.linkDuplicate(requireSourceSuggestion(sourceSuggestionId), request.reviewId());
+    public ReviewResponse linkDuplicate(Integer sourceSuggestionId, LinkDuplicateRequest request) {
+        return reviewService.linkDuplicate(requireSourceSuggestion(sourceSuggestionId), request.reviewId());
     }
 
     private IncubatorSuggestion requireSourceSuggestion(Integer id) {

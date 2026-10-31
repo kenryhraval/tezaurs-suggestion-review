@@ -9,6 +9,7 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lv.tezaurs.suggestions.common.error.ConflictException;
 import lv.tezaurs.suggestions.tezaurs.entity.TezaursGrammarFlag;
+import lv.tezaurs.suggestions.tezaurs.entity.TezaursGrammarFlagValue;
 import lv.tezaurs.suggestions.tezaurs.repository.TezaursGrammarFlagRepository;
 import org.springframework.stereotype.Service;
 
@@ -16,6 +17,16 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class TezaursFlagService {
     private final TezaursGrammarFlagRepository repository;
+
+    public void validateChanges(String scope, Map<String, Object> flags, Map<String, Object> previous) {
+        Map<String, Object> changed = new java.util.HashMap<>();
+        flags.forEach((name, value) -> {
+            if (!previous.containsKey(name) || !java.util.Objects.equals(previous.get(name), value)) {
+                changed.put(name, value);
+            }
+        });
+        if (!changed.isEmpty()) validate(scope, changed);
+    }
 
     public void validate(String scope, Map<String, Object> flags) {
         Map<String, TezaursGrammarFlag> definitions = repository
@@ -39,7 +50,7 @@ public class TezaursFlagService {
 
         Set<String> allowedValues = definition.getValues().stream()
                 .filter(item -> !item.isDeprecated())
-                .map(item -> item.getValue())
+                .map(TezaursGrammarFlagValue::getValue)
                 .collect(Collectors.toSet());
         Collection<?> submittedValues = value instanceof Collection<?> collection
                 ? collection : java.util.List.of(value);
