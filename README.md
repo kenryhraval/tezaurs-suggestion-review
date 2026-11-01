@@ -89,3 +89,5 @@ cd ../frontend && npm run lint && npm run build
 ```
 
 Deployment setup is documented in [deploy/README.md](deploy/README.md).
+
+Cucumber API tests with a temporary backend and database are documented in [integration/README.md](integration/README.md).
