@@ -1,5 +1,5 @@
-import { suggestionStatusLabels } from '../labels'
-import type { QueueItem, SuggestionSort, SuggestionStatus } from '../types'
+import { suggestionStatusLabels } from '../review/statuses'
+import type { QueueItem, SuggestionSort, SuggestionStatus } from '../api/types'
 
 const statuses: SuggestionStatus[] = [
   'NEW',

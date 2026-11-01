@@ -317,6 +317,7 @@ class SenseDraftServiceTest {
                 .isInstanceOf(ConflictException.class);
 
         review.recordTezaursCheck(TezaursStatus.NOT_FOUND, null);
+        review.recordUsageDecision(lv.tezaurs.suggestions.usage.entity.UsageDecision.USED, null, null);
         assertThat(service.findAll(review.getId())).singleElement().extracting(SenseDraftResponse::id).isEqualTo(newEntrySense.getId());
     }
 }

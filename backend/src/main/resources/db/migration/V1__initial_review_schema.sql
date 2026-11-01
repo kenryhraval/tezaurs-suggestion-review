@@ -4,6 +4,11 @@ CREATE TABLE cases (
     status VARCHAR(32) NOT NULL,
     tezaurs_status VARCHAR(32) NOT NULL,
     matched_entry_id INTEGER,
+    usage_decision VARCHAR(32) NOT NULL DEFAULT 'NOT_CHECKED'
+        CHECK (usage_decision IN ('NOT_CHECKED', 'USED', 'NOT_CONFIRMED', 'INVENTED')),
+    usage_note TEXT,
+    usage_decided_by VARCHAR(255),
+    usage_decided_at TIMESTAMPTZ,
     version BIGINT NOT NULL DEFAULT 0,
     created_at TIMESTAMPTZ NOT NULL,
     updated_at TIMESTAMPTZ NOT NULL,
@@ -99,3 +104,24 @@ CREATE INDEX ix_review_senses_case
 
 CREATE UNIQUE INDEX ix_review_senses_source
     ON senses (case_id, target_entry_id, source_sense_id);
+
+CREATE TABLE usage_evidence (
+    id UUID PRIMARY KEY,
+    case_id UUID NOT NULL REFERENCES cases (id) ON DELETE CASCADE,
+    source VARCHAR(16) NOT NULL CHECK (source IN ('CORPUS', 'EXTERNAL')),
+    corpus VARCHAR(32),
+    token_number BIGINT CHECK (token_number >= 0),
+    search_mode VARCHAR(16),
+    search_query VARCHAR(255) NOT NULL,
+    citation TEXT NOT NULL,
+    url TEXT NOT NULL,
+    reference TEXT,
+    note TEXT,
+    created_by VARCHAR(255),
+    created_at TIMESTAMPTZ NOT NULL
+);
+
+CREATE INDEX ix_review_usage_evidence_case ON usage_evidence (case_id, created_at);
+
+CREATE UNIQUE INDEX ix_review_usage_evidence_occurrence
+    ON usage_evidence (case_id, corpus, token_number);

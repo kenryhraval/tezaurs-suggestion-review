@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.withSettings;
 
@@ -32,6 +33,8 @@ import lv.tezaurs.suggestions.tezaurs.service.TezaursFlagService;
 import lv.tezaurs.suggestions.suggestion.service.ReviewCompletionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.MockMakers;
 import org.mockito.ArgumentCaptor;
 
@@ -65,6 +68,7 @@ class EntryDraftServiceTest {
     void createsAnEntryWithItsFirstPrimaryLexeme() {
         ReviewCase review = inProgressReview();
         review.recordTezaursCheck(TezaursStatus.NOT_FOUND, null);
+        review.recordUsageDecision(lv.tezaurs.suggestions.usage.entity.UsageDecision.USED, null, null);
         when(caseRepository.findById(review.getId())).thenReturn(Optional.of(review));
         when(entryRepository.findByCaseId(review.getId())).thenReturn(Optional.empty());
         when(entryTypeRepository.existsById(1)).thenReturn(true);
@@ -107,10 +111,36 @@ class EntryDraftServiceTest {
                 .isInstanceOf(ConflictException.class);
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"jauns vārds", "labots vārds"})
+    void editingPreservesTheAssignedHomonymNumber(String heading) {
+        ReviewCase review = inProgressReview();
+        review.recordTezaursCheck(TezaursStatus.NOT_FOUND, null);
+        review.recordUsageDecision(lv.tezaurs.suggestions.usage.entity.UsageDecision.USED, null, null);
+        ReviewEntry entry = new ReviewEntry(review.getId());
+        entry.update("jauns vārds", 2, 1, null, null, null, null, null, Map.of());
+        when(caseRepository.findById(review.getId())).thenReturn(Optional.of(review));
+        when(entryRepository.findByCaseId(review.getId())).thenReturn(Optional.of(entry));
+        when(entryTypeRepository.existsById(1)).thenReturn(true);
+        when(lexemeRepository.findAllByEntryIdOrderByOrderNoAscIdAsc(entry.getId()))
+                .thenReturn(List.of(primaryLexeme("jauns vārds")));
+        var request = new SaveEntryDraftRequest(
+                heading, 1, null, null, null, null, "updated note", Map.of());
+
+        var response = service.update(review.getId(), request);
+
+        assertThat(response.draft().heading()).isEqualTo(heading);
+        assertThat(response.draft().notes()).isEqualTo("updated note");
+        assertThat(response.draft().humanKey()).isEqualTo(heading + ":2");
+        verifyNoInteractions(tezaursEntryRepository);
+        verify(entryRepository, never()).findFirstByHeadingAndIdNotOrderByHomonymNoDesc(any(), any());
+    }
+
     @Test
     void reusesAnExistingDraftWithoutOverwritingItsEdits() {
         ReviewCase review = inProgressReview();
         review.recordTezaursCheck(TezaursStatus.NOT_FOUND, null);
+        review.recordUsageDecision(lv.tezaurs.suggestions.usage.entity.UsageDecision.USED, null, null);
         ReviewEntry entry = new ReviewEntry(review.getId());
         entry.update("edited heading", 2, 1, null, null, null, null, "saved note", Map.of());
         when(caseRepository.findById(review.getId())).thenReturn(Optional.of(review));

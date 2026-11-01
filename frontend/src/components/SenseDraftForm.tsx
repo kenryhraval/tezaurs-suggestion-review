@@ -4,21 +4,22 @@ import {
   getTezaursEntry,
   getTezaursFormOptions,
   saveSenseDrafts,
-} from '../api'
+} from '../api/client'
 import type {
   Review,
   SaveSenseDraft,
   TezaursFormOptions,
   TezaursEntryDetails,
+  TezaursSenseDetails,
   FlagMap,
-} from '../types'
+} from '../api/types'
 import { FlagEditor } from './FlagEditor'
 import { RestrictionEditor } from './RestrictionEditor'
 import { SenseDetails } from './ExistingEntryDetails'
 import { EditDialog } from './EditDialog'
 import { SenseActions } from './TezaursActions'
 import { ConfirmationDialog } from './ConfirmationDialog'
-import { draftGrammarData } from '../draftEntryView'
+import { draftGrammarData } from '../drafts/grammar'
 
 type Props = {
   reviewId: string
@@ -30,11 +31,13 @@ type Props = {
   renderEntry: (senses: ReactNode, onAddSense?: () => void) => ReactNode
 }
 
+type SenseEditAction = 'edit' | 'move' | 'promote'
+
 type DisplayedSense = {
   key: string
   parentKey: string | null
   draftIndex: number | null
-  sense: TezaursEntryDetails['senses'][number]
+  sense: TezaursSenseDetails
   isNew: boolean
 }
 
@@ -46,6 +49,91 @@ function newSense(gloss: string): SaveSenseDraft {
     flags: {},
     structuralRestrictions: null,
   }
+}
+
+function buildDisplayedSenses(existingEntry: TezaursEntryDetails | null, draftSenses: SaveSenseDraft[]) {
+  const existingSenses = existingEntry?.senses ?? []
+  const displayedSenses: DisplayedSense[] = []
+
+  for (const sense of existingSenses) {
+    const savedDraft = draftSenses.find((draft) => draft.id && draft.sourceSenseId === sense.id)
+    if (savedDraft) {
+      continue
+    }
+
+    let parentKey: string | null = null
+    if (sense.parentSenseId !== null) {
+      const parentDraft = draftSenses.find((draft) => draft.id && draft.sourceSenseId === sense.parentSenseId)
+      if (parentDraft) {
+        parentKey = `draft:${parentDraft.id}`
+      } else {
+        parentKey = `tezaurs:${sense.parentSenseId}`
+      }
+    }
+    displayedSenses.push({
+      key: `tezaurs:${sense.id}`,
+      parentKey,
+      draftIndex: null,
+      sense,
+      isNew: false,
+    })
+  }
+
+  draftSenses.forEach((draft, index) => {
+    if (!draft.id) {
+      return
+    }
+
+    const originalSense = existingSenses.find((sense) => sense.id === draft.sourceSenseId)
+    let parentKey = draft.parentDraftSenseId ? `draft:${draft.parentDraftSenseId}` : null
+    if (draft.parentTezaursSenseId) {
+      const parentDraft = draftSenses.find((sense) => sense.sourceSenseId === draft.parentTezaursSenseId)
+      if (parentDraft) {
+        parentKey = `draft:${parentDraft.id}`
+      } else {
+        parentKey = `tezaurs:${draft.parentTezaursSenseId}`
+      }
+    }
+
+    displayedSenses.push({
+      key: `draft:${draft.id}`,
+      parentKey,
+      draftIndex: index,
+      isNew: existingEntry !== null && !draft.sourceSenseId,
+      sense: {
+        id: draft.sourceSenseId ?? index,
+        parentSenseId: null,
+        orderNo: index,
+        senseTag: null,
+        gloss: draft.gloss,
+        hidden: false,
+        examples: originalSense?.examples ?? [],
+        data: draftGrammarData(originalSense?.data, draft.flags, draft.structuralRestrictions),
+      },
+    })
+  })
+
+  const originalSenseOrder = new Map(existingSenses.map((sense, index) => [sense.id, index]))
+  displayedSenses.sort((left, right) => {
+    if (left.isNew !== right.isNew) {
+      return left.isNew ? 1 : -1
+    }
+    if (left.isNew) {
+      return 0
+    }
+
+    const leftPosition = originalSenseOrder.get(left.sense.id) ?? 0
+    const rightPosition = originalSenseOrder.get(right.sense.id) ?? 0
+    return leftPosition - rightPosition
+  })
+
+  for (const sense of displayedSenses) {
+    const parentIsVisible = displayedSenses.some((parent) => parent.key === sense.parentKey)
+    if (sense.parentKey && !parentIsVisible) {
+      sense.parentKey = null
+    }
+  }
+  return displayedSenses
 }
 
 export function SenseDraftForm({
@@ -69,40 +157,52 @@ export function SenseDraftForm({
   const [deletingIndex, setDeletingIndex] = useState<number | null>(null)
 
   useEffect(() => {
-    let active = true
+    let requestIsOutdated = false
     const entryRequest = matchedEntryId === null
       ? Promise.resolve(null)
       : getTezaursEntry(matchedEntryId)
 
-    Promise.all([getSenseDrafts(reviewId), getTezaursFormOptions(), entryRequest])
-      .then(([loadedSenses, loadedOptions, entry]) => {
-        if (!active) return
-        const editable = editExistingSenses ? loadedSenses : loadedSenses.filter((sense) => !sense.sourceSenseId)
+    async function loadSenseForm() {
+      try {
+        const [loadedSenses, loadedOptions, entry] = await Promise.all([
+          getSenseDrafts(reviewId),
+          getTezaursFormOptions(),
+          entryRequest,
+        ])
+        if (requestIsOutdated) {
+          return
+        }
+
+        let editableSenses = loadedSenses
         if (!editExistingSenses) {
-          editable.forEach((sense) => {
+          editableSenses = loadedSenses.filter((sense) => !sense.sourceSenseId)
+          for (const sense of editableSenses) {
             const parent = loadedSenses.find((item) => item.id === sense.parentDraftSenseId)
             if (parent?.sourceSenseId) {
               sense.parentDraftSenseId = null
               sense.parentTezaursSenseId = parent.sourceSenseId
             }
-          })
+          }
         }
-        setSenses(editable)
-        setSavedSenses(editable)
+        setSenses(editableSenses)
+        setSavedSenses(editableSenses)
         setOptions(loadedOptions)
         setExistingEntry(entry)
-      })
-      .catch((cause) => {
-        if (active) {
+      } catch (cause) {
+        if (!requestIsOutdated) {
           setError(cause instanceof Error ? cause.message : 'Neizdevās ielādēt nozīmju formu.')
         }
-      })
-      .finally(() => {
-        if (active) setLoading(false)
-      })
+      } finally {
+        if (!requestIsOutdated) {
+          setLoading(false)
+        }
+      }
+    }
+
+    loadSenseForm()
 
     return () => {
-      active = false
+      requestIsOutdated = true
     }
   }, [matchedEntryId, reviewId, editExistingSenses])
 
@@ -116,7 +216,9 @@ export function SenseDraftForm({
 
   function updateParent(index: number, value: string) {
     const sense = senses[index]
-    if (!sense) return
+    if (!sense) {
+      return
+    }
 
     if (value.startsWith('draft:')) {
       replaceSense(index, {
@@ -149,16 +251,16 @@ export function SenseDraftForm({
     setSenses((currentSenses) => [...currentSenses, sense])
   }
 
-  function editSense(index: number, parentOnly = false, promote = false) {
+  function editSense(index: number, action: SenseEditAction) {
     setError('')
-    setEditingParent(parentOnly)
+    setEditingParent(action !== 'edit')
     setEditingIndex(index)
-    if (promote) {
+    if (action === 'promote') {
       replaceSense(index, { ...senses[index], parentDraftSenseId: null, parentTezaursSenseId: null })
     }
   }
 
-  function editOriginalSense(source: TezaursEntryDetails['senses'][number], parentOnly = false, promote = false) {
+  function editOriginalSense(source: TezaursSenseDetails, action: SenseEditAction) {
     const gram = source.data?.Gram as {
       Flags?: FlagMap
       StructuralRestrictions?: Record<string, unknown> | Record<string, unknown>[]
@@ -168,17 +270,17 @@ export function SenseDraftForm({
       sourceSenseId: source.id,
       gloss: source.gloss ?? '',
       parentDraftSenseId: null,
-      parentTezaursSenseId: promote ? null : source.parentSenseId,
+      parentTezaursSenseId: action === 'promote' ? null : source.parentSenseId,
       flags: gram?.Flags ?? {},
       structuralRestrictions: Array.isArray(restrictions) ? { AND: restrictions } : restrictions ?? null,
     }
     setError('')
-    setEditingParent(parentOnly)
+    setEditingParent(action !== 'edit')
     setEditingIndex(senses.length)
     setSenses((current) => [...current, draft])
   }
 
-  async function save(nextSenses = senses) {
+  async function saveSenses(nextSenses = senses) {
     setSaving(true)
     setError('')
     try {
@@ -196,68 +298,70 @@ export function SenseDraftForm({
     }
   }
 
-  if (loading) return renderEntry(<p className="muted">Ielādē nozīmju formu...</p>)
-  if (!options) return renderEntry(<p className="error">{error || 'Nozīmju forma nav pieejama.'}</p>)
+  function cancelSenseEdit() {
+    setSenses(savedSenses)
+    setEditingIndex(null)
+    setError('')
+  }
+
+  function cancelSenseDeletion() {
+    setDeletingIndex(null)
+    setError('')
+  }
+
+  async function confirmSenseDeletion() {
+    if (deletingIndex === null) {
+      return
+    }
+    const remainingSenses = senses.filter((_, index) => index !== deletingIndex)
+    const saved = await saveSenses(remainingSenses)
+    if (saved) {
+      setDeletingIndex(null)
+    }
+  }
+
+  if (loading) {
+    return renderEntry(<p className="muted">Ielādē nozīmju formu...</p>)
+  }
+  if (!options) {
+    return renderEntry(<p className="error">{error || 'Nozīmju forma nav pieejama.'}</p>)
+  }
 
   const existingSenses = existingEntry?.senses ?? []
-  const displayed: DisplayedSense[] = existingSenses
-    .filter((sense) => !senses.some((draft) => draft.id && draft.sourceSenseId === sense.id))
-    .map((sense) => {
-      const parent = sense.parentSenseId === null ? undefined
-        : senses.find((draft) => draft.id && draft.sourceSenseId === sense.parentSenseId)
-      let parentKey = sense.parentSenseId === null ? null : `tezaurs:${sense.parentSenseId}`
-      if (parent) parentKey = `draft:${parent.id}`
-      return { key: `tezaurs:${sense.id}`, parentKey, draftIndex: null, sense, isNew: false }
-    })
-  senses.forEach((sense, index) => {
-    if (!sense.id) return
-    const original = existingSenses.find((item) => item.id === sense.sourceSenseId)
-    const parentDraft = senses.find((item) => item.sourceSenseId === sense.parentTezaursSenseId)
-    let parentKey = sense.parentDraftSenseId ? `draft:${sense.parentDraftSenseId}` : null
-    if (sense.parentTezaursSenseId) {
-      parentKey = parentDraft ? `draft:${parentDraft.id}` : `tezaurs:${sense.parentTezaursSenseId}`
-    }
-    displayed.push({ key: `draft:${sense.id}`, parentKey, draftIndex: index,
-      isNew: existingEntry !== null && !sense.sourceSenseId,
-      sense: { id: sense.sourceSenseId ?? index, parentSenseId: null, orderNo: index, senseTag: null,
-        gloss: sense.gloss, hidden: false, examples: original?.examples ?? [],
-        data: draftGrammarData(original?.data, sense.flags, sense.structuralRestrictions) } })
-  })
-  const originalOrder = new Map(existingSenses.map((sense, index) => [sense.id, index]))
-  displayed.sort((left, right) => {
-    if (left.isNew !== right.isNew) return left.isNew ? 1 : -1
-    if (left.isNew) return 0
-    return (originalOrder.get(left.sense.id) ?? 0) - (originalOrder.get(right.sense.id) ?? 0)
-  })
-  displayed.forEach((item) => {
-    if (item.parentKey && !displayed.some((parent) => parent.key === item.parentKey)) item.parentKey = null
-  })
+  const displayedSenses = buildDisplayedSenses(existingEntry, senses)
 
   function renderSenses(parentKey: string | null, prefix = '') {
-    const siblings = displayed.filter((item) => item.parentKey === parentKey)
+    const siblings = displayedSenses.filter((item) => item.parentKey === parentKey)
     return siblings.map((item, index) => {
       const number = prefix ? `${prefix}.${index + 1}` : String(index + 1)
-      const showNumber = prefix !== '' || siblings.length > 1 || displayed.some((child) => child.parentKey === item.key)
+      const hasChildren = displayedSenses.some((child) => child.parentKey === item.key)
+      const showNumber = prefix !== '' || siblings.length > 1 || hasChildren
       const draftIndex = item.draftIndex
       const canEdit = editable && (draftIndex !== null || editExistingSenses)
-      const hasChildren = displayed.some((child) => child.parentKey === item.key)
-      function openEditor(parentOnly = false, promote = false) {
-        if (draftIndex !== null) editSense(draftIndex, parentOnly, promote)
-        else editOriginalSense(item.sense, parentOnly, promote)
+      const canDelete = editable && draftIndex !== null && senses.length > 1 && !hasChildren
+      function openEditor(action: SenseEditAction) {
+        if (draftIndex !== null) {
+          editSense(draftIndex, action)
+        } else {
+          editOriginalSense(item.sense, action)
+        }
       }
       return (
         <div key={item.key}>
           <SenseDetails number={showNumber ? number : ''} sense={item.sense} isNew={item.isNew}
             actions={
               <SenseActions subsense={parentKey !== null}
-                onEdit={canEdit ? () => openEditor() : undefined}
+                onEdit={canEdit ? () => openEditor('edit') : undefined}
                 onAddSubsense={editable ? () => {
-                  if (draftIndex !== null) addSense(senses[draftIndex].id ?? null)
-                  else addSense(null, item.sense.id)
+                  if (draftIndex !== null) {
+                    addSense(senses[draftIndex].id ?? null)
+                  } else {
+                    addSense(null, item.sense.id)
+                  }
                 } : undefined}
-                onMove={canEdit && displayed.length > 1 ? () => openEditor(true) : undefined}
-                onPromote={canEdit ? () => openEditor(true, true) : undefined}
-                onDelete={editable && draftIndex !== null && senses.length > 1 && !hasChildren ? () => {
+                onMove={canEdit && displayedSenses.length > 1 ? () => openEditor('move') : undefined}
+                onPromote={canEdit ? () => openEditor('promote') : undefined}
+                onDelete={canDelete ? () => {
                   setError('')
                   setDeletingIndex(draftIndex)
                 } : undefined}
@@ -273,22 +377,21 @@ export function SenseDraftForm({
     <section aria-label="Nozīmes">
       {renderSenses(null)}
       {senses.map((sense, index) => {
-        const parentValue = sense.parentDraftSenseId
-          ? `draft:${sense.parentDraftSenseId}`
-          : sense.parentTezaursSenseId ? `tezaurs:${sense.parentTezaursSenseId}` : ''
+        let parentValue = ''
+        if (sense.parentDraftSenseId) {
+          parentValue = `draft:${sense.parentDraftSenseId}`
+        } else if (sense.parentTezaursSenseId) {
+          parentValue = `tezaurs:${sense.parentTezaursSenseId}`
+        }
         let editorTitle = sense.id || sense.sourceSenseId ? 'Labot nozīmi' : 'Pievienot nozīmi'
-        if (editingParent) editorTitle = 'Pārvietot nozīmi'
+        if (editingParent) {
+          editorTitle = 'Pārvietot nozīmi'
+        }
         return (
           <div key={sense.id ?? index}>
             {editingIndex === index && (
               <EditDialog title={editorTitle} busy={saving}
-                error={error} onCancel={() => {
-                  setSenses(savedSenses)
-                  setEditingIndex(null)
-                  setError('')
-                }} onSubmit={() => {
-                  void save()
-                }}>
+                error={error} onCancel={cancelSenseEdit} onSubmit={() => saveSenses()}>
                 {!editingParent && <label>
                   Skaidrojums
                   <textarea
@@ -343,14 +446,12 @@ export function SenseDraftForm({
           </div>
         )
       })}
-      {displayed.length === 0 && <p className="muted">Nozīmes vēl nav pievienotas.</p>}
+      {displayedSenses.length === 0 && <p className="muted">Nozīmes vēl nav pievienotas.</p>}
       {deletingIndex !== null && (
         <ConfirmationDialog message={`Dzēst nozīmi “${senses[deletingIndex]?.gloss}” no melnraksta?`}
           busy={saving} error={error}
-          onConfirm={async () => {
-            if (await save(senses.filter((_, index) => index !== deletingIndex))) setDeletingIndex(null)
-          }}
-          onCancel={() => { setDeletingIndex(null); setError('') }} />
+          onConfirm={confirmSenseDeletion}
+          onCancel={cancelSenseDeletion} />
       )}
       {error && editingIndex === null && deletingIndex === null && <p className="error">{error}</p>}
     </section>

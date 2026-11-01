@@ -1,16 +1,18 @@
-import type { FlagMap, TezaursFormOptions } from '../types'
+import type { FlagMap, TezaursFlagDefinition, TezaursOption, RestrictionFrequency } from '../api/types'
 import { FlagEditor } from './FlagEditor'
 
 type Props = {
-  definitions: TezaursFormOptions['flags']
-  frequencies: TezaursFormOptions['restrictionFrequencies']
+  definitions: TezaursFlagDefinition[]
+  frequencies: RestrictionFrequency[]
   onChange: (restriction: Record<string, unknown> | null) => void
   restriction: Record<string, unknown> | null
-  types: TezaursFormOptions['restrictionTypes']
+  types: TezaursOption[]
 }
 
-function objectValue(value: unknown) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
+function readObject(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {}
+  }
   return value as Record<string, unknown>
 }
 
@@ -47,36 +49,38 @@ export function RestrictionEditor({
     )
   }
 
-  const type = typeof restriction.Restriction === 'string' ? restriction.Restriction : ''
+  const restrictionType = typeof restriction.Restriction === 'string' ? restriction.Restriction : ''
   const frequency = typeof restriction.Frequency === 'string' ? restriction.Frequency : ''
-  const value = objectValue(restriction.Value)
-  const flags = objectValue(value.Flags) as FlagMap
-  const languageMaterial = Array.isArray(value.LanguageMaterial)
-    ? value.LanguageMaterial.map(String)
+  const restrictionValue = readObject(restriction.Value)
+  const flags = readObject(restrictionValue.Flags) as FlagMap
+  const languageMaterial = Array.isArray(restrictionValue.LanguageMaterial)
+    ? restrictionValue.LanguageMaterial.map(String)
     : []
-  const isOverallFrequency = type === 'Vispārīgais lietojuma biežums'
+  const isOverallFrequency = restrictionType === 'Vispārīgais lietojuma biežums'
 
   function updateType(nextType: string) {
     const updated: Record<string, unknown> = {
       ...restriction,
       Restriction: nextType || null,
     }
-    if (nextType === 'Vispārīgais lietojuma biežums') delete updated.Value
+    if (nextType === 'Vispārīgais lietojuma biežums') {
+      delete updated.Value
+    }
     onChange(updated)
   }
 
   function updateFlags(updatedFlags: FlagMap) {
     onChange({
       ...restriction,
-      Value: { ...value, Flags: updatedFlags },
+      Value: { ...restrictionValue, Flags: updatedFlags },
     })
   }
 
   function updateLanguageMaterial(text: string) {
-    const items = text.split('|').map((item) => item.trim()).filter(Boolean)
+    const items = text.split('|').map((item) => item.trim()).filter((value) => value !== '')
     onChange({
       ...restriction,
-      Value: { ...value, LanguageMaterial: items.length > 0 ? items : null },
+      Value: { ...restrictionValue, LanguageMaterial: items.length > 0 ? items : null },
     })
   }
 
@@ -85,7 +89,7 @@ export function RestrictionEditor({
       <strong>Ierobežojums</strong>
       <label>
         Veids
-        <select value={type} onChange={(event) => updateType(event.target.value)}>
+        <select value={restrictionType} onChange={(event) => updateType(event.target.value)}>
           <option value="">Izvēlieties</option>
           {types.map((option) => (
             <option key={option.id} value={option.label}>{option.label}</option>

@@ -7,6 +7,7 @@ import lv.tezaurs.suggestions.entry.entity.ReviewEntry;
 import lv.tezaurs.suggestions.entry.entity.ReviewLexeme;
 import lv.tezaurs.suggestions.sense.entity.ReviewSense;
 import lv.tezaurs.suggestions.suggestion.entity.TezaursStatus;
+import lv.tezaurs.suggestions.usage.entity.UsageDecision;
 import lv.tezaurs.suggestions.common.error.ConflictException;
 import lv.tezaurs.suggestions.entry.repository.ReviewEntryRepository;
 import lv.tezaurs.suggestions.entry.repository.ReviewLexemeRepository;
@@ -46,8 +47,13 @@ public class ReviewCompletionService {
         if (checkStatus == TezaursStatus.MEANING_ALREADY_EXISTS) {
             return null;
         }
-        if (checkStatus == TezaursStatus.NOT_FOUND && !hasValidEntryDraft(review)) {
-            return CompletionBlockReason.ENTRY_DRAFT_REQUIRED;
+        if (checkStatus == TezaursStatus.NOT_FOUND) {
+            if (review.getUsageDecision() != UsageDecision.USED) {
+                return CompletionBlockReason.USAGE_CHECK_REQUIRED;
+            }
+            if (!hasValidEntryDraft(review)) {
+                return CompletionBlockReason.ENTRY_DRAFT_REQUIRED;
+            }
         }
         if (!hasRequiredSenseDraft(review)) {
             return CompletionBlockReason.SENSE_DRAFT_REQUIRED;

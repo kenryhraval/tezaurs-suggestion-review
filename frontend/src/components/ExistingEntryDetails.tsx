@@ -1,17 +1,16 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { getTezaursEntry } from '../api'
-import type { TezaursEntryDetails } from '../types'
+import { getTezaursEntry } from '../api/client'
+import type { TezaursEntryDetails, TezaursSenseDetails, TezaursLexemeDetails } from '../api/types'
 import { EntryHeading } from './EntryHeading'
 import { EntryActions, LexemeActions, SenseActions } from './TezaursActions'
 
 type Props = {
   entryId: number
+  defaultOpen: boolean
   children?: ReactNode
+  footer?: ReactNode
   onAddSense?: () => void
 }
-
-type Sense = TezaursEntryDetails['senses'][number]
-type Lexeme = TezaursEntryDetails['lexemes'][number]
 
 const dataLabels: Record<string, string> = {
   AltLemmas: 'Alternatīvās lemmas',
@@ -32,88 +31,111 @@ const dataLabels: Record<string, string> = {
   Source: 'Avots',
 }
 
-function label(name: string) {
+function getDataLabel(name: string) {
   return dataLabels[name] ?? name
 }
 
-function objectValue(value: unknown) {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : null
+function readObject(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null
+  }
+  return value as Record<string, unknown>
 }
 
-function lower(value: unknown) {
+function lowercaseText(value: unknown) {
   return String(value).toLocaleLowerCase('lv-LV')
 }
 
 function formatFlags(value: unknown) {
-  const flags = objectValue(value)
-  if (!flags) return ''
+  const flags = readObject(value)
+  if (!flags) {
+    return ''
+  }
 
-  return Object.entries(flags).flatMap(([name, flagValue]) => {
-    if (Array.isArray(flagValue)) return flagValue.map(lower)
-    if (flagValue === null || flagValue === true || flagValue === 'Jā') return [lower(name)]
-    return flagValue === false || flagValue === 'Nē' ? [] : [lower(flagValue)]
-  }).join(', ')
+  const descriptions: string[] = []
+  for (const [name, flagValue] of Object.entries(flags)) {
+    if (Array.isArray(flagValue)) {
+      for (const value of flagValue) {
+        descriptions.push(lowercaseText(value))
+      }
+    } else if (flagValue === null || flagValue === true || flagValue === 'Jā') {
+      descriptions.push(lowercaseText(name))
+    } else if (flagValue !== false && flagValue !== 'Nē') {
+      descriptions.push(lowercaseText(flagValue))
+    }
+  }
+  return descriptions.join(', ')
 }
 
 function restrictionName(value: unknown) {
-  const name = lower(value)
-  if (name === 'formā/atvasinājumā') return 'formā'
-  if (name === 'teikumos / noteikta veida struktūrās') return 'konstrukcijā'
-  if (name === 'vispārīgais lietojuma biežums') return 'lieto'
-  if (name === 'vārddarināšana (sastāvdaļa)') return 'darinot no'
-  if (name === 'vārddarināšana (rezultāts)') return 'darinot vārdu'
+  const name = lowercaseText(value)
+  if (name === 'formā/atvasinājumā') {
+    return 'formā'
+  }
+  if (name === 'teikumos / noteikta veida struktūrās') {
+    return 'konstrukcijā'
+  }
+  if (name === 'vispārīgais lietojuma biežums') {
+    return 'lieto'
+  }
+  if (name === 'vārddarināšana (sastāvdaļa)') {
+    return 'darinot no'
+  }
+  if (name === 'vārddarināšana (rezultāts)') {
+    return 'darinot vārdu'
+  }
   return name
 }
 
 function formatRestriction(value: unknown): string {
-  const restriction = objectValue(value)
-  if (!restriction) return ''
+  const restriction = readObject(value)
+  if (!restriction) {
+    return ''
+  }
 
   if (Array.isArray(restriction.AND)) {
-    return restriction.AND.map(formatRestriction).filter(Boolean).join(' un ')
+    return restriction.AND.map(formatRestriction).filter((text) => text !== '').join(' un ')
   }
   if (Array.isArray(restriction.OR)) {
-    return restriction.OR.map(formatRestriction).filter(Boolean).join(' vai ')
+    return restriction.OR.map(formatRestriction).filter((text) => text !== '').join(' vai ')
   }
   if (restriction.NOT) {
     const negated = formatRestriction(restriction.NOT)
     return negated ? `ne ${negated}` : ''
   }
 
-  const restrictionValue = objectValue(restriction.Value)
+  const restrictionValue = readObject(restriction.Value)
   const details = [
     formatFlags(restrictionValue?.Flags),
     restrictionValue?.LanguageMaterial ? `“${restrictionValue.LanguageMaterial}”` : '',
-  ].filter(Boolean).join(', ')
+  ].filter((text) => text !== '').join(', ')
   const name = restriction.Restriction ? restrictionName(restriction.Restriction) : ''
 
   if (restrictionValue) {
     return [
-      restriction.Frequency ? lower(restriction.Frequency) : '',
+      restriction.Frequency ? lowercaseText(restriction.Frequency) : '',
       name ? `${name}:` : '',
       details,
-    ].filter(Boolean).join(' ')
+    ].filter((text) => text !== '').join(' ')
   }
 
   return [
     name ? `${name}:` : '',
-    restriction.Frequency ? lower(restriction.Frequency) : '',
-  ].filter(Boolean).join(' ')
+    restriction.Frequency ? lowercaseText(restriction.Frequency) : '',
+  ].filter((text) => text !== '').join(' ')
 }
 
 function formatRestrictions(value: unknown) {
   const restrictions = Array.isArray(value) ? value : [value]
-  return restrictions.map(formatRestriction).filter(Boolean).join('; ')
+  return restrictions.map(formatRestriction).filter((text) => text !== '').join('; ')
 }
 
-function grammarData(data: Record<string, unknown> | null) {
-  return objectValue(data?.Gram)
+function readGrammarData(data: Record<string, unknown> | null) {
+  return readObject(data?.Gram)
 }
 
-function formatLexemeGrammar(lexeme: Lexeme) {
-  const ownFlags = objectValue(grammarData(lexeme.data)?.Flags) ?? {}
+function formatLexemeGrammar(lexeme: TezaursLexemeDetails) {
+  const ownFlags = readObject(readGrammarData(lexeme.data)?.Flags) ?? {}
   const flags = { ...lexeme.paradigmData, ...ownFlags }
   const partOfSpeech = typeof flags['Vārdšķira'] === 'string' ? flags['Vārdšķira'] : ''
   const conjugation = typeof flags['Konjugācija'] === 'string' ? flags['Konjugācija'] : ''
@@ -121,15 +143,15 @@ function formatLexemeGrammar(lexeme: Lexeme) {
   const declension = typeof flags['Deklinācija'] === 'string' ? flags['Deklinācija'] : ''
   const reflexive = flags['Atgriezeniskums'] === 'Jā'
 
-  let paradigm = lower(partOfSpeech)
+  let paradigm = lowercaseText(partOfSpeech)
   if (partOfSpeech === 'Darbības vārds' && conjugation) {
     const kind = conjugation === 'Nekārtns'
       ? 'nekārtns darbības vārds'
       : `${conjugation}. konjugācijas darbības vārds`
     paradigm = reflexive ? `atgriezenisks ${kind}` : kind
   } else if (partOfSpeech === 'Lietvārds') {
-    paradigm = [gender ? `${lower(gender)} dzimtes` : '',
-      declension ? `${declension}. deklinācijas` : '', 'lietvārds'].filter(Boolean).join(' ')
+    paradigm = [gender ? `${lowercaseText(gender)} dzimtes` : '',
+      declension ? `${declension}. deklinācijas` : '', 'lietvārds'].filter((text) => text !== '').join(' ')
   }
 
   const paradigmFields = new Set([
@@ -140,10 +162,10 @@ function formatLexemeGrammar(lexeme: Lexeme) {
     Object.entries(flags).filter(([name]) => !paradigmFields.has(name)))
   const properties = formatFlags(remainingFlags)
 
-  return [paradigm, properties].filter(Boolean).join('; ')
+  return [paradigm, properties].filter((text) => text !== '').join('; ')
 }
 
-function lexemeTechnicalInfo(lexeme: Lexeme) {
+function lexemeTechnicalInfo(lexeme: TezaursLexemeDetails) {
   let paradigmHeading = lexeme.paradigmCode ?? ''
   if (lexeme.paradigmLegacyNo !== null) {
     paradigmHeading += ` (${lexeme.paradigmLegacyNo})`
@@ -160,9 +182,15 @@ function lexemeTechnicalInfo(lexeme: Lexeme) {
     ? Object.entries(lexeme.paradigmData).sort(([left], [right]) => {
         const leftIndex = preferredOrder.indexOf(left)
         const rightIndex = preferredOrder.indexOf(right)
-        if (leftIndex === -1 && rightIndex === -1) return left.localeCompare(right, 'lv')
-        if (leftIndex === -1) return 1
-        if (rightIndex === -1) return -1
+        if (leftIndex === -1 && rightIndex === -1) {
+          return left.localeCompare(right, 'lv')
+        }
+        if (leftIndex === -1) {
+          return 1
+        }
+        if (rightIndex === -1) {
+          return -1
+        }
         return leftIndex - rightIndex
       }).map(([name, value]) => `${name}: ${Array.isArray(value) ? value.join(', ') : String(value)}`)
     : []
@@ -173,25 +201,33 @@ function lexemeTechnicalInfo(lexeme: Lexeme) {
     lexeme.stem2 ? `Tagadnes celms: ${lexeme.stem2}` : '',
     lexeme.stem3 ? `Pagātnes celms: ${lexeme.stem3}` : '',
     ...paradigmFields,
-  ].filter(Boolean).join('\n')
+  ].filter((text) => text !== '').join('\n')
 }
 
 function UsageFrequency({ extras }: { extras: Record<string, unknown> | null }) {
   const ratio = Number(extras?.ratioPerMille)
-  if (!Number.isFinite(ratio)) return null
+  if (!Number.isFinite(ratio)) {
+    return null
+  }
 
   let level = 1
-  if (ratio >= 0.1) level = 5
-  else if (ratio >= 0.01) level = 4
-  else if (ratio >= 0.001) level = 3
-  else if (ratio >= 0.0001) level = 2
+  if (ratio >= 0.1) {
+    level = 5
+  } else if (ratio >= 0.01) {
+    level = 4
+  } else if (ratio >= 0.001) {
+    level = 3
+  } else if (ratio >= 0.0001) {
+    level = 2
+  }
 
   const perMillion = Math.floor(ratio * 1000)
-  const title = ratio >= 0.001
-    ? `${perMillion} reizes uz miljonu vārdlietojumu Korpuss.lv`
-    : ratio >= 0.0001
-      ? '0,1–1 reize uz miljonu vārdlietojumu Korpuss.lv'
-      : 'Korpuss.lv sastopams retāk nekā 1 reizi uz 10 miljoniem vārdlietojumu'
+  let title = 'Korpuss.lv sastopams retāk nekā 1 reizi uz 10 miljoniem vārdlietojumu'
+  if (ratio >= 0.001) {
+    title = `${perMillion} reizes uz miljonu vārdlietojumu Korpuss.lv`
+  } else if (ratio >= 0.0001) {
+    title = '0,1–1 reize uz miljonu vārdlietojumu Korpuss.lv'
+  }
 
   return (
     <div className="usage-frequency" title={title}>
@@ -204,13 +240,15 @@ function UsageFrequency({ extras }: { extras: Record<string, unknown> | null }) 
 }
 
 function DataValue({ value }: { value: unknown }) {
-  if (Array.isArray(value)) return <>{value.map(String).join(' | ')}</>
+  if (Array.isArray(value)) {
+    return <>{value.map(String).join(' | ')}</>
+  }
   if (value && typeof value === 'object') {
     return (
       <ul>
         {Object.entries(value).map(([name, item]) => (
           <li key={name}>
-            <strong>{label(name)}:</strong> <DataValue value={item} />
+            <strong>{getDataLabel(name)}:</strong> <DataValue value={item} />
           </li>
         ))}
       </ul>
@@ -226,13 +264,15 @@ function ExtraData({
   data: Record<string, unknown> | null
   grammarAlreadyShown?: boolean
 }) {
-  if (!data || Object.keys(data).length === 0) return null
+  if (!data || Object.keys(data).length === 0) {
+    return null
+  }
 
-  const gram = grammarData(data)
-  const flags = formatFlags(gram?.Flags)
-  const restrictions = formatRestrictions(gram?.StructuralRestrictions)
-  const otherGramData = gram
-    ? Object.fromEntries(Object.entries(gram).filter(
+  const grammarData = readGrammarData(data)
+  const flags = formatFlags(grammarData?.Flags)
+  const restrictions = formatRestrictions(grammarData?.StructuralRestrictions)
+  const otherGramData = grammarData
+    ? Object.fromEntries(Object.entries(grammarData).filter(
         ([name]) => name !== 'Flags' && name !== 'StructuralRestrictions'))
     : null
   const otherData = Object.fromEntries(Object.entries(data).filter(([name, value]) =>
@@ -243,7 +283,9 @@ function ExtraData({
   if ((!flags || grammarAlreadyShown)
     && (!restrictions || grammarAlreadyShown)
     && !hasOtherGramData
-    && !hasOtherData) return null
+    && !hasOtherData) {
+    return null
+  }
 
   return (
     <div className="existing-data">
@@ -259,17 +301,19 @@ function ExtraData({
 
 export function SenseDetails({ number, sense, actions, isNew = false }: {
   number: string
-  sense: Sense
+  sense: TezaursSenseDetails
   actions?: ReactNode
   isNew?: boolean
 }) {
-  const gram = grammarData(sense.data)
-  const grammar = [formatFlags(gram?.Flags), formatRestrictions(gram?.StructuralRestrictions)]
-    .filter(Boolean).join('; ')
+  const grammarData = readGrammarData(sense.data)
+  const grammar = [formatFlags(grammarData?.Flags), formatRestrictions(grammarData?.StructuralRestrictions)]
+    .filter((text) => text !== '').join('; ')
   const gloss = sense.gloss?.trim()
-  const displayedGloss = gloss
-    ? `${gloss}${/[.!?…]$/.test(gloss) ? '' : '.'}`
-    : 'Skaidrojums nav norādīts.'
+  let displayedGloss = 'Skaidrojums nav norādīts.'
+  if (gloss) {
+    const endsWithPunctuation = /[.!?…]$/.test(gloss)
+    displayedGloss = endsWithPunctuation ? gloss : `${gloss}.`
+  }
 
   return (
     <article className="existing-sense">
@@ -291,33 +335,43 @@ export function SenseDetails({ number, sense, actions, isNew = false }: {
   )
 }
 
-export function ExistingEntryDetails({ entryId, children, onAddSense }: Props) {
+export function ExistingEntryDetails({ entryId, children, footer, onAddSense, defaultOpen }: Props) {
   const [entry, setEntry] = useState<TezaursEntryDetails | null>(null)
   const [error, setError] = useState('')
 
   useEffect(() => {
-    let active = true
-    getTezaursEntry(entryId)
-      .then((loaded) => {
-        if (active) setEntry(loaded)
-      })
-      .catch((cause) => {
-        if (active) {
+    let requestIsOutdated = false
+    async function loadEntry() {
+      try {
+        const loaded = await getTezaursEntry(entryId)
+        if (!requestIsOutdated) {
+          setEntry(loaded)
+        }
+      } catch (cause) {
+        if (!requestIsOutdated) {
           setError(cause instanceof Error ? cause.message : 'Neizdevās ielādēt šķirkli.')
         }
-      })
+      }
+    }
+
+    loadEntry()
     return () => {
-      active = false
+      requestIsOutdated = true
     }
   }, [entryId])
 
-  if (error) return <p className="error">{error}</p>
-  if (!entry) return <p className="muted">Ielādē esošo šķirkli...</p>
+  if (error) {
+    return <p className="error">{error}</p>
+  }
+  if (!entry) {
+    return <p className="muted">Ielādē esošo šķirkli...</p>
+  }
 
   return (
-    <details open className="existing-entry">
+    <details open={defaultOpen} className="existing-entry">
       <summary><strong>3. Esošais šķirklis</strong></summary>
       <EntryDisplay entry={entry} onAddSense={onAddSense}>{children}</EntryDisplay>
+      {footer}
     </details>
   )
 }
@@ -338,9 +392,9 @@ type DisplayProps = {
 export function EntryDisplay({ entry, children, onEditEntry, onEditLexeme, onAddLexeme, onAddSense,
   onDeleteLexeme, canDeleteLexeme, publicHumanKey, lexemeControls }: DisplayProps) {
   const mainSenses = entry.senses.filter((sense) => sense.parentSenseId === null)
-  const gram = grammarData(entry.data)
-  const entryGrammar = [formatFlags(gram?.Flags), formatRestrictions(gram?.StructuralRestrictions)]
-    .filter(Boolean).join('; ')
+  const grammarData = readGrammarData(entry.data)
+  const entryGrammar = [formatFlags(grammarData?.Flags), formatRestrictions(grammarData?.StructuralRestrictions)]
+    .filter((text) => text !== '').join('; ')
   return (
     <div className="tezaurs-entry-display">
       <div className="draft-heading">
@@ -366,7 +420,7 @@ export function EntryDisplay({ entry, children, onEditEntry, onEditLexeme, onAdd
             <div>
               <LexemeActions onEdit={onEditLexeme ? () => onEditLexeme(index) : undefined}
                 onDelete={onDeleteLexeme && canDeleteLexeme?.(index) ? () => onDeleteLexeme(index) : undefined} />
-              <strong title={lexeme.role ?? undefined}>{lexeme.lemma}</strong>{' '}
+              <strong className="lexeme-heading" title={lexeme.role ?? undefined}>{lexeme.lemma}</strong>{' '}
               {pronunciations.length > 0 && <span>[{pronunciations.join('], [')}] </span>}
               {grammar && <span className="lexeme-metadata">{grammar}</span>}
               {technicalInfo && (

@@ -122,6 +122,7 @@ class LexemeDraftServiceTest {
         review.changeStatus(SuggestionStatus.READY_FOR_REVIEW);
         review.changeStatus(SuggestionStatus.IN_PROGRESS);
         review.recordTezaursCheck(TezaursStatus.NOT_FOUND, null);
+        review.recordUsageDecision(lv.tezaurs.suggestions.usage.entity.UsageDecision.USED, null, null);
         return review;
     }
 

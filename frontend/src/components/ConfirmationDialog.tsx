@@ -18,7 +18,9 @@ export function ConfirmationDialog({
     <Dialog title={title} busy={busy} onCancel={onCancel}>
       <form onSubmit={(event) => {
         event.preventDefault()
-        if (!busy) onConfirm()
+        if (!busy) {
+          onConfirm()
+        }
       }}>
         {message && <p>{message}</p>}
         {children}

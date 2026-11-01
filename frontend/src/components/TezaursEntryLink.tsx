@@ -1,4 +1,4 @@
-import { tezaursEntryUrl } from '../tezaurs'
+import { tezaursEntryUrl } from '../config/tezaurs'
 
 export function TezaursEntryLink({ humanKey }: { humanKey: string }) {
   const label = `Atvērt ${humanKey} Tēzaurā (jaunā cilnē)`

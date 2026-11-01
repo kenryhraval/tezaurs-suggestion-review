@@ -64,7 +64,8 @@ public class EntryDraftService {
                 null, null, null, null, null, Map.of());
         validateEntry(request);
         ReviewEntry entry = new ReviewEntry(caseId);
-        updateEntry(entry, request);
+        int homonymNo = nextHomonymNumber(request.heading().trim(), entry.getId());
+        updateEntry(entry, request, homonymNo);
         ReviewEntry savedEntry = entryRepository.save(entry);
         ReviewLexeme primaryLexeme = lexemeDraftService.createInitial(
                 savedEntry, new SaveLexemeDraftRequest(entry.getHeading(), true, DEFAULT_LEXEME_ROLE_ID, null,
@@ -83,16 +84,15 @@ public class EntryDraftService {
             throw new ConflictException("The selected entry type does not exist");
         }
         flagService.validateChanges("E", request.flags(), entry.getFlags());
-        updateEntry(entry, request);
+        updateEntry(entry, request, entry.getHomonymNo());
 
         List<ReviewLexeme> lexemes = lexemeRepository
                 .findAllByEntryIdOrderByOrderNoAscIdAsc(entry.getId());
         return response(entry, lexemes, reviewCase);
     }
 
-    private void updateEntry(ReviewEntry entry, SaveEntryDraftRequest request) {
+    private void updateEntry(ReviewEntry entry, SaveEntryDraftRequest request, int homonymNo) {
         String heading = request.heading().trim();
-        int homonymNo = nextHomonymNumber(heading, entry.getId());
         entry.update(heading, homonymNo, request.typeId(),
                 clean(request.etymology()), clean(request.normativeComment()),
                 clean(request.scientificName()), clean(request.source()), clean(request.notes()),

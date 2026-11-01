@@ -4,7 +4,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import lv.tezaurs.suggestions.entry.service.EntryDraftService;
 import lv.tezaurs.suggestions.common.error.ConflictException;
 import lv.tezaurs.suggestions.common.error.NotFoundException;
 import lv.tezaurs.suggestions.suggestion.dto.CorrectTermRequest;
@@ -38,7 +37,6 @@ public class ReviewService {
     private final CaseSuggestionRepository reviewSourceRepository;
     private final TezaursEntryRepository tezaursEntryRepository;
     private final TezaursEntrySearchService tezaursEntrySearchService;
-    private final EntryDraftService entryDraftService;
 
     @Transactional(readOnly = true)
     public ReviewPageResponse list(
@@ -148,9 +146,6 @@ public class ReviewService {
             throw new ConflictException("The selected Tēzaurs entry does not exist");
         }
         review.recordTezaursCheck(request.status(), request.matchedEntryId());
-        if (request.status() == TezaursStatus.NOT_FOUND) {
-            entryDraftService.create(reviewId);
-        }
         return completionService.response(review);
     }
 

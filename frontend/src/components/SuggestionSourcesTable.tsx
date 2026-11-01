@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { ReviewSource } from '../types'
+import type { ReviewSource } from '../api/types'
 import { ConfirmationDialog } from './ConfirmationDialog'
 
 type Props = {
@@ -25,7 +25,9 @@ export function SuggestionSourcesTable({ sources, onDetach }: Props) {
   const canDetach = sources.length > 1 && onDetach !== undefined
 
   async function confirmDetach() {
-    if (!detaching || !onDetach || saving) return
+    if (!detaching || !onDetach || saving) {
+      return
+    }
     setSaving(true)
     setError('')
     try {
@@ -84,7 +86,7 @@ export function SuggestionSourcesTable({ sources, onDetach }: Props) {
           message={`Ieteikums “${detaching.submittedTerm}” tiks atdalīts un atgriezts sarakstā “Jauns”. Šīs izskatīšanas statuss un melnraksti paliks nemainīti un netiks kopēti līdzi.`}
           busy={saving}
           error={error}
-          onConfirm={() => void confirmDetach()}
+          onConfirm={() => confirmDetach()}
           onCancel={() => setDetaching(null)}
         />
       )}

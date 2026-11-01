@@ -22,7 +22,9 @@ export function Dialog({ title, busy, wide = false, onCancel, children }: Props)
     <dialog className={wide ? 'confirmation-dialog edit-dialog' : 'confirmation-dialog'}
       ref={dialogRef} aria-labelledby={titleId} onCancel={(event) => {
         event.preventDefault()
-        if (!busy) onCancel()
+        if (!busy) {
+          onCancel()
+        }
       }}>
       <h3 id={titleId}>{title}</h3>
       {children}

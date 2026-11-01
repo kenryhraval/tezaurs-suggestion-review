@@ -1,10 +1,13 @@
-import { useState, type ReactNode } from 'react'
+import { UsageCheck } from './UsageCheck'
+import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   correctReviewTerm,
   detachSuggestion,
+  getReview,
   saveTezaursCheck,
-} from '../api'
-import { suggestionStatusLabels, suggestionStatusTransitions } from '../labels'
+  saveUsageDecision,
+} from '../api/client'
+import { suggestionStatusLabels } from '../review/statuses'
 import type {
   QueueItem,
   Review,
@@ -12,8 +15,9 @@ import type {
   Suggestion,
   SuggestionStatus,
   TezaursStatus,
-} from '../types'
-import { useSuggestionReview } from '../hooks/useSuggestionReview'
+  UsageDecision,
+} from '../api/types'
+import { getReviewWorkflow } from '../review/workflow'
 import { TezaursCheckForm } from './TezaursCheckForm'
 import { SuggestionIntake } from './SuggestionIntake'
 import { EntryDraftForm } from './EntryDraftForm'
@@ -44,9 +48,53 @@ function sourceFromSuggestion(suggestion: Suggestion): ReviewSource {
   }
 }
 
+function useSuggestionReview(reviewId: string | null) {
+  const [review, setReview] = useState<Review | null>(null)
+  const [error, setError] = useState('')
+  const reviewVersion = useRef(0)
+
+  useEffect(() => {
+    if (!reviewId) {
+      return
+    }
+    const id = reviewId
+
+    let requestIsOutdated = false
+    reviewVersion.current += 1
+    const versionBeforeLoading = reviewVersion.current
+
+    async function loadReview() {
+      try {
+        const loaded = await getReview(id)
+        if (!requestIsOutdated && versionBeforeLoading === reviewVersion.current) {
+          setReview(loaded)
+          setError('')
+        }
+      } catch (cause) {
+        if (!requestIsOutdated && versionBeforeLoading === reviewVersion.current) {
+          setError(cause instanceof Error ? cause.message : 'Pārskatu neizdevās ielādēt.')
+        }
+      }
+    }
+
+    loadReview()
+    return () => {
+      requestIsOutdated = true
+    }
+  }, [reviewId])
+
+  function updateReview(saved: Review) {
+    reviewVersion.current += 1
+    setReview(saved)
+    setError('')
+  }
+
+  return { review: review?.id === reviewId ? review : null, updateReview, error }
+}
+
 export function SuggestionDetails({ item, onStatusChange, onDuplicate, onReviewUpdated }: Props) {
   const [error, setError] = useState('')
-  const [pendingStatus, setPendingStatus] = useState<SuggestionStatus | null>(null)
+  const [pendingCompletionStatus, setPendingCompletionStatus] = useState<'NEEDS_EXPERT' | 'COMPLETED' | null>(null)
   const [changingStatus, setChangingStatus] = useState(false)
   const [statusError, setStatusError] = useState('')
   const [editingTitle, setEditingTitle] = useState(false)
@@ -58,54 +106,47 @@ export function SuggestionDetails({ item, onStatusChange, onDuplicate, onReviewU
   const reviewState = useSuggestionReview(requestedReviewId)
   const review = reviewState.review
   const reviewLoading = item.itemType === 'REVIEW' && !review && !reviewState.error
-  const reviewInProgress = item.status === 'IN_PROGRESS'
-  const needsCaseChoice = item.status === 'READY_FOR_REVIEW'
-    && review?.sources.length === 1 && review.tezaursStatus === 'NOT_CHECKED'
-  const tezaursEntryExists = review?.tezaursStatus === 'FOUND'
-    || review?.tezaursStatus === 'MEANING_ALREADY_EXISTS'
-    || review?.tezaursStatus === 'MEANING_NEEDS_EDITING'
-    || review?.tezaursStatus === 'MEANING_NOT_FOUND'
-  const senseDraftAvailable = review?.tezaursStatus === 'NOT_FOUND'
-    || review?.tezaursStatus === 'MEANING_NOT_FOUND' || review?.tezaursStatus === 'MEANING_NEEDS_EDITING'
-  const entryDraftAvailable = review?.tezaursStatus === 'NOT_FOUND'
-  const visibleTransitions = suggestionStatusTransitions[item.status].filter((status) => {
-    if (status === 'ALREADY_EXISTS') return review?.tezaursStatus === 'MEANING_ALREADY_EXISTS'
-    if (status === 'COMPLETED') {
-      return review?.canComplete === true
-        && review.tezaursStatus !== 'MEANING_ALREADY_EXISTS'
-    }
-    return true
-  })
+  const workflow = getReviewWorkflow(review, item.status)
+  const status = workflow.status
+  const reviewInProgress = status === 'IN_PROGRESS'
 
   async function changeStatus(status: SuggestionStatus) {
     const updatedReview = await onStatusChange(status)
-    if (updatedReview) reviewState.setReview(updatedReview)
+    if (updatedReview) {
+      reviewState.updateReview(updatedReview)
+    }
     return updatedReview
   }
 
-  function requestStatusChange(status: SuggestionStatus) {
+  function requestReviewCompletion(nextStatus: 'NEEDS_EXPERT' | 'COMPLETED') {
     setStatusError('')
-    setPendingStatus(status)
+    setPendingCompletionStatus(nextStatus)
   }
 
-  async function confirmStatusChange() {
-    if (!pendingStatus || changingStatus) return
+  async function confirmReviewCompletion() {
+    if (!pendingCompletionStatus || changingStatus) {
+      return
+    }
     setChangingStatus(true)
     setStatusError('')
     try {
-      const updatedReview = await changeStatus(pendingStatus)
+      const updatedReview = await changeStatus(pendingCompletionStatus)
       if (updatedReview) {
-        setPendingStatus(null)
+        setPendingCompletionStatus(null)
       } else {
         setStatusError('Neizdevās mainīt statusu. Mēģiniet vēlreiz.')
       }
+    } catch (cause) {
+      setStatusError(cause instanceof Error ? cause.message : 'Neizdevās mainīt statusu.')
     } finally {
       setChangingStatus(false)
     }
   }
 
   async function handleTermCorrection() {
-    if (!review || savingTitle) return
+    if (!review || savingTitle) {
+      return
+    }
     const title = editedTitle.trim()
     if (!title) {
       setTitleError('Ievadiet nosaukumu.')
@@ -115,7 +156,7 @@ export function SuggestionDetails({ item, onStatusChange, onDuplicate, onReviewU
     setTitleError('')
     try {
       const updated = await correctReviewTerm(review.id, title)
-      reviewState.setReview(updated)
+      reviewState.updateReview(updated)
       onReviewUpdated(updated)
       setEditingTitle(false)
     } catch (cause) {
@@ -126,46 +167,83 @@ export function SuggestionDetails({ item, onStatusChange, onDuplicate, onReviewU
   }
 
   async function handleDetach(sourceId: number) {
-    if (!review) return
+    if (!review) {
+      return
+    }
     const updated = await detachSuggestion(review.id, sourceId)
-    reviewState.setReview(updated)
+    reviewState.updateReview(updated)
     onReviewUpdated(updated)
   }
 
   async function handleTezaursCheck(status: TezaursStatus, entryId: number | null) {
-    if (!review) return false
+    if (!review) {
+      return false
+    }
     setError('')
     try {
       const updatedReview = await saveTezaursCheck(review.id, status, entryId)
-      reviewState.setReview(updatedReview)
+      reviewState.updateReview(updatedReview)
       onReviewUpdated(updatedReview)
       return true
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Neizdevās saglabāt pārbaudi.')
+      throw cause
+    }
+  }
+
+  async function handleUsageDecision(decision: UsageDecision) {
+    if (!review) {
       return false
     }
+    const updated = await saveUsageDecision(review.id, decision)
+    reviewState.updateReview(updated)
+    onReviewUpdated(updated)
+    return true
+  }
+
+  function openTitleEditor() {
+    setEditedTitle(displayedTerm)
+    setTitleError('')
+    setEditingTitle(true)
   }
 
   const listTerm = item.itemType === 'SUGGESTION'
     ? item.submittedTerm : item.reviewedTerm
   const displayedTerm = review?.reviewedTerm ?? listTerm
-  const sources = suggestion
-    ? [sourceFromSuggestion(suggestion)]
-    : Array.isArray(review?.sources) ? review.sources : []
+  let sources: ReviewSource[] = []
+  if (suggestion) {
+    sources = [sourceFromSuggestion(suggestion)]
+  } else if (Array.isArray(review?.sources)) {
+    sources = review.sources
+  }
   const initialGloss = sources.length === 1 ? sources[0].submittedDefinition : ''
+  const completionQuestion = review && (
+    <div className="draft-actions">
+      <p><strong>Vai uzskatāt, ka nepieciešams eksperta apstiprinājums?</strong></p>
+      <div className="tezaurs-answer-actions">
+        <button type="button" disabled={!reviewInProgress}
+          onClick={() => requestReviewCompletion('NEEDS_EXPERT')}>Jā, vajag</button>
+        <button type="button" disabled={!reviewInProgress || !review.canComplete}
+          onClick={() => requestReviewCompletion('COMPLETED')}>Nē, nevajag</button>
+      </div>
+    </div>
+  )
+
   function renderEntry(senses: ReactNode, onAddSense?: () => void) {
-    if (!review) return null
-    if (entryDraftAvailable) {
+    if (!review) {
+      return null
+    }
+    if (workflow.draft.newEntry) {
       return (
-        <EntryDraftForm reviewId={review.id} editable={reviewInProgress}
-          onReviewUpdated={reviewState.setReview} onAddSense={onAddSense}>
+        <EntryDraftForm reviewId={review.id} editable={!workflow.draft.readOnly}
+          onReviewUpdated={reviewState.updateReview} onAddSense={onAddSense} footer={completionQuestion} defaultOpen={workflow.draft.defaultOpen}>
           {senses}
         </EntryDraftForm>
       )
     }
-    if (tezaursEntryExists && review.matchedEntryId !== null) {
+    if (review.matchedEntryId !== null) {
       return (
-        <ExistingEntryDetails entryId={review.matchedEntryId} onAddSense={onAddSense}>
+        <ExistingEntryDetails entryId={review.matchedEntryId} onAddSense={onAddSense} footer={completionQuestion} defaultOpen={workflow.draft.defaultOpen}>
           {senses}
         </ExistingEntryDetails>
       )
@@ -175,35 +253,31 @@ export function SuggestionDetails({ item, onStatusChange, onDuplicate, onReviewU
 
   return (
     <article className="details">
-      {pendingStatus && (
+      {pendingCompletionStatus && (
         <ConfirmationDialog
-          message={pendingStatus === 'ALREADY_EXISTS'
-            ? 'Ieteiktā nozīme jau ir Tēzaurā. Izskatīšana tiks slēgta ar statusu “Jau bija”.'
-            : `Ieteikuma “${displayedTerm}” statuss tiks mainīts no “${suggestionStatusLabels[item.status]}” uz “${suggestionStatusLabels[pendingStatus]}”.`}
+          message={pendingCompletionStatus === 'NEEDS_EXPERT'
+            ? 'Izskatīšana pāries statusā “Vajag ekspertu”. Saglabātais melnraksts paliks pieejams.'
+            : 'Izskatīšana tiks pabeigta un atzīmēta kā “Gatavs”.'}
           busy={changingStatus}
           error={statusError}
-          onConfirm={() => void confirmStatusChange()}
-          onCancel={() => setPendingStatus(null)}
+          onConfirm={confirmReviewCompletion}
+          onCancel={() => setPendingCompletionStatus(null)}
         />
       )}
       <div className="review-heading">
-        <span className="muted">{suggestionStatusLabels[item.status]}</span>
+        <span className="muted">{suggestionStatusLabels[status]}</span>
         <h2 className="suggestion-title">{displayedTerm}</h2>
         {reviewInProgress && review && (
-          <EditButton label="Labot izskatīšanas nosaukumu" onClick={() => {
-            setEditedTitle(displayedTerm)
-            setTitleError('')
-            setEditingTitle(true)
-          }} />
+          <EditButton label="Labot izskatīšanas nosaukumu" onClick={openTitleEditor} />
         )}
       </div>
       {editingTitle && (
         <ConfirmationDialog
           title="Labot izskatīšanas nosaukumu"
-          message="Mainīsies tikai izskatīšanas nosaukums. Iesniegtie ieteikumi un šķirkļa melnraksts paliks nemainīti."
+          message="Mainīsies tikai izskatīšanas nosaukums."
           busy={savingTitle}
           error={titleError}
-          onConfirm={() => void handleTermCorrection()}
+          onConfirm={() => handleTermCorrection()}
           onCancel={() => setEditingTitle(false)}
         >
           <label>
@@ -227,50 +301,34 @@ export function SuggestionDetails({ item, onStatusChange, onDuplicate, onReviewU
       {(error || reviewState.error) && <p className="error">{error || reviewState.error}</p>}
       {reviewLoading && <p className="muted">Ielādē izskatīšanas informāciju...</p>}
 
-      {(suggestion || review) && (
-        <SuggestionIntake status={item.status} onStatusChange={changeStatus}
-          review={review} needsCaseChoice={needsCaseChoice} onDuplicate={onDuplicate} />
-      )}
+      <Fragment key={workflow.sectionResetKey}>
+        {(suggestion || review) && (
+          <SuggestionIntake status={status} onStatusChange={changeStatus}
+            review={review} onDuplicate={onDuplicate}
+            defaultOpen={workflow.intake.defaultOpen} readOnly={workflow.intake.readOnly} />
+        )}
 
-      {(reviewInProgress || item.status === 'ALREADY_EXISTS') && review && (
-        <TezaursCheckForm
-          key={review.reviewedTerm}
-          reviewId={review.id}
-          status={review.tezaursStatus}
-          matchedEntryId={review.matchedEntryId}
-          caseClosed={item.status === 'ALREADY_EXISTS'}
-          onSave={handleTezaursCheck}
-        />
-      )}
+        {review && workflow.tezaurs.visible && (
+          <TezaursCheckForm reviewId={review.id} status={review.tezaursStatus}
+            matchedEntryId={review.matchedEntryId} caseClosed={status === 'ALREADY_EXISTS'}
+            readOnly={workflow.tezaurs.readOnly} defaultOpen={workflow.tezaurs.defaultOpen}
+            onSave={handleTezaursCheck} />
+        )}
 
-      {item.status !== 'ALREADY_EXISTS' && (senseDraftAvailable && review ? (
-        <SenseDraftForm
-          key={`${review.id}:${review.matchedEntryId}:${review.tezaursStatus}`}
-          initialGloss={initialGloss}
-          matchedEntryId={review.matchedEntryId}
-          onReviewUpdated={reviewState.setReview}
-          reviewId={review.id}
-          editExistingSenses={review.tezaursStatus === 'MEANING_NEEDS_EDITING'}
-          editable={reviewInProgress}
-          renderEntry={renderEntry}
-        />
-      ) : renderEntry(null))}
+        {status === 'ALREADY_EXISTS' && completionQuestion}
 
-      {review && !needsCaseChoice && item.status !== 'GARBAGE' && (
-        <div className="review-return">
-          {visibleTransitions.map((status) => (
-            <button
-              key={status}
-              type="button"
-              onClick={() => requestStatusChange(status)}
-            >
-              {item.status === 'READY_FOR_REVIEW' && status === 'IN_PROGRESS'
-                ? 'Sākt izskatīšanu'
-                : status === 'ALREADY_EXISTS' ? 'Jau bija' : suggestionStatusLabels[status]}
-            </button>
-          ))}
-        </div>
-      )}
+        {review && workflow.usage.visible && (
+          <UsageCheck review={review} onSaveDecision={handleUsageDecision}
+            defaultOpen={workflow.usage.defaultOpen} readOnly={workflow.usage.readOnly} />
+        )}
+
+        {review && workflow.draft.visible && (
+          <SenseDraftForm initialGloss={initialGloss} matchedEntryId={review.matchedEntryId}
+            onReviewUpdated={reviewState.updateReview} reviewId={review.id}
+            editExistingSenses={review.tezaursStatus === 'MEANING_NEEDS_EDITING'}
+            editable={!workflow.draft.readOnly} renderEntry={renderEntry} />
+        )}
+      </Fragment>
     </article>
   )
 }

@@ -29,13 +29,26 @@ The application currently supports the review queue, duplicate linking,
 Tēzaurs entry checks, and entry, lexeme, and sense drafts. It does
 not write drafts back to the real Tēzaurs tables.
 
-Confirming that an entry is absent creates its draft and first primary lexeme.
+For a new entry, first confirm usage in “Lietojuma pārbaude”. “Jā, atzīstu” creates
+its draft and first primary lexeme. “Nē, neatzīstu” offers postponement or an explicit
+reviewer decision to mark the word as “Izdoma”. Automatic search checks the 42 corpora
+listed by [korpuss.lv](https://korpuss.lv/search), using word forms and lemmas where
+available. Results appear progressively; unavailable corpora are marked separately.
+Press Enter to search a changed word; click a corpus count to open its examples.
+The corpus with the most matches opens by default after the search finishes.
+Marked examples stay in the results and in a paginated selection across all search phrases.
+The corpus list and server URLs are maintained in `Corpus.java`.
+Findings and external citations are saved separately from dictionary examples.
 Entry, lexeme and sense edits open separate dialogs in a shared Tēzaurs-style view.
 Existing entries and lexemes remain read-only. Before closing as “Jau ir”,
 the reviewer may choose to edit the existing sense instead. Only saved sense
 edits are copied into `review`; new senses and edits are kept per selected entry.
 Completion is checked against the active drafts; readiness flags are not stored.
 The schema is defined by the single V1 migration.
+
+Section rules are in `frontend/src/review/workflow.ts`: `Jauns`/`Skatāms` open intake,
+`Apstrādē` opens the unfinished step, and postponed/finished cases start collapsed.
+Workflow changes reset section UI, while saved checks, evidence, and drafts are preserved.
 
 Authentication is performed by the deployment reverse proxy. The backend reads
 the authenticated username from the proxy-validated Basic Authorization header

@@ -1,6 +1,7 @@
 package lv.tezaurs.suggestions.common.error;
 
 import jakarta.servlet.http.HttpServletRequest;
+import lv.tezaurs.suggestions.usage.error.CorpusUnavailableException;
 import java.time.Instant;
 import java.util.List;
 import org.springframework.http.HttpStatus;
@@ -20,6 +21,11 @@ public class ApiExceptionHandler {
     @ExceptionHandler(ConflictException.class)
     ResponseEntity<ApiError> conflict(ConflictException exception, HttpServletRequest request) {
         return error(HttpStatus.CONFLICT, "CONFLICT", exception.getMessage(), request, List.of());
+    }
+
+    @ExceptionHandler(CorpusUnavailableException.class)
+    ResponseEntity<ApiError> corpusUnavailable(CorpusUnavailableException exception, HttpServletRequest request) {
+        return error(HttpStatus.BAD_GATEWAY, "CORPUS_UNAVAILABLE", exception.getMessage(), request, List.of());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

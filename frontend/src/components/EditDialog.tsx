@@ -8,14 +8,17 @@ type Props = {
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
   onCancel: () => void
   children: ReactNode
+  wide?: boolean
 }
 
-export function EditDialog({ title, busy, error, onSubmit, onCancel, children }: Props) {
+export function EditDialog({ title, busy, error, onSubmit, onCancel, children, wide = true }: Props) {
   return (
-    <Dialog title={title} busy={busy} wide onCancel={onCancel}>
+    <Dialog title={title} busy={busy} wide={wide} onCancel={onCancel}>
       <form className="entry-draft-form" onSubmit={(event) => {
         event.preventDefault()
-        if (!busy) onSubmit(event)
+        if (!busy) {
+          onSubmit(event)
+        }
       }}>
         {children}
         {error && <p className="error" role="alert">{error}</p>}

@@ -7,7 +7,7 @@ import {
   getTezaursFormOptions,
   updateEntryDraft,
   updateLexemeDraft,
-} from '../api'
+} from '../api/client'
 import type {
   EntryDraft,
   FlagMap,
@@ -16,18 +16,21 @@ import type {
   SaveEntryDraft,
   SaveLexemeDraft,
   TezaursFormOptions,
-} from '../types'
+  TezaursEntryDetails,
+} from '../api/types'
 import { FlagEditor } from './FlagEditor'
 import { RestrictionEditor } from './RestrictionEditor'
 import { EditDialog } from './EditDialog'
 import { EntryDisplay } from './ExistingEntryDetails'
-import { draftEntryView } from '../draftEntryView'
+import { draftGrammarData } from '../drafts/grammar'
 import { ConfirmationDialog } from './ConfirmationDialog'
 
 type Props = {
   reviewId: string
   onReviewUpdated: (review: Review) => void
   children?: ReactNode
+  defaultOpen: boolean
+  footer?: ReactNode
   editable: boolean
   onAddSense?: () => void
 }
@@ -63,7 +66,53 @@ function lexemeRequest(lexeme: LexemeDraft): SaveLexemeDraft {
   }
 }
 
-export function EntryDraftForm({ reviewId, onReviewUpdated, children, editable, onAddSense }: Props) {
+function draftEntryView(
+  draft: EntryDraft,
+  options: TezaursFormOptions,
+): TezaursEntryDetails {
+  return {
+    id: 0,
+    heading: draft.heading,
+    humanKey: draft.humanKey,
+    typeId: draft.typeId,
+    type: options.entryTypes.find((type) => type.id === draft.typeId)?.label ?? null,
+    hidden: false,
+    notes: draft.notes,
+    data: {
+      ...draftGrammarData(null, draft.flags),
+      Etymology: draft.etymology,
+      Normative: draft.normativeComment,
+      SciName: draft.scientificName,
+      Source: draft.source,
+    },
+    lexemes: draft.lexemes.map((lexeme, index) => {
+      const paradigm = options.paradigms.find((item) => item.id === lexeme.paradigmId)
+      return {
+        id: index,
+        lemma: lexeme.lemma,
+        roleId: lexeme.roleId,
+        role: options.lexemeRoles.find((item) => item.id === lexeme.roleId)?.label ?? null,
+        paradigmId: lexeme.paradigmId,
+        paradigmLegacyNo: paradigm?.legacyNo ?? null,
+        paradigmCode: paradigm?.code ?? null,
+        paradigm: paradigm?.label ?? null,
+        paradigmData: paradigm?.data ?? null,
+        stem1: lexeme.stem1,
+        stem2: lexeme.stem2,
+        stem3: lexeme.stem3,
+        hidden: false,
+        data: { ...draftGrammarData(null, lexeme.flags, lexeme.structuralRestrictions),
+          Pronunciations: lexeme.pronunciations },
+        extras: null,
+      }
+    }),
+    senses: [],
+    examples: [],
+    sources: [],
+  }
+}
+
+export function EntryDraftForm({ reviewId, onReviewUpdated, children, footer, editable, onAddSense, defaultOpen }: Props) {
   const [draft, setDraft] = useState<EntryDraft | null>(null)
   const [options, setOptions] = useState<TezaursFormOptions | null>(null)
   const [lexemes, setLexemes] = useState<LexemeDraft[]>([])
@@ -77,30 +126,49 @@ export function EntryDraftForm({ reviewId, onReviewUpdated, children, editable, 
   const [deletingLexemeIndex, setDeletingLexemeIndex] = useState<number | null>(null)
 
   useEffect(() => {
-    let active = true
+    let requestIsOutdated = false
 
-    Promise.all([getEntryDraft(reviewId), getTezaursFormOptions()])
-      .then(async ([loadedDraft, loadedOptions]) => {
-        if (!active) return
-        if (!loadedDraft && editable) loadedDraft = (await createEntryDraft(reviewId)).draft
-        if (!loadedDraft) throw new Error('Šķirkļa melnraksts nav pieejams.')
-        if (!active) return
+    async function loadDraftForm() {
+      try {
+        const [savedDraft, loadedOptions] = await Promise.all([
+          getEntryDraft(reviewId),
+          getTezaursFormOptions(),
+        ])
+        if (requestIsOutdated) {
+          return
+        }
+
+        let loadedDraft = savedDraft
+        if (!loadedDraft && editable) {
+          const response = await createEntryDraft(reviewId)
+          loadedDraft = response.draft
+        }
+        if (!loadedDraft) {
+          throw new Error('Šķirkļa melnraksts nav pieejams.')
+        }
+        if (requestIsOutdated) {
+          return
+        }
+
         setOptions(loadedOptions)
         setDraft(loadedDraft)
         setLexemes(loadedDraft.lexemes)
         setEntryFlags(loadedDraft.flags)
-      })
-      .catch((cause) => {
-        if (active) {
+      } catch (cause) {
+        if (!requestIsOutdated) {
           setError(cause instanceof Error ? cause.message : 'Neizdevās ielādēt šķirkļa formu.')
         }
-      })
-      .finally(() => {
-        if (active) setLoading(false)
-      })
+      } finally {
+        if (!requestIsOutdated) {
+          setLoading(false)
+        }
+      }
+    }
+
+    loadDraftForm()
 
     return () => {
-      active = false
+      requestIsOutdated = true
     }
   }, [reviewId, editable])
 
@@ -117,14 +185,23 @@ export function EntryDraftForm({ reviewId, onReviewUpdated, children, editable, 
     setSavingLexemeIndex(index)
     setError('')
     try {
-      const response = lexeme.id
-        ? await updateLexemeDraft(reviewId, lexeme.id, lexemeRequest(lexeme))
-        : await createLexemeDraft(reviewId, lexemeRequest(lexeme))
+      const request = lexemeRequest(lexeme)
+      let response
+      if (lexeme.id) {
+        response = await updateLexemeDraft(reviewId, lexeme.id, request)
+      } else {
+        response = await createLexemeDraft(reviewId, request)
+      }
       replaceLexeme(index, response.lexeme)
-      setDraft((current) => current && ({
-        ...current,
-        lexemes: lexemes.map((item, itemIndex) => itemIndex === index ? response.lexeme : item),
-      }))
+      setDraft((currentDraft) => {
+        if (!currentDraft) {
+          return currentDraft
+        }
+        const savedLexemes = lexemes.map((item, itemIndex) => {
+          return itemIndex === index ? response.lexeme : item
+        })
+        return { ...currentDraft, lexemes: savedLexemes }
+      })
       setEditingLexemeIndex(null)
       onReviewUpdated(response.review)
     } catch (cause) {
@@ -136,7 +213,9 @@ export function EntryDraftForm({ reviewId, onReviewUpdated, children, editable, 
 
   async function selectPrimary(lexemeId: string) {
     const index = lexemes.findIndex((lexeme) => lexeme.id === lexemeId)
-    if (index < 0 || lexemes[index].primary) return
+    if (index < 0 || lexemes[index].primary) {
+      return
+    }
 
     const previousLexemes = lexemes
     const selectedLexeme = { ...lexemes[index], primary: true }
@@ -153,13 +232,16 @@ export function EntryDraftForm({ reviewId, onReviewUpdated, children, editable, 
         lexemeRequest(selectedLexeme),
       )
       replaceLexeme(index, response.lexeme)
-      setDraft((current) => current && ({
-        ...current,
-        lexemes: lexemes.map((item, itemIndex) => ({
+      setDraft((currentDraft) => {
+        if (!currentDraft) {
+          return currentDraft
+        }
+        const savedLexemes = lexemes.map((item, itemIndex) => ({
           ...item,
           primary: itemIndex === index,
-        })),
-      }))
+        }))
+        return { ...currentDraft, lexemes: savedLexemes }
+      })
       onReviewUpdated(response.review)
     } catch (cause) {
       setLexemes(previousLexemes)
@@ -171,17 +253,22 @@ export function EntryDraftForm({ reviewId, onReviewUpdated, children, editable, 
 
   async function removeLexeme(index: number) {
     const lexeme = lexemes[index]
-    if (!lexeme.id) return false
+    if (!lexeme.id) {
+      return false
+    }
 
     setSavingLexemeIndex(index)
     setError('')
     try {
       const review = await deleteLexemeDraft(reviewId, lexeme.id)
       setLexemes((current) => current.filter((_, itemIndex) => itemIndex !== index))
-      setDraft((current) => current && ({
-        ...current,
-        lexemes: current.lexemes.filter((item) => item.id !== lexeme.id),
-      }))
+      setDraft((currentDraft) => {
+        if (!currentDraft) {
+          return currentDraft
+        }
+        const remainingLexemes = currentDraft.lexemes.filter((item) => item.id !== lexeme.id)
+        return { ...currentDraft, lexemes: remainingLexemes }
+      })
       setEditingLexemeIndex(null)
       onReviewUpdated(review)
       return true
@@ -203,7 +290,9 @@ export function EntryDraftForm({ reviewId, onReviewUpdated, children, editable, 
     const lexeme = lexemes[index]
     if (lexeme.id) {
       const savedLexeme = draft?.lexemes.find((item) => item.id === lexeme.id)
-      if (savedLexeme) replaceLexeme(index, savedLexeme)
+      if (savedLexeme) {
+        replaceLexeme(index, savedLexeme)
+      }
     } else {
       setLexemes((current) => current.filter((_, itemIndex) => itemIndex !== index))
     }
@@ -243,41 +332,80 @@ export function EntryDraftForm({ reviewId, onReviewUpdated, children, editable, 
     }
   }
 
-  if (loading) return <p className="muted">Ielādē šķirkļa formu...</p>
-  if (!options || !draft) return <p className="error">{error || 'Šķirkļa forma nav pieejama.'}</p>
+  function openEntryEditor() {
+    setError('')
+    setEditingEntry(true)
+  }
+
+  function openLexemeEditor(index: number) {
+    setError('')
+    setEditingLexemeIndex(index)
+  }
+
+  function addLexeme() {
+    if (!options) {
+      return
+    }
+    setError('')
+    setEditingLexemeIndex(lexemes.length)
+    const defaultRoleId = options.lexemeRoles[0]?.id ?? 1
+    const addedLexeme = newLexeme('', defaultRoleId, false)
+    setLexemes((currentLexemes) => [...currentLexemes, addedLexeme])
+  }
+
+  function requestLexemeDeletion(index: number) {
+    setError('')
+    setDeletingLexemeIndex(index)
+  }
+
+  async function confirmLexemeDeletion() {
+    if (deletingLexemeIndex === null) {
+      return
+    }
+    const removed = await removeLexeme(deletingLexemeIndex)
+    if (removed) {
+      setDeletingLexemeIndex(null)
+    }
+  }
+
+  function cancelLexemeDeletion() {
+    setDeletingLexemeIndex(null)
+    setError('')
+  }
+
+  if (loading) {
+    return <p className="muted">Ielādē šķirkļa formu...</p>
+  }
+  if (!options || !draft) {
+    return <p className="error">{error || 'Šķirkļa forma nav pieejama.'}</p>
+  }
 
   const entryTypeId = draft.typeId
   const savedLexemes = lexemes.filter((lexeme) => lexeme.id !== null)
   const primaryLexemeId = savedLexemes.find((lexeme) => lexeme.primary)?.id ?? ''
 
   return (
-    <details open className="entry-draft-section existing-entry">
-      <summary><strong>3. Jauna šķirkļa melnraksts</strong></summary>
+    <details open={defaultOpen} className="entry-draft-section existing-entry">
+      <summary><strong>4. Jauna šķirkļa melnraksts</strong></summary>
 
       <EntryDisplay entry={draftEntryView(draft, options)}
-        onEditEntry={editable ? () => { setError(''); setEditingEntry(true) } : undefined}
-        onEditLexeme={editable ? (index) => { setError(''); setEditingLexemeIndex(index) } : undefined}
-        onAddLexeme={editable ? () => {
-          setError('')
-          setEditingLexemeIndex(lexemes.length)
-          setLexemes((current) => [...current, newLexeme('', options.lexemeRoles[0]?.id ?? 1, false)])
-        } : undefined}
+        onEditEntry={editable ? openEntryEditor : undefined}
+        onEditLexeme={editable ? openLexemeEditor : undefined}
+        onAddLexeme={editable ? addLexeme : undefined}
         onAddSense={onAddSense}
-        onDeleteLexeme={editable ? (index) => {
-          setError('')
-          setDeletingLexemeIndex(index)
-        } : undefined}
+        onDeleteLexeme={editable ? requestLexemeDeletion : undefined}
         canDeleteLexeme={(index) => draft.lexemes.length > 1 && !draft.lexemes[index].primary}
         lexemeControls={editable && savedLexemes.length > 1 && (
           <label>Galvenā leksēma
             <select value={primaryLexemeId} disabled={savingLexemeIndex !== null}
-              onChange={(event) => void selectPrimary(event.target.value)}>
+              onChange={(event) => selectPrimary(event.target.value)}>
               {savedLexemes.map((lexeme) => <option key={lexeme.id} value={lexeme.id ?? ''}>{lexeme.lemma}</option>)}
             </select>
           </label>
         )}>
         {children}
       </EntryDisplay>
+      {footer}
 
       {editingEntry && (
         <EditDialog title="Labot šķirkli" busy={saving} error={error}
@@ -320,7 +448,7 @@ export function EntryDraftForm({ reviewId, onReviewUpdated, children, editable, 
               <EditDialog title={lexeme.id ? 'Labot leksēmu' : 'Pievienot leksēmu'}
                 busy={savingLexemeIndex !== null} error={error}
                 onCancel={() => cancelLexemeEdit(index)} onSubmit={() => {
-                  void saveLexeme(index)
+                  saveLexeme(index)
                 }}>
                 <label>
                   Pamatforma
@@ -410,7 +538,7 @@ export function EntryDraftForm({ reviewId, onReviewUpdated, children, editable, 
                       pronunciations: event.target.value
                         .split('|')
                         .map((item) => item.trim())
-                        .filter(Boolean),
+                        .filter((value) => value !== ''),
                     })}
                     value={lexeme.pronunciations.join(' | ')}
                   />
@@ -440,10 +568,8 @@ export function EntryDraftForm({ reviewId, onReviewUpdated, children, editable, 
         <ConfirmationDialog
           message={`Dzēst leksēmu “${lexemes[deletingLexemeIndex]?.lemma}” no melnraksta?`}
           busy={savingLexemeIndex !== null} error={error}
-          onConfirm={async () => {
-            if (await removeLexeme(deletingLexemeIndex)) setDeletingLexemeIndex(null)
-          }}
-          onCancel={() => { setDeletingLexemeIndex(null); setError('') }}
+          onConfirm={confirmLexemeDeletion}
+          onCancel={cancelLexemeDeletion}
         />
       )}
       {error && !editingEntry && editingLexemeIndex === null && deletingLexemeIndex === null && <p className="error">{error}</p>}

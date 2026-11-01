@@ -4,6 +4,7 @@ import type {
   Review,
   ReviewListItem,
   QueuePage,
+  QueueItem,
   SaveSenseDraft,
   SenseDraft,
   SuggestionPage,
@@ -16,6 +17,11 @@ import type {
   TezaursEntryDetails,
   TezaursFormOptions,
   TezaursStatus,
+  UsageDecision,
+  UsageEvidence,
+  SaveUsageEvidence,
+  CorpusSearchResult,
+  CorpusOption,
 } from './types'
 
 async function request(path: string, options?: RequestInit): Promise<Response> {
@@ -32,6 +38,10 @@ async function request(path: string, options?: RequestInit): Promise<Response> {
       throw new Error('Ieraksts netika atrasts.')
     }
     if (response.status === 409) {
+      const error = await response.json().catch(() => null)
+      if (typeof error?.message === 'string' && error.message.trim()) {
+        throw new Error(error.message)
+      }
       throw new Error('Darbību nevar izpildīt pašreizējā stāvoklī.')
     }
     throw new Error('Pieprasījumu neizdevās izpildīt.')
@@ -85,11 +95,11 @@ export async function getQueueItems(
     const result = await getSuggestions(query, page, size, sort)
     return {
       ...result,
-      items: result.items.map((item) => ({
+      items: result.items.map((item): QueueItem => ({
         ...item,
-        itemType: 'SUGGESTION' as const,
-        status: 'NEW' as const,
-        sourceCount: 1 as const,
+        itemType: 'SUGGESTION',
+        status: 'NEW',
+        sourceCount: 1,
       })),
     }
   }
@@ -97,7 +107,7 @@ export async function getQueueItems(
   const result = await getReviews(status, query, page, size, sort)
   return {
     ...result,
-    items: result.items.map((item) => ({ ...item, itemType: 'REVIEW' as const })),
+    items: result.items.map((item): QueueItem => ({ ...item, itemType: 'REVIEW' })),
   }
 }
 
@@ -134,9 +144,11 @@ export async function getDuplicateReviewCandidates(
   query: string,
   excludedCaseId?: string,
 ): Promise<DuplicateReviewCandidate[]> {
-  const response = await request(
-    `/api/reviews/duplicate-candidates?query=${encodeURIComponent(query)}${excludedCaseId ? `&excludedCaseId=${excludedCaseId}` : ''}`,
-  )
+  const parameters = new URLSearchParams({ query })
+  if (excludedCaseId) {
+    parameters.set('excludedCaseId', excludedCaseId)
+  }
+  const response = await request(`/api/reviews/duplicate-candidates?${parameters}`)
   return response.json()
 }
 
@@ -187,7 +199,9 @@ export async function getTezaursCandidates(
 
 export async function getEntryDraft(reviewId: string): Promise<EntryDraft | null> {
   const response = await request(`/api/reviews/${reviewId}/entry-draft`)
-  if (response.status === 204) return null
+  if (response.status === 204) {
+    return null
+  }
   return response.json()
 }
 
@@ -278,5 +292,41 @@ export async function saveSenseDrafts(
     `/api/reviews/${reviewId}/sense-drafts`,
     { method: 'PUT', body: JSON.stringify({ senses: requestSenses }) },
   )
+  return response.json()
+}
+
+export async function getUsageEvidence(reviewId: string): Promise<UsageEvidence[]> {
+  const response = await request(`/api/reviews/${reviewId}/usage/evidence`)
+  return response.json()
+}
+
+export async function saveUsageEvidence(reviewId: string, evidence: SaveUsageEvidence): Promise<UsageEvidence> {
+  const response = await request(`/api/reviews/${reviewId}/usage/evidence`, {
+    method: 'POST', body: JSON.stringify(evidence),
+  })
+  return response.json()
+}
+
+export async function deleteUsageEvidence(reviewId: string, evidenceId: string): Promise<void> {
+  await request(`/api/reviews/${reviewId}/usage/evidence/${evidenceId}`, { method: 'DELETE' })
+}
+
+export async function saveUsageDecision(reviewId: string, decision: UsageDecision): Promise<Review> {
+  const response = await request(`/api/reviews/${reviewId}/usage/decision`, {
+    method: 'POST', body: JSON.stringify({ decision }),
+  })
+  return response.json()
+}
+
+export async function searchCorpus(
+  reviewId: string, query: string, corpus: string, page: number,
+): Promise<CorpusSearchResult> {
+  const parameters = new URLSearchParams({ query, corpus, page: String(page) })
+  const response = await request(`/api/reviews/${reviewId}/usage/search?${parameters}`)
+  return response.json()
+}
+
+export async function getCorpora(): Promise<CorpusOption[]> {
+  const response = await request('/api/corpora')
   return response.json()
 }

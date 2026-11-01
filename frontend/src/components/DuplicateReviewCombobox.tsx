@@ -1,7 +1,7 @@
-import { useEffect, useState, type ChangeEvent, type FocusEvent } from 'react'
-import { getDuplicateReviewCandidates } from '../api'
-import { suggestionStatusLabels } from '../labels'
-import type { DuplicateReviewCandidate, Review } from '../types'
+import { useEffect, useState, type ChangeEvent, type FocusEvent, type KeyboardEvent } from 'react'
+import { getDuplicateReviewCandidates } from '../api/client'
+import { suggestionStatusLabels } from '../review/statuses'
+import type { DuplicateReviewCandidate, Review } from '../api/types'
 import { ConfirmationDialog } from './ConfirmationDialog'
 
 type Props = {
@@ -9,10 +9,11 @@ type Props = {
   initialQuery: string
   onSelect: (reviewId: string) => Promise<void>
   onCreate: () => Promise<boolean>
-  selectedCase?: Review | null
+  currentCase?: Review | null
 }
 
-export function DuplicateReviewCombobox({ excludedCaseId, initialQuery, onSelect, onCreate, selectedCase }: Props) {
+export function DuplicateReviewCombobox({ excludedCaseId, initialQuery, onSelect, onCreate, currentCase }: Props) {
+  const caseChosen = currentCase !== null && currentCase !== undefined && currentCase.status !== 'READY_FOR_REVIEW'
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [candidates, setCandidates] = useState<DuplicateReviewCandidate[]>([])
@@ -24,26 +25,34 @@ export function DuplicateReviewCombobox({ excludedCaseId, initialQuery, onSelect
 
   useEffect(() => {
     const term = query.trim()
-    if (!open || term.length < 2) return
+    if (!open || term.length < 2) {
+      return
+    }
 
-    let active = true
-    const timeout = window.setTimeout(async () => {
+    let requestIsOutdated = false
+    async function searchDuplicateCases() {
       try {
         const loaded = await getDuplicateReviewCandidates(term, excludedCaseId)
-        if (active) setCandidates(loaded)
+        if (!requestIsOutdated) {
+          setCandidates(loaded)
+        }
       } catch (cause) {
-        if (active) {
+        if (!requestIsOutdated) {
           setError(cause instanceof Error
             ? cause.message
             : 'Neizdevās meklēt dublikātus.')
         }
       } finally {
-        if (active) setSearching(false)
+        if (!requestIsOutdated) {
+          setSearching(false)
+        }
       }
-    }, 300)
+    }
+
+    const timeout = window.setTimeout(searchDuplicateCases, 300)
 
     return () => {
-      active = false
+      requestIsOutdated = true
       window.clearTimeout(timeout)
     }
   }, [open, query, excludedCaseId])
@@ -61,8 +70,37 @@ export function DuplicateReviewCombobox({ excludedCaseId, initialQuery, onSelect
     setSearching(false)
   }
 
+  function toggleDropdown() {
+    if (open) {
+      closeDropdown()
+    } else {
+      openDropdown()
+    }
+  }
+
+  function closeOnEscape(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key === 'Escape') {
+      closeDropdown()
+    }
+  }
+
+  function chooseNewCase() {
+    closeDropdown()
+    setError('')
+    if (currentCase?.status !== 'IN_PROGRESS') {
+      setCreating(true)
+    }
+  }
+
+  function cancelConfirmation() {
+    setConfirmation(null)
+    setCreating(false)
+  }
+
   function closeOnBlur(event: FocusEvent<HTMLDivElement>) {
-    if (!event.currentTarget.contains(event.relatedTarget)) closeDropdown()
+    if (!event.currentTarget.contains(event.relatedTarget)) {
+      closeDropdown()
+    }
   }
 
   function changeQuery(event: ChangeEvent<HTMLInputElement>) {
@@ -80,12 +118,15 @@ export function DuplicateReviewCombobox({ excludedCaseId, initialQuery, onSelect
   }
 
   async function confirmDuplicate() {
-    if ((!confirmation && !creating) || saving) return
+    if ((!confirmation && !creating) || saving) {
+      return
+    }
     setSaving(true)
     setError('')
     try {
       if (creating) {
-        if (!await onCreate()) {
+        const created = await onCreate()
+        if (!created) {
           setError('Neizdevās izveidot izskatīšanu. Mēģiniet vēlreiz.')
           return
         }
@@ -105,13 +146,13 @@ export function DuplicateReviewCombobox({ excludedCaseId, initialQuery, onSelect
 
   const term = query.trim()
   const visibleCandidates = candidates.filter(
-    (candidate) => candidate.id !== excludedCaseId && candidate.id !== selectedCase?.id,
+    (candidate) => candidate.id !== excludedCaseId && candidate.id !== currentCase?.id,
   )
-  let confirmationMessage = 'Ieteikumam tiks izveidota jauna izskatīšana ar statusu “Apstrādē”.'
+  let confirmationMessage = 'Izskatīšana pāries statusā “Apstrādē”.'
   if (confirmation) {
     confirmationMessage = `Ieteikums tiks pievienots izskatīšanai “${confirmation.reviewedTerm}” kā dublikāts. Mērķa izskatīšana paliks statusā “${suggestionStatusLabels[confirmation.status]}”.`
-    if (selectedCase) {
-      confirmationMessage = `Visi šīs izskatīšanas ieteikumi tiks pievienoti izskatīšanai “${confirmation.reviewedTerm}”. Mērķa izskatīšanas dati un statuss “${suggestionStatusLabels[confirmation.status]}” paliks nemainīti. Pašreizējā izskatīšana un visi tās melnraksti tiks neatgriezeniski dzēsti; atšķirīgā informācija netiks apvienota.`
+    if (currentCase) {
+      confirmationMessage = `Visi šīs izskatīšanas ieteikumi tiks pievienoti izskatīšanai “${confirmation.reviewedTerm}”. Mērķa izskatīšanas dati un statuss “${suggestionStatusLabels[confirmation.status]}” paliks nemainīti. Pašreizējā izskatīšana, tās atradumi un melnraksti tiks neatgriezeniski dzēsti; atšķirīgā informācija netiks apvienota.`
     }
   }
 
@@ -119,20 +160,18 @@ export function DuplicateReviewCombobox({ excludedCaseId, initialQuery, onSelect
     <div
       className="tezaurs-dropdown duplicate-review-dropdown"
       onBlur={closeOnBlur}
-      onKeyDown={(event) => {
-        if (event.key === 'Escape') closeDropdown()
-      }}
+      onKeyDown={closeOnEscape}
     >
       <div className="tezaurs-dropdown-control">
         <button
           aria-expanded={open}
           className="tezaurs-dropdown-toggle"
           disabled={saving}
-          onClick={() => open ? closeDropdown() : openDropdown()}
+          onClick={toggleDropdown}
           type="button"
         >
           <span className="tezaurs-option-label">
-            {selectedCase ? 'Jauna izskatīšana' : 'Izvēlieties izskatīšanu...'}
+            {caseChosen ? 'Jauna izskatīšana' : 'Izvēlieties izskatīšanu...'}
           </span>
           <span aria-hidden="true">▾</span>
         </button>
@@ -164,11 +203,7 @@ export function DuplicateReviewCombobox({ excludedCaseId, initialQuery, onSelect
                   </span>
                 </button>
               ))}
-            <button type="button" onClick={() => {
-              closeDropdown()
-              setError('')
-              if (!selectedCase) setCreating(true)
-            }}>Jauna izskatīšana</button>
+            <button type="button" onClick={chooseNewCase}>Jauna izskatīšana</button>
           </div>
         </div>
       )}
@@ -177,11 +212,8 @@ export function DuplicateReviewCombobox({ excludedCaseId, initialQuery, onSelect
           message={confirmationMessage}
           busy={saving}
           error={error}
-          onConfirm={() => void confirmDuplicate()}
-          onCancel={() => {
-            setConfirmation(null)
-            setCreating(false)
-          }}
+          onConfirm={() => confirmDuplicate()}
+          onCancel={cancelConfirmation}
         />
       )}
     </div>

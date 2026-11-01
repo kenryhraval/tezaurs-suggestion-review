@@ -14,7 +14,6 @@ import java.util.Optional;
 import java.util.UUID;
 import lv.tezaurs.suggestions.common.error.ConflictException;
 import lv.tezaurs.suggestions.common.error.NotFoundException;
-import lv.tezaurs.suggestions.entry.service.EntryDraftService;
 import lv.tezaurs.suggestions.entry.repository.ReviewEntryRepository;
 import lv.tezaurs.suggestions.entry.repository.ReviewLexemeRepository;
 import lv.tezaurs.suggestions.sense.repository.ReviewSenseRepository;
@@ -48,7 +47,6 @@ class ReviewServiceTest {
     private CaseSuggestionRepository reviewSourceRepository;
     private TezaursEntryRepository tezaursEntryRepository;
     private TezaursEntrySearchService tezaursEntrySearchService;
-    private EntryDraftService entryDraftService;
     private ReviewCompletionService completionService;
     private ReviewSenseRepository senseRepository;
     private ReviewService service;
@@ -61,12 +59,11 @@ class ReviewServiceTest {
                 withSettings().mockMaker(MockMakers.PROXY));
         tezaursEntryRepository = mock(TezaursEntryRepository.class);
         tezaursEntrySearchService = mock(TezaursEntrySearchService.class);
-        entryDraftService = mock(EntryDraftService.class);
         senseRepository = mock(ReviewSenseRepository.class);
         completionService = new ReviewCompletionService(mock(ReviewEntryRepository.class),
                 mock(ReviewLexemeRepository.class), senseRepository);
         service = new ReviewService(completionService, reviewRepository, reviewSourceRepository,
-                tezaursEntryRepository, tezaursEntrySearchService, entryDraftService);
+                tezaursEntryRepository, tezaursEntrySearchService);
         when(reviewRepository.save(any(ReviewCase.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
         when(reviewSourceRepository.save(any(CaseSuggestion.class)))
@@ -205,6 +202,7 @@ class ReviewServiceTest {
         new CaseSuggestion(new IncubatorSuggestion(44, "target", "definition"), target);
         preliminary.changeStatus(SuggestionStatus.IN_PROGRESS);
         preliminary.recordTezaursCheck(TezaursStatus.NOT_FOUND, null);
+        preliminary.recordUsageDecision(lv.tezaurs.suggestions.usage.entity.UsageDecision.USED, null, null);
         when(reviewSourceRepository.findById(source.getId())).thenReturn(Optional.of(link));
         when(reviewRepository.findById(target.getId())).thenReturn(Optional.of(target));
 
@@ -305,7 +303,6 @@ class ReviewServiceTest {
         service.recordTezaursCheck(review.getId(),
                 new RecordTezaursCheckRequest(TezaursStatus.NOT_FOUND, null));
 
-        verify(entryDraftService).create(review.getId());
         assertThat(review.getTezaursStatus()).isEqualTo(TezaursStatus.NOT_FOUND);
     }
 
@@ -339,7 +336,6 @@ class ReviewServiceTest {
         assertThat(result.status()).isEqualTo(SuggestionStatus.IN_PROGRESS);
         assertThat(result.tezaursStatus()).isEqualTo(TezaursStatus.MEANING_NOT_FOUND);
         assertThat(result.matchedEntryId()).isEqualTo(42);
-        verify(entryDraftService, never()).create(any());
     }
 
     @Test
@@ -354,7 +350,6 @@ class ReviewServiceTest {
         assertThat(result.status()).isEqualTo(SuggestionStatus.IN_PROGRESS);
         assertThat(result.tezaursStatus()).isEqualTo(TezaursStatus.NOT_FOUND);
         assertThat(result.matchedEntryId()).isNull();
-        verify(entryDraftService).create(review.getId());
     }
 
     @Test
@@ -387,7 +382,6 @@ class ReviewServiceTest {
                 new RecordTezaursCheckRequest(TezaursStatus.MEANING_NEEDS_EDITING, 42));
         assertThat(response.status()).isEqualTo(SuggestionStatus.IN_PROGRESS);
         assertThat(response.tezaursStatus()).isEqualTo(TezaursStatus.MEANING_NEEDS_EDITING);
-        verify(entryDraftService, never()).create(any());
     }
 
     private static ReviewCase inProgressReview() {

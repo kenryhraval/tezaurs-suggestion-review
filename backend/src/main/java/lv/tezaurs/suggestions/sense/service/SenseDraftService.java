@@ -50,6 +50,9 @@ public class SenseDraftService {
         if (reviewCase.getStatus() != SuggestionStatus.IN_PROGRESS) {
             throw new ConflictException("Sense drafts can only be edited while the case is in progress");
         }
+        if (reviewCase.getTezaursStatus() == TezaursStatus.NOT_FOUND && !reviewCase.canEditEntryDraft()) {
+            throw new ConflictException("Confirm word usage before editing a new entry's senses");
+        }
         if (reviewCase.getTezaursStatus() != TezaursStatus.NOT_FOUND
                 && reviewCase.getTezaursStatus() != TezaursStatus.MEANING_NOT_FOUND
                 && reviewCase.getTezaursStatus() != TezaursStatus.MEANING_NEEDS_EDITING) {

@@ -38,6 +38,7 @@ class ReviewCompletionServiceTest {
     void readsNewEntryAndPrimaryLexemesFromActualDrafts() {
         ReviewCase review = review();
         review.recordTezaursCheck(TezaursStatus.NOT_FOUND, null);
+        review.recordUsageDecision(lv.tezaurs.suggestions.usage.entity.UsageDecision.USED, null, null);
         assertBlocked(review, CompletionBlockReason.ENTRY_DRAFT_REQUIRED);
         ReviewEntry entry = new ReviewEntry(review.getId());
         when(entries.findByCaseId(review.getId())).thenReturn(Optional.of(entry));

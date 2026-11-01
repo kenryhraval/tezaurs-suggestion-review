@@ -4,10 +4,10 @@ import {
   changeSuggestionStatus,
   getQueueItems,
   linkDuplicateSuggestion,
-} from '../api'
+} from '../api/client'
 import { SuggestionDetails } from '../components/SuggestionDetails'
 import { SuggestionList } from '../components/SuggestionList'
-import type { QueueItem, Review, SuggestionSort, SuggestionStatus } from '../types'
+import type { QueueItem, Review, SuggestionSort, SuggestionStatus } from '../api/types'
 
 const PAGE_SIZE = 20
 
@@ -38,12 +38,14 @@ export function ReviewPage() {
   const [selected, setSelected] = useState<QueueItem | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [reload, setReload] = useState(0)
+  const [reloadCount, setReloadCount] = useState(0)
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
       const nextQuery = search.trim()
-      if (nextQuery === query) return
+      if (nextQuery === query) {
+        return
+      }
       setLoading(true)
       setSelected(null)
       setPage(0)
@@ -53,11 +55,15 @@ export function ReviewPage() {
   }, [search, query])
 
   useEffect(() => {
-    let active = true
+    let requestIsOutdated = false
 
-    getQueueItems(status, query, page, PAGE_SIZE, sort)
-      .then((result) => {
-        if (!active) return
+    async function loadQueue() {
+      try {
+        const result = await getQueueItems(status, query, page, PAGE_SIZE, sort)
+        if (requestIsOutdated) {
+          return
+        }
+
         if (result.totalPages > 0 && page >= result.totalPages) {
           setPage(result.totalPages - 1)
           return
@@ -66,33 +72,40 @@ export function ReviewPage() {
         setTotalPages(result.totalPages)
         setTotalItems(result.totalItems)
         setSelected((current) => {
-          if (current && current.status !== status) return current
-          return result.items.find((item) => current && itemKey(item) === itemKey(current))
-            ?? result.items[0]
-            ?? null
+          const selectedReviewMovedToAnotherStatus = current && current.status !== status
+          if (selectedReviewMovedToAnotherStatus) {
+            return current
+          }
+          const previousSelection = result.items.find((item) => current && itemKey(item) === itemKey(current))
+          return previousSelection ?? result.items[0] ?? null
         })
         setError('')
-      })
-      .catch((cause) => {
-        if (active) {
+      } catch (cause) {
+        if (!requestIsOutdated) {
           setError(cause instanceof Error ? cause.message : 'Neizdevās ielādēt ieteikumus.')
         }
-      })
-      .finally(() => {
-        if (active) setLoading(false)
-      })
+      } finally {
+        if (!requestIsOutdated) {
+          setLoading(false)
+        }
+      }
+    }
+
+    loadQueue()
 
     return () => {
-      active = false
+      requestIsOutdated = true
     }
-  }, [status, query, page, sort, reload])
+  }, [status, query, page, sort, reloadCount])
 
   function changeFilterStatus(nextStatus: SuggestionStatus) {
     setLoading(true)
     setSelected(null)
     setStatus(nextStatus)
     setPage(0)
-    if (nextStatus === 'NEW' && sort === 'MOST_SUGGESTIONS') setSort('NEWEST')
+    if (nextStatus === 'NEW' && sort === 'MOST_SUGGESTIONS') {
+      setSort('NEWEST')
+    }
   }
 
   function changeSort(nextSort: SuggestionSort) {
@@ -118,7 +131,7 @@ export function ReviewPage() {
       setTotalItems((count) => Math.max(0, count - 1))
     }
     setSelected(keepOpen ?? next)
-    setReload((value) => value + 1)
+    setReloadCount((value) => value + 1)
   }
 
   async function changeStatus(
@@ -128,15 +141,18 @@ export function ReviewPage() {
   ): Promise<Review | null> {
     setError('')
     try {
-      const review = item.itemType === 'SUGGESTION'
-        ? await changeSuggestionStatus(item.id, nextStatus)
-        : await changeReviewStatus(item.id, nextStatus)
+      let review: Review
+      if (item.itemType === 'SUGGESTION') {
+        review = await changeSuggestionStatus(item.id, nextStatus)
+      } else {
+        review = await changeReviewStatus(item.id, nextStatus)
+      }
       const updated = itemFromReview(review)
       removeItem(item, keepOpen ? updated : undefined)
       return review
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Neizdevās mainīt statusu.')
-      return null
+      throw cause
     }
   }
 
@@ -144,9 +160,13 @@ export function ReviewPage() {
     setError('')
     try {
       const target = await linkDuplicateSuggestion(id, reviewId)
-      const source = selected?.itemType === 'REVIEW'
-        ? selected : items.find((item) => item.itemType === 'SUGGESTION' && item.id === id)
-      if (source) removeItem(source, itemFromReview(target))
+      let source = items.find((item) => item.itemType === 'SUGGESTION' && item.id === id)
+      if (selected?.itemType === 'REVIEW') {
+        source = selected
+      }
+      if (source) {
+        removeItem(source, itemFromReview(target))
+      }
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : 'Neizdevās piesaistīt dublikātu.'
       setError(message)
@@ -161,8 +181,13 @@ export function ReviewPage() {
       const updated = itemFromReview(review)
       setItems((current) => current.map((item) => itemKey(item) === itemKey(updated) ? updated : item))
       setSelected(updated)
-      setReload((value) => value + 1)
+      setReloadCount((value) => value + 1)
     }
+  }
+
+  function selectItem(key: string) {
+    const selectedItem = items.find((item) => itemKey(item) === key)
+    setSelected(selectedItem ?? null)
   }
 
   return (
@@ -184,9 +209,7 @@ export function ReviewPage() {
           page={page}
           totalPages={totalPages}
           totalItems={totalItems}
-          onSelect={(key) => setSelected(
-            items.find((item) => itemKey(item) === key) ?? null,
-          )}
+          onSelect={selectItem}
           onFilterStatusChange={changeFilterStatus}
           onSortChange={changeSort}
           onSearchChange={setSearch}

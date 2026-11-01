@@ -7,6 +7,11 @@ Feature: Editing drafts
       {"status":"NOT_FOUND"}
       """
     Then the response status is 200
+    When I POST "/api/reviews/{caseId}/usage/decision" with:
+      """
+      {"decision":"USED","note":"Valodniekam zināms vārds."}
+      """
+    Then the response status is 200
     When I request "/api/reviews/{caseId}/entry-draft"
     Then the response status is 200
     And the response field "/heading" equals "jaunvārds"
@@ -118,6 +123,11 @@ Feature: Editing drafts
       {"status":"NOT_FOUND"}
       """
     Then the response status is 200
+    When I POST "/api/reviews/{caseId}/usage/decision" with:
+      """
+      {"decision":"USED","note":"Valodniekam zināms vārds."}
+      """
+    Then the response status is 200
     When I PUT "/api/reviews/{caseId}/sense-drafts" with:
       """
       {"senses":[{"gloss":"Jaunā šķirkļa nozīme.","flags":{}}]}
@@ -136,6 +146,11 @@ Feature: Editing drafts
     When I POST "/api/reviews/{caseId}/tezaurs-check" with:
       """
       {"status":"NOT_FOUND"}
+      """
+    Then the response status is 200
+    When I POST "/api/reviews/{caseId}/usage/decision" with:
+      """
+      {"decision":"USED","note":"Valodniekam zināms vārds."}
       """
     Then the response status is 200
     When I request "/api/reviews/{caseId}/sense-drafts"

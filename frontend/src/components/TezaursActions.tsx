@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useId, useRef, useState } from 'react'
-import { tezaursEntryUrl } from '../tezaurs'
+import { tezaursEntryUrl } from '../config/tezaurs'
 import { EditButton } from './EditButton'
 
 type Action = {
@@ -23,9 +23,13 @@ function EntityActions({ kind, label, onEdit, items }: ActionsProps) {
   const menuId = useId()
 
   useEffect(() => {
-    if (!open) return
+    if (!open) {
+      return
+    }
     function closeOutside(event: PointerEvent) {
-      if (!container.current?.contains(event.target as Node)) setOpen(false)
+      if (!container.current?.contains(event.target as Node)) {
+        setOpen(false)
+      }
     }
     document.addEventListener('pointerdown', closeOutside)
     return () => document.removeEventListener('pointerdown', closeOutside)
@@ -34,7 +38,9 @@ function EntityActions({ kind, label, onEdit, items }: ActionsProps) {
   return (
     <span className={`entity-actions entity-actions-${kind}`} ref={container}
       onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false)
+        if (!event.currentTarget.contains(event.relatedTarget)) {
+          setOpen(false)
+        }
       }} onKeyDown={(event) => {
         if (event.key === 'Escape') {
           event.stopPropagation()

@@ -88,6 +88,7 @@ class ReviewCaseTest {
     void closingAsAlreadyExistingStillRequiresAMatchingEntry() {
         ReviewCase review = inProgressReview();
         review.recordTezaursCheck(TezaursStatus.NOT_FOUND, null);
+        review.recordUsageDecision(lv.tezaurs.suggestions.usage.entity.UsageDecision.USED, null, null);
 
         assertThatThrownBy(() -> review.changeStatus(SuggestionStatus.ALREADY_EXISTS))
                 .isInstanceOf(ConflictException.class)
@@ -105,6 +106,39 @@ class ReviewCaseTest {
         assertThatThrownBy(() -> review.recordTezaursCheck(TezaursStatus.FOUND, null))
                 .isInstanceOf(ConflictException.class);
 
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = SuggestionStatus.class, names = {"IN_PROGRESS", "ALREADY_EXISTS"}, mode = EnumSource.Mode.EXCLUDE)
+    void requiresResumingBeforeChangingTheTezaursCheck(SuggestionStatus status) {
+        ReviewCase review = inProgressReview();
+        review.recordTezaursCheck(TezaursStatus.NOT_FOUND, null);
+        if (status == SuggestionStatus.NEW) review = new ReviewCase("submitted");
+        else review.changeStatus(status);
+        ReviewCase paused = review;
+        TezaursStatus previousCheck = paused.getTezaursStatus();
+
+        assertThatThrownBy(() -> paused.recordTezaursCheck(TezaursStatus.MEANING_NOT_FOUND, 42))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("Resume the case in Apstrādē");
+        assertThat(paused.getStatus()).isEqualTo(status);
+        assertThat(paused.getTezaursStatus()).isEqualTo(previousCheck);
+        assertThat(paused.getMatchedEntryId()).isNull();
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = SuggestionStatus.class, names = "IN_PROGRESS", mode = EnumSource.Mode.EXCLUDE)
+    void requiresResumingBeforeChangingTheTitle(SuggestionStatus status) {
+        ReviewCase review = inProgressReview();
+        review.recordTezaursCheck(TezaursStatus.MEANING_NOT_FOUND, 42);
+        if (status == SuggestionStatus.NEW) review = new ReviewCase("submitted");
+        else review.changeStatus(status);
+        ReviewCase paused = review;
+
+        assertThatThrownBy(() -> paused.correctTerm("changed"))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("Resume the case in Apstrādē");
+        assertThat(paused.getReviewedTerm()).isEqualTo("submitted");
     }
 
     private static ReviewCase inProgressReview() {

@@ -1,24 +1,32 @@
 import { useState } from 'react'
-import type { Review, SuggestionStatus } from '../types'
-import { suggestionStatusLabels, suggestionStatusTransitions } from '../labels'
+import type { Review, SuggestionStatus } from '../api/types'
+import { suggestionStatusLabels, suggestionStatusTransitions } from '../review/statuses'
 import { ConfirmationDialog } from './ConfirmationDialog'
 import { DuplicateReviewCombobox } from './DuplicateReviewCombobox'
 
+const intakeChoices: SuggestionStatus[] = ['GARBAGE', 'READY_FOR_REVIEW']
+
 type Props = {
   status: SuggestionStatus
+  defaultOpen: boolean
+  readOnly: boolean
   onStatusChange: (status: SuggestionStatus) => Promise<Review | null>
   review: Review | null
-  needsCaseChoice: boolean
   onDuplicate: (sourceId: number, caseId: string) => Promise<void>
 }
 
-export function SuggestionIntake({ status, onStatusChange, review, needsCaseChoice, onDuplicate }: Props) {
-  const [expanded, setExpanded] = useState(status === 'NEW' || needsCaseChoice)
+export function SuggestionIntake({ status, onStatusChange, review, onDuplicate, defaultOpen, readOnly }: Props) {
+  const [expanded, setExpanded] = useState(defaultOpen)
   const [pendingStatus, setPendingStatus] = useState<SuggestionStatus | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const selectedStatus = status === 'NEW' ? null : status === 'GARBAGE' ? 'GARBAGE' : 'READY_FOR_REVIEW'
-  const caseSelected = review !== null && status !== 'GARBAGE' && !needsCaseChoice
+  let selectedStatus: SuggestionStatus | null = null
+  if (status === 'GARBAGE') {
+    selectedStatus = 'GARBAGE'
+  } else if (status !== 'NEW') {
+    selectedStatus = 'READY_FOR_REVIEW'
+  }
+  const caseSelected = review !== null && status !== 'GARBAGE' && status !== 'READY_FOR_REVIEW'
 
   function choose(nextStatus: SuggestionStatus) {
     if (nextStatus === selectedStatus) {
@@ -29,15 +37,20 @@ export function SuggestionIntake({ status, onStatusChange, review, needsCaseChoi
   }
 
   async function confirm() {
-    if (!pendingStatus || saving) return
+    if (!pendingStatus || saving) {
+      return
+    }
     setSaving(true)
     try {
-      if (!await onStatusChange(pendingStatus)) {
+      const updatedReview = await onStatusChange(pendingStatus)
+      if (!updatedReview) {
         setError('Neizdevās mainīt statusu. Mēģiniet vēlreiz.')
         return
       }
       setPendingStatus(null)
       setExpanded(pendingStatus === 'READY_FOR_REVIEW')
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Neizdevās mainīt statusu.')
     } finally {
       setSaving(false)
     }
@@ -45,7 +58,9 @@ export function SuggestionIntake({ status, onStatusChange, review, needsCaseChoi
 
   async function startCase() {
     const updated = await onStatusChange('IN_PROGRESS')
-    if (updated) setExpanded(false)
+    if (updated) {
+      setExpanded(false)
+    }
     return updated !== null
   }
 
@@ -56,27 +71,29 @@ export function SuggestionIntake({ status, onStatusChange, review, needsCaseChoi
           <strong>1. Ieteikuma pirmapstrāde</strong>
         </summary>
         <p className="muted">Vai ieteikums ir skatāms vai atkritums?</p>
-        <div className="tezaurs-answer-actions">
-          {(['GARBAGE', 'READY_FOR_REVIEW'] as const).map((value) => (
-            <button key={value} type="button" aria-pressed={selectedStatus === value}
-              disabled={saving || (value !== selectedStatus && !suggestionStatusTransitions[status].includes(value))}
-              onClick={() => choose(value)}>
-              {suggestionStatusLabels[value]}
-            </button>
-          ))}
-        </div>
-        {selectedStatus === 'READY_FOR_REVIEW' && review && (
-          <div className="meaning-existence-check">
-            <p><strong>Vai ieteikums attiecas uz esošu izskatīšanu, vai jāsāk jauna?</strong></p>
-            <DuplicateReviewCombobox
-              excludedCaseId={review.id}
-              initialQuery={review.reviewedTerm}
-              selectedCase={caseSelected ? review : null}
-              onSelect={(targetId) => onDuplicate(review.sources[0].id, targetId)}
-              onCreate={startCase}
-            />
+        <fieldset className="review-controls" disabled={readOnly}>
+          <div className="tezaurs-answer-actions">
+            {intakeChoices.map((value) => (
+              <button key={value} type="button" aria-pressed={selectedStatus === value}
+                disabled={saving || (value !== selectedStatus && !suggestionStatusTransitions[status].includes(value))}
+                onClick={() => choose(value)}>
+                {suggestionStatusLabels[value]}
+              </button>
+            ))}
           </div>
-        )}
+          {selectedStatus === 'READY_FOR_REVIEW' && review && (
+            <div className="meaning-existence-check">
+              <p><strong>Vai ieteikums attiecas uz esošu izskatīšanu, vai jāsāk jauna?</strong></p>
+              <DuplicateReviewCombobox
+                excludedCaseId={review.id}
+                initialQuery={review.reviewedTerm}
+                currentCase={review}
+                onSelect={(targetId) => onDuplicate(review.sources[0].id, targetId)}
+                onCreate={startCase}
+              />
+            </div>
+          )}
+        </fieldset>
       </details>
       {!expanded && selectedStatus && (
         <p className="muted">
@@ -87,7 +104,7 @@ export function SuggestionIntake({ status, onStatusChange, review, needsCaseChoi
         <ConfirmationDialog
           message={`Ieteikums tiks atzīmēts kā “${suggestionStatusLabels[pendingStatus]}”.`}
           busy={saving} error={error}
-          onConfirm={() => void confirm()}
+          onConfirm={() => confirm()}
           onCancel={() => setPendingStatus(null)}
         />
       )}

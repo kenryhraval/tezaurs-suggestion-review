@@ -65,7 +65,7 @@ class ReviewControllerTest {
 
     private static ReviewResponse response() {
         return new ReviewResponse(UUID.randomUUID(), "term", SuggestionStatus.IN_PROGRESS,
-                TezaursStatus.NOT_CHECKED, null, false, CompletionBlockReason.TEZAURS_CHECK_REQUIRED,
+                TezaursStatus.NOT_CHECKED, null, lv.tezaurs.suggestions.usage.entity.UsageDecision.NOT_CHECKED, null, null, null, false, CompletionBlockReason.TEZAURS_CHECK_REQUIRED,
                 Instant.EPOCH, List.of());
     }
 }

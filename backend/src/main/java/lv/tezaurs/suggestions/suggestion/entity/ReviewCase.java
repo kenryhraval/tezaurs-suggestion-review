@@ -17,6 +17,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lv.tezaurs.suggestions.common.error.ConflictException;
+import lv.tezaurs.suggestions.usage.entity.UsageDecision;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -41,6 +42,19 @@ public class ReviewCase {
 
     @Column(name = "matched_entry_id")
     private Integer matchedEntryId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "usage_decision", nullable = false, length = 32)
+    private UsageDecision usageDecision = UsageDecision.NOT_CHECKED;
+
+    @Column(name = "usage_note", columnDefinition = "text")
+    private String usageNote;
+
+    @Column(name = "usage_decided_by")
+    private String usageDecidedBy;
+
+    @Column(name = "usage_decided_at")
+    private Instant usageDecidedAt;
 
     @Version
     @Column(nullable = false)
@@ -80,10 +94,38 @@ public class ReviewCase {
     }
 
     public void correctTerm(String term) {
+        if (status != SuggestionStatus.IN_PROGRESS) {
+            throw new ConflictException("Resume the case in Apstrādē before changing its title");
+        }
         reviewedTerm = term;
     }
 
+    public void recordUsageDecision(UsageDecision decision, String note, String username) {
+        if (tezaursStatus != TezaursStatus.NOT_FOUND
+                || (status != SuggestionStatus.IN_PROGRESS && status != SuggestionStatus.INSUFFICIENT_DATA
+                    && status != SuggestionStatus.INVENTED)) {
+            throw new ConflictException("Usage decisions require a new-entry case in progress or awaiting evidence");
+        }
+        if (decision == UsageDecision.NOT_CHECKED) {
+            throw new ConflictException("Choose whether usage has been confirmed");
+        }
+        usageDecision = decision;
+        usageNote = note == null || note.isBlank() ? null : note.trim();
+        usageDecidedBy = username;
+        usageDecidedAt = Instant.now();
+        if (decision == UsageDecision.USED) {
+            status = SuggestionStatus.IN_PROGRESS;
+        } else if (decision == UsageDecision.NOT_CONFIRMED) {
+            status = SuggestionStatus.INSUFFICIENT_DATA;
+        } else {
+            status = SuggestionStatus.INVENTED;
+        }
+    }
+
     public void recordTezaursCheck(TezaursStatus newTezaursStatus, Integer selectedEntryId) {
+        if (status != SuggestionStatus.IN_PROGRESS && status != SuggestionStatus.ALREADY_EXISTS) {
+            throw new ConflictException("Resume the case in Apstrādē before changing the Tēzaurs check");
+        }
         if (newTezaursStatus.entryExists() && selectedEntryId == null) {
             throw new ConflictException("Select the matching Tēzaurs entry");
         }
@@ -104,6 +146,7 @@ public class ReviewCase {
     }
 
     public boolean canEditEntryDraft() {
-        return status == SuggestionStatus.IN_PROGRESS && tezaursStatus == TezaursStatus.NOT_FOUND;
+        return status == SuggestionStatus.IN_PROGRESS && tezaursStatus == TezaursStatus.NOT_FOUND
+                && usageDecision == UsageDecision.USED;
     }
 }

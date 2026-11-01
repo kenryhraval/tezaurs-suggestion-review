@@ -1,4 +1,4 @@
-import type { SuggestionStatus } from './types'
+import type { SuggestionStatus } from '../api/types'
 
 export const suggestionStatusLabels: Record<SuggestionStatus, string> = {
   NEW: 'Jauns',

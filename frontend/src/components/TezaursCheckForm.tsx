@@ -1,6 +1,6 @@
-import { useEffect, useState, type ChangeEvent, type FocusEvent } from 'react'
-import { getTezaursCandidates, getTezaursEntry } from '../api'
-import type { TezaursEntryCandidate, TezaursEntryDetails, TezaursStatus } from '../types'
+import { useEffect, useState, type ChangeEvent, type FocusEvent, type KeyboardEvent, type SyntheticEvent } from 'react'
+import { getTezaursCandidates, getTezaursEntry } from '../api/client'
+import type { TezaursEntryCandidate, TezaursEntryDetails, TezaursStatus } from '../api/types'
 import { ConfirmationDialog } from './ConfirmationDialog'
 import { TezaursEntryLink } from './TezaursEntryLink'
 
@@ -9,13 +9,25 @@ type Props = {
   status: TezaursStatus
   matchedEntryId: number | null
   caseClosed?: boolean
+  readOnly: boolean
+  defaultOpen: boolean
   onSave: (status: TezaursStatus, entryId: number | null) => Promise<boolean>
 }
 
 const NOT_FOUND = 'not-found'
+const checkDescriptions = {
+  NOT_CHECKED: 'Pārbaude Tēzaurā nav veikta.',
+  FOUND: 'Šķirklis ir Tēzaurā; nozīme vēl nav pārbaudīta.',
+  NOT_FOUND: 'Šķirkļa nav Tēzaurā.',
+  MEANING_NEEDS_EDITING: 'Nozīme jau ir Tēzaurā; esošā nozīme jāprecizē.',
+  MEANING_ALREADY_EXISTS: 'Šķirklis un ieteiktā nozīme jau ir Tēzaurā.',
+  MEANING_NOT_FOUND: 'Šķirklis ir Tēzaurā; jāpievieno jauna nozīme.',
+}
 
 function initialSelection(status: TezaursStatus, matchedEntryId: number | null) {
-  if (status === 'NOT_FOUND') return NOT_FOUND
+  if (status === 'NOT_FOUND') {
+    return NOT_FOUND
+  }
   return matchedEntryId === null ? '' : String(matchedEntryId)
 }
 
@@ -64,6 +76,8 @@ export function TezaursCheckForm({
   status,
   matchedEntryId,
   caseClosed = false,
+  readOnly,
+  defaultOpen,
   onSave,
 }: Props) {
   const editExistingSenses = status === 'MEANING_NEEDS_EDITING'
@@ -83,23 +97,29 @@ export function TezaursCheckForm({
   const [saving, setSaving] = useState(false)
   const [confirmation, setConfirmation] = useState<TezaursStatus | null>(null)
   const [confirmationError, setConfirmationError] = useState('')
-  const [expanded, setExpanded] = useState(
-    status === 'NOT_CHECKED' || status === 'FOUND',
-  )
-  const selectedEntryId = Number.isInteger(Number(selection)) && selection !== ''
-    ? Number(selection)
-    : null
-  const selectedCandidate = candidates.find((candidate) => candidate.id === selectedEntryId)
-    ?? (customSelection?.id === selectedEntryId ? customSelection : undefined)
-  const visibleCandidates = selectedCandidate
-    && !candidates.some((candidate) => candidate.id === selectedCandidate.id)
-    ? [...candidates, selectedCandidate]
-    : candidates
+  const [expanded, setExpanded] = useState(defaultOpen)
+  let selectedEntryId: number | null = null
+  if (selection !== '' && Number.isInteger(Number(selection))) {
+    selectedEntryId = Number(selection)
+  }
+
+  let selectedCandidate = candidates.find((candidate) => candidate.id === selectedEntryId)
+  if (!selectedCandidate && customSelection?.id === selectedEntryId) {
+    selectedCandidate = customSelection
+  }
+
+  let visibleCandidates = candidates
+  const selectionIsInResults = candidates.some((candidate) => candidate.id === selectedCandidate?.id)
+  if (selectedCandidate && !selectionIsInResults) {
+    visibleCandidates = [...candidates, selectedCandidate]
+  }
+
   const searchTerm = query.trim()
   const displayedCandidates = searchTerm === '' ? visibleCandidates : searchResults
-  const previewCandidate = displayedCandidates
-    .find((candidate) => candidate.id === previewEntryId)
-    ?? (selectedCandidate?.id === previewEntryId ? selectedCandidate : undefined)
+  let previewCandidate = displayedCandidates.find((candidate) => candidate.id === previewEntryId)
+  if (!previewCandidate && selectedCandidate?.id === previewEntryId) {
+    previewCandidate = selectedCandidate
+  }
   const confirmed = status === 'NOT_FOUND'
     || status === 'MEANING_ALREADY_EXISTS'
     || status === 'MEANING_NEEDS_EDITING'
@@ -108,57 +128,73 @@ export function TezaursCheckForm({
     || pendingSenseEdit !== editExistingSenses
 
   useEffect(() => {
-    let active = true
+    let requestIsOutdated = false
     const selectedId = matchedEntryId
 
-    if (selectedId === null) return
+    if (selectedId === null) {
+      return
+    }
 
     async function loadSelectedEntry(entryId: number) {
       try {
         const loaded = await getTezaursEntry(entryId)
-        if (active) setCustomSelection(asCandidate(loaded))
+        if (!requestIsOutdated) {
+          setCustomSelection(asCandidate(loaded))
+        }
       } catch (cause) {
-        if (active) {
+        if (!requestIsOutdated) {
           setServerError(cause instanceof Error
             ? cause.message
             : 'Neizdevās pārbaudīt Tēzauru.')
         }
       } finally {
-        if (active) setLoading(false)
+        if (!requestIsOutdated) {
+          setLoading(false)
+        }
       }
     }
 
-    void loadSelectedEntry(selectedId)
+    loadSelectedEntry(selectedId)
     return () => {
-      active = false
+      requestIsOutdated = true
     }
   }, [matchedEntryId])
 
   useEffect(() => {
     const term = query.trim()
-    if (!dropdownOpen || term.length === 1) return
+    if (!dropdownOpen || term.length === 1) {
+      return
+    }
 
-    let active = true
-    const timeout = window.setTimeout(async () => {
+    let requestIsOutdated = false
+    async function searchEntries() {
       try {
         const loaded = await getTezaursCandidates(reviewId, term || undefined)
-        if (active) {
-          if (term === '') setCandidates(loaded)
-          else setSearchResults(loaded)
+        if (!requestIsOutdated) {
+          if (term === '') {
+            setCandidates(loaded)
+          } else {
+            setSearchResults(loaded)
+          }
         }
       } catch (cause) {
-        if (active) {
+        if (!requestIsOutdated) {
           setSearchError(cause instanceof Error
             ? cause.message
             : 'Neizdevās pārbaudīt Tēzauru.')
         }
       } finally {
-        if (active) setSearching(false)
+        if (!requestIsOutdated) {
+          setSearching(false)
+        }
       }
-    }, term === '' ? 0 : 300)
+    }
+
+    const searchDelay = term === '' ? 0 : 300
+    const timeout = window.setTimeout(searchEntries, searchDelay)
 
     return () => {
-      active = false
+      requestIsOutdated = true
       window.clearTimeout(timeout)
     }
   }, [dropdownOpen, query, reviewId])
@@ -178,8 +214,37 @@ export function TezaursCheckForm({
     setSearching(false)
   }
 
+  function toggleDropdown() {
+    if (dropdownOpen) {
+      closeDropdown()
+    } else {
+      openDropdown()
+    }
+  }
+
+  function closeDropdownOnEscape(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key === 'Escape') {
+      closeDropdown()
+    }
+  }
+
+  function toggleSection(event: SyntheticEvent<HTMLDetailsElement>) {
+    const isOpen = event.currentTarget.open
+    setExpanded(isOpen)
+    if (!isOpen) {
+      closeDropdown()
+    }
+  }
+
+  function cancelConfirmation() {
+    setPendingSenseEdit(selectedEntryId === matchedEntryId && editExistingSenses)
+    setConfirmation(null)
+  }
+
   function closeDropdownOnBlur(event: FocusEvent<HTMLDivElement>) {
-    if (!event.currentTarget.contains(event.relatedTarget)) closeDropdown()
+    if (!event.currentTarget.contains(event.relatedTarget)) {
+      closeDropdown()
+    }
   }
 
   function changeQuery(event: ChangeEvent<HTMLInputElement>) {
@@ -203,42 +268,54 @@ export function TezaursCheckForm({
 
   function chooseNotFound() {
     closeDropdown()
-    if (status === 'NOT_FOUND' && selection === NOT_FOUND) return
+    if (status === 'NOT_FOUND' && selection === NOT_FOUND) {
+      return
+    }
     setConfirmationError('')
     setConfirmation('NOT_FOUND')
   }
 
   function chooseMeaning(nextStatus: 'MEANING_ALREADY_EXISTS' | 'MEANING_NOT_FOUND') {
-    if (nextStatus === 'MEANING_NOT_FOUND' && nextStatus === status && selectedEntryId === matchedEntryId) return
+    if (nextStatus === 'MEANING_NOT_FOUND' && nextStatus === status && selectedEntryId === matchedEntryId) {
+      return
+    }
     setPendingSenseEdit(nextStatus === 'MEANING_ALREADY_EXISTS' && selectedEntryId === matchedEntryId && editExistingSenses)
     setConfirmationError('')
     setConfirmation(nextStatus)
   }
 
   async function confirmCheck() {
-    if (!confirmation || saving) return
+    if (!confirmation || saving) {
+      return
+    }
     setSaving(true)
     try {
       let nextStatus = confirmation
       if (confirmation === 'MEANING_ALREADY_EXISTS' && pendingSenseEdit) {
         nextStatus = 'MEANING_NEEDS_EDITING'
       }
-      if (await onSave(nextStatus, confirmation === 'NOT_FOUND' ? null : selectedEntryId)) {
+      const entryIdToSave = confirmation === 'NOT_FOUND' ? null : selectedEntryId
+      const saved = await onSave(nextStatus, entryIdToSave)
+      if (saved) {
         setPendingSenseEdit(nextStatus === 'MEANING_NEEDS_EDITING')
         setPendingStatus(nextStatus)
-        if (confirmation === 'NOT_FOUND') setSelection(NOT_FOUND)
+        if (confirmation === 'NOT_FOUND') {
+          setSelection(NOT_FOUND)
+        }
         setConfirmation(null)
         closeDropdown()
         setExpanded(false)
       } else {
         setConfirmationError('Neizdevās saglabāt izvēli. Mēģiniet vēlreiz.')
       }
+    } catch (cause) {
+      setConfirmationError(cause instanceof Error ? cause.message : 'Neizdevās saglabāt izvēli.')
     } finally {
       setSaving(false)
     }
   }
 
-  let confirmationMessage = 'Šķirkļa nav Tēzaurā. Apstiprinot tiks izveidots šķirkļa melnraksts.'
+  let confirmationMessage = 'Šķirkļa nav Tēzaurā. Apstiprinot varēsiet pārbaudīt vārda lietojumu.'
   if (confirmation === 'MEANING_ALREADY_EXISTS') {
     confirmationMessage = pendingSenseEdit
       ? 'Izskatīšana paliks statusā “Apstrādē”. Varēsiet labot esošo nozīmi melnrakstā; Tēzaura dati netiks mainīti.'
@@ -256,126 +333,117 @@ export function TezaursCheckForm({
 
   return (
     <section className="tezaurs-check">
-      <details open={expanded} onToggle={(event) => {
-        setExpanded(event.currentTarget.open)
-        if (!event.currentTarget.open) closeDropdown()
-      }}>
-        <summary className={!expanded && confirmed && !hasChanges ? 'confirmed' : undefined}>
+      <details open={expanded} onToggle={toggleSection}>
+        <summary className={!expanded && confirmed && (readOnly || !hasChanges) ? 'confirmed' : undefined}>
           <strong>2. Pārbaude Tēzaurā</strong>
         </summary>
-        <p className="muted">Izvēlieties atbilstošo šķirkli vai norādiet, ka tāda nav.</p>
 
         {serverError && <p className="error">{serverError}</p>}
         {loading && <p className="muted">Ielādē izvēlēto šķirkli...</p>}
 
-        <div
-          className="tezaurs-dropdown"
-          onBlur={closeDropdownOnBlur}
-          onKeyDown={(event) => {
-            if (event.key === 'Escape') closeDropdown()
-          }}
-        >
-          <div className="tezaurs-dropdown-control">
-            <button
-              aria-expanded={dropdownOpen}
-              aria-label="Tēzaura šķirklis"
-              className="tezaurs-dropdown-toggle"
-              disabled={loading || saving}
-              onClick={() => {
-                if (dropdownOpen) closeDropdown()
-                else openDropdown()
-              }}
-              type="button"
-            >
-              <span className="tezaurs-option-label">
-                {selectedCandidate
-                  ? <><strong>{selectedCandidate.heading}</strong>
-                    <small>{selectedCandidate.humanKey}</small></>
-                  : selection === NOT_FOUND ? 'Šķirkļa nav Tēzaurā' : 'Izvēlieties...'}
-              </span>
-              <span aria-hidden="true">▾</span>
-            </button>
-            {selectedCandidate && <TezaursEntryLink humanKey={selectedCandidate.humanKey} />}
+        <fieldset className="review-controls" disabled={readOnly}>
+          <p className="muted">Izvēlieties atbilstošo šķirkli vai norādiet, ka tāda nav.</p>
+          <div
+            className="tezaurs-dropdown"
+            onBlur={closeDropdownOnBlur}
+            onKeyDown={closeDropdownOnEscape}
+          >
+            <div className="tezaurs-dropdown-control">
+              <button
+                aria-expanded={dropdownOpen}
+                aria-label="Tēzaura šķirklis"
+                className="tezaurs-dropdown-toggle"
+                disabled={loading || saving}
+                onClick={toggleDropdown}
+                type="button"
+              >
+                <span className="tezaurs-option-label">
+                  {selectedCandidate
+                    ? <><strong>{selectedCandidate.heading}</strong>
+                      <small>{selectedCandidate.humanKey}</small></>
+                    : selection === NOT_FOUND ? 'Šķirkļa nav Tēzaurā' : 'Izvēlieties...'}
+                </span>
+                <span aria-hidden="true">▾</span>
+              </button>
+              {selectedCandidate && <TezaursEntryLink humanKey={selectedCandidate.humanKey} />}
+            </div>
+
+            {dropdownOpen && (
+              <div className="tezaurs-dropdown-menu">
+                <div className="tezaurs-combobox-search">
+                  <label>
+                    Meklēt šķirkli
+                    <input autoFocus onChange={changeQuery} type="search" value={query} />
+                  </label>
+
+                  {searchTerm.length === 1 && <small>Ievadiet vēl vienu burtu.</small>}
+                  {searching && <small>Meklē...</small>}
+                  {searchError && <small className="error">{searchError}</small>}
+                  {!searching && !searchError && searchTerm.length >= 2
+                    && searchResults.length === 0 && <small>Nekas netika atrasts.</small>}
+                </div>
+
+                <div className="tezaurs-dropdown-options">
+                  {displayedCandidates.map((candidate) => (
+                    <div className="tezaurs-option"
+                      key={candidate.id}
+                      onFocus={() => setPreviewEntryId(candidate.id)}
+                      onMouseEnter={() => setPreviewEntryId(candidate.id)}
+                    >
+                      <button aria-pressed={candidate.id === selectedEntryId}
+                        onClick={() => chooseCandidate(candidate)} type="button">
+                        <span className="tezaurs-option-label">
+                          <strong>{candidate.heading}</strong>
+                          <small>{candidate.humanKey}</small>
+                        </span>
+                      </button>
+                      <TezaursEntryLink humanKey={candidate.humanKey} />
+                    </div>
+                  ))}
+                  <button
+                    aria-pressed={selection === NOT_FOUND}
+                    className="tezaurs-dropdown-special"
+                    onClick={chooseNotFound}
+                    onFocus={() => setPreviewEntryId(null)}
+                    onMouseEnter={() => setPreviewEntryId(null)}
+                    type="button"
+                  >
+                    Šķirkļa nav Tēzaurā
+                  </button>
+                </div>
+
+                {previewCandidate && (
+                  <div className="tezaurs-dropdown-preview">
+                    <EntryDetails candidate={previewCandidate} />
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
-          {dropdownOpen && (
-            <div className="tezaurs-dropdown-menu">
-              <div className="tezaurs-combobox-search">
-                <label>
-                  Meklēt šķirkli
-                  <input autoFocus onChange={changeQuery} type="search" value={query} />
-                </label>
-
-                {searchTerm.length === 1 && <small>Ievadiet vēl vienu burtu.</small>}
-                {searching && <small>Meklē...</small>}
-                {searchError && <small className="error">{searchError}</small>}
-                {!searching && !searchError && searchTerm.length >= 2
-                  && searchResults.length === 0 && <small>Nekas netika atrasts.</small>}
-              </div>
-
-              <div className="tezaurs-dropdown-options">
-                {displayedCandidates.map((candidate) => (
-                  <div className="tezaurs-option"
-                    key={candidate.id}
-                    onFocus={() => setPreviewEntryId(candidate.id)}
-                    onMouseEnter={() => setPreviewEntryId(candidate.id)}
-                  >
-                    <button aria-pressed={candidate.id === selectedEntryId}
-                      onClick={() => chooseCandidate(candidate)} type="button">
-                      <span className="tezaurs-option-label">
-                        <strong>{candidate.heading}</strong>
-                        <small>{candidate.humanKey}</small>
-                      </span>
-                    </button>
-                    <TezaursEntryLink humanKey={candidate.humanKey} />
-                  </div>
-                ))}
-                <button
-                  aria-pressed={selection === NOT_FOUND}
-                  className="tezaurs-dropdown-special"
-                  onClick={chooseNotFound}
-                  onFocus={() => setPreviewEntryId(null)}
-                  onMouseEnter={() => setPreviewEntryId(null)}
-                  type="button"
-                >
-                  Šķirkļa nav Tēzaurā
+          {selectedEntryId !== null && selectedCandidate && (
+            <div className="meaning-existence-check">
+              <p><strong>
+                Vai iesniegtā nozīme jau ir šķirklī “{selectedCandidate.heading}”?
+              </strong></p>
+              <div className="tezaurs-answer-actions">
+                <button aria-pressed={pendingStatus === 'MEANING_ALREADY_EXISTS' || pendingStatus === 'MEANING_NEEDS_EDITING'} disabled={saving}
+                  onClick={() => chooseMeaning('MEANING_ALREADY_EXISTS')} type="button">
+                  Jā, nozīme jau ir
+                </button>
+                <button aria-pressed={pendingStatus === 'MEANING_NOT_FOUND'} disabled={saving}
+                  onClick={() => chooseMeaning('MEANING_NOT_FOUND')} type="button">
+                  Nē, tā ir jauna nozīme
                 </button>
               </div>
-
-              {previewCandidate && (
-                <div className="tezaurs-dropdown-preview">
-                  <EntryDetails candidate={previewCandidate} />
-                </div>
-              )}
             </div>
           )}
-        </div>
-
-        {selectedEntryId !== null && selectedCandidate && (
-          <div className="meaning-existence-check">
-            <p><strong>
-              Vai iesniegtā nozīme jau ir šķirklī “{selectedCandidate.heading}”?
-            </strong></p>
-            <div className="tezaurs-answer-actions">
-              <button aria-pressed={pendingStatus === 'MEANING_ALREADY_EXISTS' || pendingStatus === 'MEANING_NEEDS_EDITING'} disabled={saving}
-                onClick={() => chooseMeaning('MEANING_ALREADY_EXISTS')} type="button">
-                Jā, nozīme jau ir
-              </button>
-              <button aria-pressed={pendingStatus === 'MEANING_NOT_FOUND'} disabled={saving}
-                onClick={() => chooseMeaning('MEANING_NOT_FOUND')} type="button">
-                Nē, tā ir jauna nozīme
-              </button>
-            </div>
-          </div>
-        )}
+        </fieldset>
 
       </details>
-      {!expanded && confirmed && !hasChanges && (
+      {!expanded && confirmed && (readOnly || !hasChanges) && (
         <p className="muted">
-          {status === 'NOT_FOUND' ? 'Šķirkļa nav Tēzaurā.'
-            : status === 'MEANING_NEEDS_EDITING' ? 'Nozīme jau ir Tēzaurā; esošā nozīme jāprecizē.'
-              : status === 'MEANING_ALREADY_EXISTS' ? 'Šķirklis un ieteiktā nozīme jau ir Tēzaurā.'
-              : 'Šķirklis ir Tēzaurā; jāpievieno jauna nozīme.'}
+          {checkDescriptions[status]}
         </p>
       )}
       {confirmation && (
@@ -383,11 +451,8 @@ export function TezaursCheckForm({
           message={confirmation === 'MEANING_ALREADY_EXISTS' ? '' : confirmationMessage}
           busy={saving}
           error={confirmationError}
-          onConfirm={() => void confirmCheck()}
-          onCancel={() => {
-            setPendingSenseEdit(selectedEntryId === matchedEntryId && editExistingSenses)
-            setConfirmation(null)
-          }}
+          onConfirm={() => confirmCheck()}
+          onCancel={cancelConfirmation}
         >
           {confirmation === 'MEANING_ALREADY_EXISTS' && <>
             <label className="checkbox-label">
