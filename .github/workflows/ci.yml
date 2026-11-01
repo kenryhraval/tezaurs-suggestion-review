@@ -35,6 +35,9 @@ jobs:
       - name: Build and test
         run: ./mvnw --batch-mode verify
 
+      - name: API integration tests
+        run: ./mvnw --batch-mode -f ../integration-tests/pom.xml test
+
       - name: Analyze with SonarCloud
         if: github.event_name == 'push'
         env:
