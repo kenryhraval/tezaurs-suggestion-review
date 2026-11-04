@@ -43,7 +43,7 @@ public class UsageController {
 
     @PostMapping("/decision")
     ReviewResponse decide(@PathVariable UUID caseId, @Valid @RequestBody UsageDecisionRequest request,
-            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization) {
+            @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization) {
         return service.decide(caseId, request, authorization);
     }
 

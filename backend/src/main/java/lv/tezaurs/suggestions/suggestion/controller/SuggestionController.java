@@ -10,10 +10,12 @@ import lv.tezaurs.suggestions.suggestion.dto.SuggestionSort;
 import lv.tezaurs.suggestions.suggestion.dto.UpdateStatusRequest;
 import lv.tezaurs.suggestions.suggestion.dto.LinkDuplicateRequest;
 import lv.tezaurs.suggestions.suggestion.service.SuggestionService;
+import org.springframework.http.HttpHeaders;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -34,8 +36,9 @@ public class SuggestionController {
     }
 
     @PostMapping("/{id}/status")
-    ReviewResponse changeStatus(@PathVariable Integer id, @Valid @RequestBody UpdateStatusRequest request) {
-        return service.changeStatus(id, request);
+    ReviewResponse changeStatus(@PathVariable Integer id, @Valid @RequestBody UpdateStatusRequest request,
+            @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization) {
+        return service.changeStatus(id, request, authorization);
     }
 
     @PostMapping("/{id}/duplicate")

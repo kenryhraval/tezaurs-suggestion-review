@@ -1,7 +1,7 @@
 package lv.tezaurs.suggestions.suggestion.dto;
 
 import jakarta.validation.constraints.NotNull;
-import lv.tezaurs.suggestions.suggestion.entity.SuggestionStatus;
+import lv.tezaurs.suggestions.suggestion.entity.ReviewStatus;
 
-public record UpdateStatusRequest(@NotNull SuggestionStatus status) {
+public record UpdateStatusRequest(@NotNull ReviewStatus status) {
 }

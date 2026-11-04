@@ -36,9 +36,9 @@ public class SuggestionService {
     }
 
     @Transactional
-    public ReviewResponse changeStatus(Integer sourceSuggestionId, UpdateStatusRequest request) {
+    public ReviewResponse changeStatus(Integer sourceSuggestionId, UpdateStatusRequest request, String authorization) {
         IncubatorSuggestion source = requireSourceSuggestion(sourceSuggestionId);
-        ReviewCase review = reviewService.startReview(source, request.status());
+        ReviewCase review = reviewService.startReview(source, request.status(), authorization);
         return completionService.response(review);
     }
 

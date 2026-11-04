@@ -1,6 +1,6 @@
 import { useEffect, useState, type ChangeEvent, type FocusEvent, type KeyboardEvent } from 'react'
 import { getDuplicateReviewCandidates } from '../api/client'
-import { suggestionStatusLabels } from '../review/statuses'
+import { reviewStatusLabels } from '../review/statuses'
 import type { DuplicateReviewCandidate, Review } from '../api/types'
 import { ConfirmationDialog } from './ConfirmationDialog'
 
@@ -8,12 +8,10 @@ type Props = {
   excludedCaseId?: string
   initialQuery: string
   onSelect: (reviewId: string) => Promise<void>
-  onCreate: () => Promise<boolean>
   currentCase?: Review | null
 }
 
-export function DuplicateReviewCombobox({ excludedCaseId, initialQuery, onSelect, onCreate, currentCase }: Props) {
-  const caseChosen = currentCase !== null && currentCase !== undefined && currentCase.status !== 'READY_FOR_REVIEW'
+export function DuplicateReviewCombobox({ excludedCaseId, initialQuery, onSelect, currentCase }: Props) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [candidates, setCandidates] = useState<DuplicateReviewCandidate[]>([])
@@ -21,7 +19,6 @@ export function DuplicateReviewCombobox({ excludedCaseId, initialQuery, onSelect
   const [error, setError] = useState('')
   const [confirmation, setConfirmation] = useState<DuplicateReviewCandidate | null>(null)
   const [saving, setSaving] = useState(false)
-  const [creating, setCreating] = useState(false)
 
   useEffect(() => {
     const term = query.trim()
@@ -87,14 +84,10 @@ export function DuplicateReviewCombobox({ excludedCaseId, initialQuery, onSelect
   function chooseNewCase() {
     closeDropdown()
     setError('')
-    if (currentCase?.status !== 'IN_PROGRESS') {
-      setCreating(true)
-    }
   }
 
   function cancelConfirmation() {
     setConfirmation(null)
-    setCreating(false)
   }
 
   function closeOnBlur(event: FocusEvent<HTMLDivElement>) {
@@ -118,23 +111,14 @@ export function DuplicateReviewCombobox({ excludedCaseId, initialQuery, onSelect
   }
 
   async function confirmDuplicate() {
-    if ((!confirmation && !creating) || saving) {
+    if (!confirmation || saving) {
       return
     }
     setSaving(true)
     setError('')
     try {
-      if (creating) {
-        const created = await onCreate()
-        if (!created) {
-          setError('Neizdevās izveidot izskatīšanu. Mēģiniet vēlreiz.')
-          return
-        }
-      } else if (confirmation) {
-        await onSelect(confirmation.id)
-      }
+      await onSelect(confirmation.id)
       setConfirmation(null)
-      setCreating(false)
     } catch (cause) {
       setError(cause instanceof Error
         ? cause.message
@@ -148,11 +132,11 @@ export function DuplicateReviewCombobox({ excludedCaseId, initialQuery, onSelect
   const visibleCandidates = candidates.filter(
     (candidate) => candidate.id !== excludedCaseId && candidate.id !== currentCase?.id,
   )
-  let confirmationMessage = 'Izskatīšana pāries statusā “Apstrādē”.'
+  let confirmationMessage = ''
   if (confirmation) {
-    confirmationMessage = `Ieteikums tiks pievienots izskatīšanai “${confirmation.reviewedTerm}” kā dublikāts. Mērķa izskatīšana paliks statusā “${suggestionStatusLabels[confirmation.status]}”.`
+    confirmationMessage = `Ieteikums tiks pievienots izskatīšanai “${confirmation.reviewedTerm}” kā dublikāts. Mērķa izskatīšana paliks statusā “${reviewStatusLabels[confirmation.status]}”.`
     if (currentCase) {
-      confirmationMessage = `Visi šīs izskatīšanas ieteikumi tiks pievienoti izskatīšanai “${confirmation.reviewedTerm}”. Mērķa izskatīšanas dati un statuss “${suggestionStatusLabels[confirmation.status]}” paliks nemainīti. Pašreizējā izskatīšana, tās atradumi un melnraksti tiks neatgriezeniski dzēsti; atšķirīgā informācija netiks apvienota.`
+      confirmationMessage = `Visi šīs izskatīšanas ieteikumi tiks pievienoti izskatīšanai “${confirmation.reviewedTerm}”. Mērķa izskatīšanas dati un statuss “${reviewStatusLabels[confirmation.status]}” paliks nemainīti. Pašreizējā izskatīšana, tās atradumi un melnraksti tiks neatgriezeniski dzēsti; atšķirīgā informācija netiks apvienota.`
     }
   }
 
@@ -171,7 +155,7 @@ export function DuplicateReviewCombobox({ excludedCaseId, initialQuery, onSelect
           type="button"
         >
           <span className="tezaurs-option-label">
-            {caseChosen ? 'Jauna izskatīšana' : 'Izvēlieties izskatīšanu...'}
+            Jauna izskatīšana
           </span>
           <span aria-hidden="true">▾</span>
         </button>
@@ -198,7 +182,7 @@ export function DuplicateReviewCombobox({ excludedCaseId, initialQuery, onSelect
                   <span className="tezaurs-option-label">
                     <strong>{candidate.reviewedTerm}</strong>
                     <small>
-                      {suggestionStatusLabels[candidate.status]} · {candidate.sourceCount} ieteikumi
+                      {reviewStatusLabels[candidate.status]} · {candidate.sourceCount} ieteikumi
                     </small>
                   </span>
                 </button>
@@ -207,7 +191,7 @@ export function DuplicateReviewCombobox({ excludedCaseId, initialQuery, onSelect
           </div>
         </div>
       )}
-      {(confirmation || creating) && (
+      {confirmation && (
         <ConfirmationDialog
           message={confirmationMessage}
           busy={saving}

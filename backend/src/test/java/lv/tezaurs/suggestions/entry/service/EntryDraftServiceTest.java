@@ -23,7 +23,7 @@ import lv.tezaurs.suggestions.entry.entity.ReviewLexeme;
 import lv.tezaurs.suggestions.entry.repository.ReviewEntryRepository;
 import lv.tezaurs.suggestions.entry.repository.ReviewLexemeRepository;
 import lv.tezaurs.suggestions.suggestion.entity.ReviewCase;
-import lv.tezaurs.suggestions.suggestion.entity.SuggestionStatus;
+import lv.tezaurs.suggestions.suggestion.entity.ReviewStatus;
 import lv.tezaurs.suggestions.suggestion.entity.TezaursStatus;
 import lv.tezaurs.suggestions.suggestion.repository.ReviewCaseRepository;
 import lv.tezaurs.suggestions.tezaurs.entity.TezaursEntry;
@@ -158,8 +158,8 @@ class EntryDraftServiceTest {
 
     private static ReviewCase inProgressReview() {
         ReviewCase review = new ReviewCase("jauns vārds");
-        review.changeStatus(SuggestionStatus.READY_FOR_REVIEW);
-        review.changeStatus(SuggestionStatus.IN_PROGRESS);
+        review.changeStatus(ReviewStatus.READY_FOR_REVIEW);
+        review.changeStatus(ReviewStatus.IN_PROGRESS);
         return review;
     }
 

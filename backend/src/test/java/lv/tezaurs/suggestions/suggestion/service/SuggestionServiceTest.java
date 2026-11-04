@@ -17,7 +17,7 @@ import lv.tezaurs.suggestions.suggestion.dto.SuggestionSort;
 import lv.tezaurs.suggestions.suggestion.dto.UpdateStatusRequest;
 import lv.tezaurs.suggestions.suggestion.entity.IncubatorSuggestion;
 import lv.tezaurs.suggestions.suggestion.entity.ReviewCase;
-import lv.tezaurs.suggestions.suggestion.entity.SuggestionStatus;
+import lv.tezaurs.suggestions.suggestion.entity.ReviewStatus;
 import lv.tezaurs.suggestions.suggestion.repository.IncubatorSuggestionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -58,15 +58,15 @@ class SuggestionServiceTest {
     void delegatesTheFirstStatusChangeToReviewCreation() {
         IncubatorSuggestion source = source(42);
         ReviewCase review = new ReviewCase("term");
-        review.changeStatus(SuggestionStatus.GARBAGE);
+        review.changeStatus(ReviewStatus.GARBAGE);
         when(sourceSuggestionRepository.findById(42)).thenReturn(Optional.of(source));
-        when(reviewService.startReview(source, SuggestionStatus.GARBAGE)).thenReturn(review);
+        when(reviewService.startReview(source, ReviewStatus.GARBAGE, null)).thenReturn(review);
 
         ReviewResponse response = service.changeStatus(42,
-                new UpdateStatusRequest(SuggestionStatus.GARBAGE));
+                new UpdateStatusRequest(ReviewStatus.GARBAGE), null);
 
-        assertThat(response.status()).isEqualTo(SuggestionStatus.GARBAGE);
-        verify(reviewService).startReview(source, SuggestionStatus.GARBAGE);
+        assertThat(response.status()).isEqualTo(ReviewStatus.GARBAGE);
+        verify(reviewService).startReview(source, ReviewStatus.GARBAGE, null);
     }
 
     private static IncubatorSuggestion source(int id) {

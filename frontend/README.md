@@ -14,6 +14,9 @@ npm run dev
 
 Vite opens the frontend locally and proxies `/api` requests to
 `http://localhost:8080`.
+The development proxy supplies the test identity `local` automatically;
+no login is needed when running `npm run dev`. Its settings are in `vite.config.ts`,
+enabled only for the development server, excluding builds and preview.
 
 The `/` page contains the reviewer interface. Deployment authentication is
 handled by the reverse proxy, as described in the root README.

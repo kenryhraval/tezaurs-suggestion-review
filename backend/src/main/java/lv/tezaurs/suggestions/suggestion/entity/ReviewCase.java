@@ -34,7 +34,10 @@ public class ReviewCase {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 32)
-    private SuggestionStatus status;
+    private ReviewStatus status;
+
+    @Column(name = "assigned_to")
+    private String assignedTo;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "tezaurs_status", nullable = false, length = 32)
@@ -74,7 +77,7 @@ public class ReviewCase {
     public ReviewCase(String submittedTerm) {
         this.id = UUID.randomUUID();
         this.reviewedTerm = submittedTerm;
-        this.status = SuggestionStatus.NEW;
+        this.status = ReviewStatus.NEW;
         this.tezaursStatus = TezaursStatus.NOT_CHECKED;
     }
 
@@ -82,19 +85,39 @@ public class ReviewCase {
         sources.add(source);
     }
 
-    public void changeStatus(SuggestionStatus newStatus) {
+    public void changeStatus(ReviewStatus newStatus) {
         status.requireTransitionTo(newStatus);
-        if (newStatus == SuggestionStatus.ALREADY_EXISTS) {
+        if (newStatus == ReviewStatus.ALREADY_EXISTS) {
             if (matchedEntryId == null) {
                 throw new ConflictException("Select the matching Tēzaurs entry");
             }
             tezaursStatus = TezaursStatus.MEANING_ALREADY_EXISTS;
         }
         status = newStatus;
+        if (newStatus == ReviewStatus.READY_FOR_REVIEW || newStatus == ReviewStatus.GARBAGE) {
+            assignedTo = null;
+        }
+    }
+
+    public void takeForReview(String username) {
+        if (assignedTo != null && !assignedTo.equals(username)) {
+            throw new ConflictException("Izskatīšanu jau paņēmis lietotājs “" + assignedTo + "”.");
+        }
+        if (status != ReviewStatus.IN_PROGRESS) {
+            changeStatus(ReviewStatus.IN_PROGRESS);
+        }
+        assignedTo = username;
+    }
+
+    public void giveUpReview(String username) {
+        if (assignedTo != null && !assignedTo.equals(username)) {
+            throw new ConflictException("Atteikties no apstrādes var tikai lietotājs, kurš to paņēmis.");
+        }
+        changeStatus(ReviewStatus.READY_FOR_REVIEW);
     }
 
     public void correctTerm(String term) {
-        if (status != SuggestionStatus.IN_PROGRESS) {
+        if (status != ReviewStatus.IN_PROGRESS) {
             throw new ConflictException("Resume the case in Apstrādē before changing its title");
         }
         reviewedTerm = term;
@@ -102,8 +125,8 @@ public class ReviewCase {
 
     public void recordUsageDecision(UsageDecision decision, String note, String username) {
         if (tezaursStatus != TezaursStatus.NOT_FOUND
-                || (status != SuggestionStatus.IN_PROGRESS && status != SuggestionStatus.INSUFFICIENT_DATA
-                    && status != SuggestionStatus.INVENTED)) {
+                || (status != ReviewStatus.IN_PROGRESS && status != ReviewStatus.INSUFFICIENT_DATA
+                    && status != ReviewStatus.INVENTED)) {
             throw new ConflictException("Usage decisions require a new-entry case in progress or awaiting evidence");
         }
         if (decision == UsageDecision.NOT_CHECKED) {
@@ -114,16 +137,16 @@ public class ReviewCase {
         usageDecidedBy = username;
         usageDecidedAt = Instant.now();
         if (decision == UsageDecision.USED) {
-            status = SuggestionStatus.IN_PROGRESS;
+            status = ReviewStatus.IN_PROGRESS;
         } else if (decision == UsageDecision.NOT_CONFIRMED) {
-            status = SuggestionStatus.INSUFFICIENT_DATA;
+            status = ReviewStatus.INSUFFICIENT_DATA;
         } else {
-            status = SuggestionStatus.INVENTED;
+            status = ReviewStatus.INVENTED;
         }
     }
 
     public void recordTezaursCheck(TezaursStatus newTezaursStatus, Integer selectedEntryId) {
-        if (status != SuggestionStatus.IN_PROGRESS && status != SuggestionStatus.ALREADY_EXISTS) {
+        if (status != ReviewStatus.IN_PROGRESS && status != ReviewStatus.ALREADY_EXISTS) {
             throw new ConflictException("Resume the case in Apstrādē before changing the Tēzaurs check");
         }
         if (newTezaursStatus.entryExists() && selectedEntryId == null) {
@@ -132,21 +155,21 @@ public class ReviewCase {
         if (!newTezaursStatus.entryExists() && selectedEntryId != null) {
             throw new ConflictException("An entry ID is only allowed when a Tēzaurs entry was found");
         }
-        boolean shouldReopenCase = this.status == SuggestionStatus.ALREADY_EXISTS
+        boolean shouldReopenCase = this.status == ReviewStatus.ALREADY_EXISTS
                 && newTezaursStatus != TezaursStatus.MEANING_ALREADY_EXISTS;
         if (shouldReopenCase) {
-            status = SuggestionStatus.IN_PROGRESS;
+            status = ReviewStatus.IN_PROGRESS;
         }
         this.tezaursStatus = newTezaursStatus;
         this.matchedEntryId = selectedEntryId;
         if (newTezaursStatus == TezaursStatus.MEANING_ALREADY_EXISTS
-                && status != SuggestionStatus.ALREADY_EXISTS) {
-            changeStatus(SuggestionStatus.ALREADY_EXISTS);
+                && status != ReviewStatus.ALREADY_EXISTS) {
+            changeStatus(ReviewStatus.ALREADY_EXISTS);
         }
     }
 
     public boolean canEditEntryDraft() {
-        return status == SuggestionStatus.IN_PROGRESS && tezaursStatus == TezaursStatus.NOT_FOUND
+        return status == ReviewStatus.IN_PROGRESS && tezaursStatus == TezaursStatus.NOT_FOUND
                 && usageDecision == UsageDecision.USED;
     }
 }

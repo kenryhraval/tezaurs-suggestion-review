@@ -14,7 +14,9 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
 import tools.jackson.databind.JsonNode;
@@ -178,6 +180,8 @@ public class ApiSteps {
                 .timeout(Duration.ofSeconds(15))
                 .header("Accept", "application/json")
                 .header("Content-Type", "application/json")
+                .header("Authorization", "Basic " + Base64.getEncoder().encodeToString(
+                        "reviewer:test".getBytes(StandardCharsets.ISO_8859_1)))
                 .method(method, content).build();
         try {
             response = client.send(request, HttpResponse.BodyHandlers.ofString());

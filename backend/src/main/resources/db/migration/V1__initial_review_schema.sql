@@ -2,6 +2,7 @@ CREATE TABLE cases (
     id UUID PRIMARY KEY,
     reviewed_term VARCHAR(255) NOT NULL,
     status VARCHAR(32) NOT NULL,
+    assigned_to VARCHAR(255),
     tezaurs_status VARCHAR(32) NOT NULL,
     matched_entry_id INTEGER,
     usage_decision VARCHAR(32) NOT NULL DEFAULT 'NOT_CHECKED'

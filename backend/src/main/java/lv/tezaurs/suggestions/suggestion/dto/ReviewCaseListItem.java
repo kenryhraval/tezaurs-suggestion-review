@@ -2,14 +2,14 @@ package lv.tezaurs.suggestions.suggestion.dto;
 
 import java.time.Instant;
 import java.util.UUID;
-import lv.tezaurs.suggestions.suggestion.entity.SuggestionStatus;
+import lv.tezaurs.suggestions.suggestion.entity.ReviewStatus;
 
 public interface ReviewCaseListItem {
     UUID getId();
 
     String getReviewedTerm();
 
-    SuggestionStatus getStatus();
+    ReviewStatus getStatus();
 
     Instant getCreatedAt();
 

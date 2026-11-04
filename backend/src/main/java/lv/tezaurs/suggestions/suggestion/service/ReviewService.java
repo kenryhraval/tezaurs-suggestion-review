@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lv.tezaurs.suggestions.auth.service.CurrentUserService;
 import lv.tezaurs.suggestions.common.error.ConflictException;
 import lv.tezaurs.suggestions.common.error.NotFoundException;
 import lv.tezaurs.suggestions.suggestion.dto.CorrectTermRequest;
@@ -17,7 +18,7 @@ import lv.tezaurs.suggestions.suggestion.dto.UpdateStatusRequest;
 import lv.tezaurs.suggestions.suggestion.entity.IncubatorSuggestion;
 import lv.tezaurs.suggestions.suggestion.entity.ReviewCase;
 import lv.tezaurs.suggestions.suggestion.entity.CaseSuggestion;
-import lv.tezaurs.suggestions.suggestion.entity.SuggestionStatus;
+import lv.tezaurs.suggestions.suggestion.entity.ReviewStatus;
 import lv.tezaurs.suggestions.suggestion.entity.TezaursStatus;
 import lv.tezaurs.suggestions.suggestion.repository.ReviewCaseRepository;
 import lv.tezaurs.suggestions.suggestion.repository.CaseSuggestionRepository;
@@ -37,10 +38,11 @@ public class ReviewService {
     private final CaseSuggestionRepository reviewSourceRepository;
     private final TezaursEntryRepository tezaursEntryRepository;
     private final TezaursEntrySearchService tezaursEntrySearchService;
+    private final CurrentUserService currentUserService;
 
     @Transactional(readOnly = true)
     public ReviewPageResponse list(
-            SuggestionStatus status, String query, int page, int size, ReviewSort sort) {
+            ReviewStatus status, String query, int page, int size, ReviewSort sort) {
         String searchQuery = query == null ? "" : query.trim();
         Sort reviewSort = switch (sort) {
             case NEWEST -> Sort.by(Sort.Direction.DESC, "createdAt");
@@ -60,22 +62,36 @@ public class ReviewService {
     }
 
     @Transactional
-    public ReviewCase startReview(IncubatorSuggestion source, SuggestionStatus status) {
+    public ReviewCase startReview(IncubatorSuggestion source, ReviewStatus status, String authorization) {
+        String username = currentUserService.requireUsername(authorization);
         if (reviewSourceRepository.existsById(source.getId())) {
             throw new ConflictException("The source suggestion already belongs to a review");
         }
         ReviewCase review = create(source);
-        review.changeStatus(status);
+        if (status == ReviewStatus.IN_PROGRESS) {
+            review.takeForReview(username);
+        } else {
+            review.changeStatus(status);
+        }
         return review;
     }
 
     @Transactional
-    public ReviewResponse changeStatus(UUID reviewId, UpdateStatusRequest request) {
-        ReviewCase review = requireReview(reviewId);
-        if (request.status() == SuggestionStatus.COMPLETED) {
+    public ReviewResponse changeStatus(UUID reviewId, UpdateStatusRequest request, String authorization) {
+        String username = currentUserService.requireUsername(authorization);
+        ReviewCase review = reviewRepository.findLockedById(reviewId)
+                .orElseThrow(() -> new NotFoundException("Review " + reviewId + " was not found"));
+        if (request.status() == ReviewStatus.COMPLETED) {
             completionService.requireCompletionAllowed(review);
         }
-        review.changeStatus(request.status());
+        if (request.status() == ReviewStatus.IN_PROGRESS) {
+            review.takeForReview(username);
+        } else if (request.status() == ReviewStatus.READY_FOR_REVIEW
+                && review.getStatus() == ReviewStatus.IN_PROGRESS) {
+            review.giveUpReview(username);
+        } else {
+            review.changeStatus(request.status());
+        }
         return completionService.response(review);
     }
 
@@ -85,7 +101,7 @@ public class ReviewService {
             return List.of();
         }
         return reviewRepository.findDuplicateCandidates(
-                        excludedCaseId, SuggestionStatus.GARBAGE, query.trim(),
+                        excludedCaseId, ReviewStatus.GARBAGE, query.trim(),
                         PageRequest.of(0, 5, Sort.by("reviewedTerm")))
                 .stream()
                 .map(review -> DuplicateReviewCandidateResponse.from(
@@ -138,7 +154,8 @@ public class ReviewService {
     }
 
     @Transactional
-    public ReviewResponse recordTezaursCheck(UUID reviewId, RecordTezaursCheckRequest request) {
+    public ReviewResponse recordTezaursCheck(UUID reviewId, RecordTezaursCheckRequest request, String authorization) {
+        currentUserService.requireUsername(authorization);
         ReviewCase review = requireReview(reviewId);
         if (request.status().entryExists()
                 && (request.matchedEntryId() == null

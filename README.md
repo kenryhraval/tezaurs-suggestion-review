@@ -8,11 +8,13 @@ Tēzaurs.
 - `incubator.suggestions` is the immutable source of submitted suggestions.
 - An untouched suggestion is shown as `NEW` and is addressed by its integer
   incubator ID.
-- First confirm whether the suggestion is trash. For a non-trash suggestion,
-  choose an existing case or create a new case in `Apstrādē`.
+- First decide whether the suggestion is trash. For a non-trash suggestion,
+  choose an existing case or keep a new case in `Skatāms`.
 - The first decision creates a preliminary case in `Skatāms` or `Atkritums`,
-  so it survives reloads. Choosing a new case starts that preliminary case;
-  choosing an existing case moves all its sources to the destination case.
+  so it survives reloads. “Paņemt apstrādē?” starts work separately and records
+  the proxy-authenticated username. “Atteikties no apstrādes” returns the case to
+  `Skatāms`, clears the assignment and preserves saved work.
+  Choosing an existing case moves all its sources to the destination case.
 - Merging keeps the destination's data and status. After confirmation, the source
   case and its drafts are deleted; draft differences are not merged.
 - Cases link immutable sources through `review.case_suggestions`.
@@ -53,6 +55,8 @@ Workflow changes reset section UI, while saved checks, evidence, and drafts are 
 Authentication is performed by the deployment reverse proxy. The backend reads
 the authenticated username from the proxy-validated Basic Authorization header
 through `GET /api/me`, so the backend must not be published without that proxy.
+All status changes, including usage and Tēzaurs decisions, require this header
+and a readable username. Full status-change history is not implemented yet.
 
 ## Run locally
 
@@ -81,6 +85,9 @@ cd frontend
 npm install
 npm run dev
 ```
+
+The Vite development proxy identifies API requests as the test user `local`.
+Deployed environments continue to use their reverse-proxy login.
 
 Swagger is available at `http://localhost:8080/swagger-ui.html`.
 

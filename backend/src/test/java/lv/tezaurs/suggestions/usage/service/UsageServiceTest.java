@@ -13,7 +13,7 @@ import lv.tezaurs.suggestions.common.error.ConflictException;
 import lv.tezaurs.suggestions.common.error.NotFoundException;
 import lv.tezaurs.suggestions.entry.service.EntryDraftService;
 import lv.tezaurs.suggestions.suggestion.entity.ReviewCase;
-import lv.tezaurs.suggestions.suggestion.entity.SuggestionStatus;
+import lv.tezaurs.suggestions.suggestion.entity.ReviewStatus;
 import lv.tezaurs.suggestions.suggestion.entity.TezaursStatus;
 import lv.tezaurs.suggestions.suggestion.repository.ReviewCaseRepository;
 import lv.tezaurs.suggestions.suggestion.service.ReviewCompletionService;
@@ -22,6 +22,8 @@ import lv.tezaurs.suggestions.usage.entity.*;
 import lv.tezaurs.suggestions.usage.repository.UsageEvidenceRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 class UsageServiceTest {
     private final ReviewCaseRepository cases = mock(ReviewCaseRepository.class);
@@ -35,7 +37,7 @@ class UsageServiceTest {
     @BeforeEach
     void prepareCase() {
         review = new ReviewCase("vārds");
-        review.changeStatus(SuggestionStatus.IN_PROGRESS);
+        review.changeStatus(ReviewStatus.IN_PROGRESS);
         review.recordTezaursCheck(TezaursStatus.NOT_FOUND, null);
         when(cases.findById(review.getId())).thenReturn(Optional.of(review));
         when(cases.findLockedById(review.getId())).thenReturn(Optional.of(review));
@@ -45,11 +47,11 @@ class UsageServiceTest {
     @Test
     void confirmsUsageFromTheReviewersKnowledgeAndPostponesWithoutCallingItInvented() {
         assertThat(review.canEditEntryDraft()).isFalse();
-        service.decide(review.getId(), new UsageDecisionRequest(UsageDecision.NOT_CONFIRMED, "Nav datu"), null);
-        assertThat(review.getStatus()).isEqualTo(SuggestionStatus.INSUFFICIENT_DATA);
+        service.decide(review.getId(), new UsageDecisionRequest(UsageDecision.NOT_CONFIRMED, "Nav datu"), "Basic dXNlcjpwYXNz");
+        assertThat(review.getStatus()).isEqualTo(ReviewStatus.INSUFFICIENT_DATA);
         verifyNoInteractions(drafts);
         service.decide(review.getId(), new UsageDecisionRequest(UsageDecision.USED, " Pazīstu šo vārdu. "), "Basic dXNlcjpwYXNz");
-        assertThat(review.getStatus()).isEqualTo(SuggestionStatus.IN_PROGRESS);
+        assertThat(review.getStatus()).isEqualTo(ReviewStatus.IN_PROGRESS);
         assertThat(review.getUsageNote()).isEqualTo("Pazīstu šo vārdu.");
         assertThat(review.getUsageDecidedBy()).isEqualTo("user");
         assertThat(review.getUsageDecidedAt()).isNotNull();
@@ -63,23 +65,35 @@ class UsageServiceTest {
         assertThat(review.getUsageDecidedBy()).isEqualTo("user");
         assertThat(review.getUsageDecidedAt()).isEqualTo(decisionTime);
         assertThat(review.getTezaursStatus()).isEqualTo(TezaursStatus.NOT_FOUND);
-        assertThat(review.getStatus()).isEqualTo(SuggestionStatus.IN_PROGRESS);
+        assertThat(review.getStatus()).isEqualTo(ReviewStatus.IN_PROGRESS);
         assertThat(review.canEditEntryDraft()).isTrue();
     }
 
     @Test
     void distinguishesPostponementFromAnExplicitInventedDecision() {
-        service.decide(review.getId(), new UsageDecisionRequest(UsageDecision.NOT_CONFIRMED, "Jāturpina izpēte"), null);
-        assertThat(review.getStatus()).isEqualTo(SuggestionStatus.INSUFFICIENT_DATA);
-        service.decide(review.getId(), new UsageDecisionRequest(UsageDecision.INVENTED, "Valodnieka izvērtējums"), null);
-        assertThat(review.getStatus()).isEqualTo(SuggestionStatus.INVENTED);
+        service.decide(review.getId(), new UsageDecisionRequest(UsageDecision.NOT_CONFIRMED, "Jāturpina izpēte"), "Basic dXNlcjpwYXNz");
+        assertThat(review.getStatus()).isEqualTo(ReviewStatus.INSUFFICIENT_DATA);
+        service.decide(review.getId(), new UsageDecisionRequest(UsageDecision.INVENTED, "Valodnieka izvērtējums"), "Basic dXNlcjpwYXNz");
+        assertThat(review.getStatus()).isEqualTo(ReviewStatus.INVENTED);
         assertThat(review.getUsageDecision()).isEqualTo(UsageDecision.INVENTED);
-        service.decide(review.getId(), new UsageDecisionRequest(UsageDecision.NOT_CONFIRMED, null), null);
-        assertThat(review.getStatus()).isEqualTo(SuggestionStatus.INSUFFICIENT_DATA);
-        service.decide(review.getId(), new UsageDecisionRequest(UsageDecision.INVENTED, null), null);
-        service.decide(review.getId(), new UsageDecisionRequest(UsageDecision.USED, null), null);
-        assertThat(review.getStatus()).isEqualTo(SuggestionStatus.IN_PROGRESS);
+        service.decide(review.getId(), new UsageDecisionRequest(UsageDecision.NOT_CONFIRMED, null), "Basic dXNlcjpwYXNz");
+        assertThat(review.getStatus()).isEqualTo(ReviewStatus.INSUFFICIENT_DATA);
+        service.decide(review.getId(), new UsageDecisionRequest(UsageDecision.INVENTED, null), "Basic dXNlcjpwYXNz");
+        service.decide(review.getId(), new UsageDecisionRequest(UsageDecision.USED, null), "Basic dXNlcjpwYXNz");
+        assertThat(review.getStatus()).isEqualTo(ReviewStatus.IN_PROGRESS);
         verify(drafts).create(review.getId());
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = UsageDecision.class, names = "NOT_CHECKED", mode = EnumSource.Mode.EXCLUDE)
+    void usageDecisionsRequireAUsername(UsageDecision decision) {
+        assertThatThrownBy(() -> service.decide(review.getId(), new UsageDecisionRequest(decision, null), null))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("jāpiesakās");
+
+        assertThat(review.getStatus()).isEqualTo(ReviewStatus.IN_PROGRESS);
+        assertThat(review.getUsageDecision()).isEqualTo(UsageDecision.NOT_CHECKED);
+        verifyNoInteractions(drafts);
     }
 
     @Test
@@ -108,15 +122,15 @@ class UsageServiceTest {
 
     @Test
     void rejectsUnsupportedDecisionsAndWritesToClosedOrExistingEntryCases() {
-        assertThatThrownBy(() -> service.decide(review.getId(), new UsageDecisionRequest(UsageDecision.NOT_CHECKED, null), null))
+        assertThatThrownBy(() -> service.decide(review.getId(), new UsageDecisionRequest(UsageDecision.NOT_CHECKED, null), "Basic dXNlcjpwYXNz"))
                 .isInstanceOf(ConflictException.class);
-        review.changeStatus(SuggestionStatus.COMPLETED);
-        assertThatThrownBy(() -> service.decide(review.getId(), new UsageDecisionRequest(UsageDecision.USED, null), null))
+        review.changeStatus(ReviewStatus.COMPLETED);
+        assertThatThrownBy(() -> service.decide(review.getId(), new UsageDecisionRequest(UsageDecision.USED, null), "Basic dXNlcjpwYXNz"))
                 .isInstanceOf(ConflictException.class);
         assertThatThrownBy(() -> service.addEvidence(review.getId(), external("https://example.com"), null))
                 .isInstanceOf(ConflictException.class);
         ReviewCase other = new ReviewCase("lemt");
-        other.changeStatus(SuggestionStatus.IN_PROGRESS);
+        other.changeStatus(ReviewStatus.IN_PROGRESS);
         other.recordTezaursCheck(TezaursStatus.MEANING_NOT_FOUND, 100);
         when(cases.findById(other.getId())).thenReturn(Optional.of(other));
         assertThatThrownBy(() -> service.evidence(other.getId())).isInstanceOf(ConflictException.class);

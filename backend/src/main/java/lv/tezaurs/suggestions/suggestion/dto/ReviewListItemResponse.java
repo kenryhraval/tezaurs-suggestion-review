@@ -2,12 +2,12 @@ package lv.tezaurs.suggestions.suggestion.dto;
 
 import java.time.Instant;
 import java.util.UUID;
-import lv.tezaurs.suggestions.suggestion.entity.SuggestionStatus;
+import lv.tezaurs.suggestions.suggestion.entity.ReviewStatus;
 
 public record ReviewListItemResponse(
         UUID id,
         String reviewedTerm,
-        SuggestionStatus status,
+        ReviewStatus status,
         Instant createdAt,
         long sourceCount) {
 

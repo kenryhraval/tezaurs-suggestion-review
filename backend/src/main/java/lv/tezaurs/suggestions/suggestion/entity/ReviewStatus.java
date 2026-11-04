@@ -3,7 +3,7 @@ package lv.tezaurs.suggestions.suggestion.entity;
 import java.util.Set;
 import lv.tezaurs.suggestions.common.error.ConflictException;
 
-public enum SuggestionStatus {
+public enum ReviewStatus {
     NEW,
     READY_FOR_REVIEW,
     GARBAGE,
@@ -14,17 +14,17 @@ public enum SuggestionStatus {
     INSUFFICIENT_DATA,
     NEEDS_EXPERT;
 
-    public boolean canTransitionTo(SuggestionStatus target) {
+    public boolean canTransitionTo(ReviewStatus target) {
         return transitions().contains(target);
     }
 
-    public void requireTransitionTo(SuggestionStatus target) {
+    public void requireTransitionTo(ReviewStatus target) {
         if (!canTransitionTo(target)) {
-            throw new ConflictException("Suggestion status cannot change from " + this + " to " + target);
+            throw new ConflictException("Review status cannot change from " + this + " to " + target);
         }
     }
 
-    private Set<SuggestionStatus> transitions() {
+    private Set<ReviewStatus> transitions() {
         return switch (this) {
             case NEW -> Set.of(READY_FOR_REVIEW, IN_PROGRESS, GARBAGE);
             case READY_FOR_REVIEW -> Set.of(IN_PROGRESS, COMPLETED, GARBAGE);

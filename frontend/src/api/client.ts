@@ -9,7 +9,7 @@ import type {
   SenseDraft,
   SuggestionPage,
   SuggestionSort,
-  SuggestionStatus,
+  ReviewStatus,
   SaveEntryDraft,
   SaveLexemeDraft,
   LexemeDraft,
@@ -50,6 +50,11 @@ async function request(path: string, options?: RequestInit): Promise<Response> {
   return response
 }
 
+export async function getCurrentUser(): Promise<{ username: string | null }> {
+  const response = await request('/api/me')
+  return response.json()
+}
+
 export async function getSuggestions(
   query: string,
   page: number,
@@ -67,7 +72,7 @@ export async function getSuggestions(
 }
 
 async function getReviews(
-  status: SuggestionStatus,
+  status: ReviewStatus,
   query: string,
   page: number,
   size: number,
@@ -85,7 +90,7 @@ async function getReviews(
 }
 
 export async function getQueueItems(
-  status: SuggestionStatus,
+  status: ReviewStatus,
   query: string,
   page: number,
   size: number,
@@ -120,7 +125,7 @@ export async function detachSuggestion(reviewId: string, sourceId: number): Prom
 
 export async function changeSuggestionStatus(
   id: number,
-  status: SuggestionStatus,
+  status: ReviewStatus,
 ): Promise<Review> {
   const response = await request(`/api/suggestions/${id}/status`, {
     method: 'POST',
@@ -131,7 +136,7 @@ export async function changeSuggestionStatus(
 
 export async function changeReviewStatus(
   id: string,
-  status: SuggestionStatus,
+  status: ReviewStatus,
 ): Promise<Review> {
   const response = await request(`/api/reviews/${id}/status`, {
     method: 'POST',

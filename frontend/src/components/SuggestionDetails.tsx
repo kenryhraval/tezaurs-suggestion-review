@@ -7,13 +7,13 @@ import {
   saveTezaursCheck,
   saveUsageDecision,
 } from '../api/client'
-import { suggestionStatusLabels } from '../review/statuses'
+import { reviewStatusLabels, reviewStatusTransitions } from '../review/statuses'
 import type {
   QueueItem,
   Review,
   ReviewSource,
   Suggestion,
-  SuggestionStatus,
+  ReviewStatus,
   TezaursStatus,
   UsageDecision,
 } from '../api/types'
@@ -29,7 +29,9 @@ import { EditButton } from './EditButton'
 
 type Props = {
   item: QueueItem
-  onStatusChange: (status: SuggestionStatus) => Promise<Review | null>
+  initialReview: Review | null
+  username: string | null
+  onStatusChange: (status: ReviewStatus) => Promise<Review | null>
   onDuplicate: (sourceSuggestionId: number, targetReviewId: string) => Promise<void>
   onReviewUpdated: (review: Review) => void
 }
@@ -48,13 +50,13 @@ function sourceFromSuggestion(suggestion: Suggestion): ReviewSource {
   }
 }
 
-function useSuggestionReview(reviewId: string | null) {
-  const [review, setReview] = useState<Review | null>(null)
+function useSuggestionReview(reviewId: string | null, initialReview: Review | null) {
+  const [review, setReview] = useState<Review | null>(initialReview)
   const [error, setError] = useState('')
   const reviewVersion = useRef(0)
 
   useEffect(() => {
-    if (!reviewId) {
+    if (!reviewId || initialReview?.id === reviewId) {
       return
     }
     const id = reviewId
@@ -81,7 +83,7 @@ function useSuggestionReview(reviewId: string | null) {
     return () => {
       requestIsOutdated = true
     }
-  }, [reviewId])
+  }, [reviewId, initialReview])
 
   function updateReview(saved: Review) {
     reviewVersion.current += 1
@@ -92,7 +94,8 @@ function useSuggestionReview(reviewId: string | null) {
   return { review: review?.id === reviewId ? review : null, updateReview, error }
 }
 
-export function SuggestionDetails({ item, onStatusChange, onDuplicate, onReviewUpdated }: Props) {
+export function SuggestionDetails({ item, initialReview, username, onStatusChange, onDuplicate, onReviewUpdated }: Props) {
+  const [intakeOpen, setIntakeOpen] = useState<boolean | null>(null)
   const [error, setError] = useState('')
   const [pendingCompletionStatus, setPendingCompletionStatus] = useState<'NEEDS_EXPERT' | 'COMPLETED' | null>(null)
   const [changingStatus, setChangingStatus] = useState(false)
@@ -101,21 +104,57 @@ export function SuggestionDetails({ item, onStatusChange, onDuplicate, onReviewU
   const [editedTitle, setEditedTitle] = useState('')
   const [savingTitle, setSavingTitle] = useState(false)
   const [titleError, setTitleError] = useState('')
+  const assignmentMenuRef = useRef<HTMLDetailsElement>(null)
   const suggestion = item.itemType === 'SUGGESTION' ? item : null
   const requestedReviewId = item.itemType === 'REVIEW' ? item.id : null
-  const reviewState = useSuggestionReview(requestedReviewId)
+  const reviewState = useSuggestionReview(requestedReviewId, initialReview)
   const review = reviewState.review
   const reviewLoading = item.itemType === 'REVIEW' && !review && !reviewState.error
   const workflow = getReviewWorkflow(review, item.status)
   const status = workflow.status
   const reviewInProgress = status === 'IN_PROGRESS'
+  const canTakeForReview = review !== null
+    && (reviewStatusTransitions[status].includes('IN_PROGRESS') || (reviewInProgress && !review.assignedTo))
+    && (!review.assignedTo || review.assignedTo === username)
 
-  async function changeStatus(status: SuggestionStatus) {
+  useEffect(() => {
+    function closeAssignmentMenuOutside(event: PointerEvent) {
+      const menu = assignmentMenuRef.current
+      if (menu?.open && !menu.contains(event.target as Node)) {
+        menu.open = false
+      }
+    }
+    document.addEventListener('pointerdown', closeAssignmentMenuOutside)
+    return () => document.removeEventListener('pointerdown', closeAssignmentMenuOutside)
+  }, [])
+
+  async function changeStatus(status: ReviewStatus) {
     const updatedReview = await onStatusChange(status)
     if (updatedReview) {
+      setIntakeOpen(updatedReview.status === 'READY_FOR_REVIEW')
       reviewState.updateReview(updatedReview)
     }
     return updatedReview
+  }
+
+  async function changeAssignment(nextStatus: 'IN_PROGRESS' | 'READY_FOR_REVIEW') {
+    if (changingStatus) {
+      return
+    }
+    const menu = assignmentMenuRef.current
+    if (menu) {
+      menu.open = false
+      menu.querySelector('summary')?.focus()
+    }
+    setChangingStatus(true)
+    setStatusError('')
+    try {
+      await changeStatus(nextStatus)
+    } catch (cause) {
+      setStatusError(cause instanceof Error ? cause.message : 'Neizdevās mainīt apstrādi.')
+    } finally {
+      setChangingStatus(false)
+    }
   }
 
   function requestReviewCompletion(nextStatus: 'NEEDS_EXPERT' | 'COMPLETED') {
@@ -182,6 +221,7 @@ export function SuggestionDetails({ item, onStatusChange, onDuplicate, onReviewU
     setError('')
     try {
       const updatedReview = await saveTezaursCheck(review.id, status, entryId)
+      setIntakeOpen(false)
       reviewState.updateReview(updatedReview)
       onReviewUpdated(updatedReview)
       return true
@@ -196,6 +236,7 @@ export function SuggestionDetails({ item, onStatusChange, onDuplicate, onReviewU
       return false
     }
     const updated = await saveUsageDecision(review.id, decision)
+    setIntakeOpen(false)
     reviewState.updateReview(updated)
     onReviewUpdated(updated)
     return true
@@ -217,6 +258,9 @@ export function SuggestionDetails({ item, onStatusChange, onDuplicate, onReviewU
     sources = review.sources
   }
   const initialGloss = sources.length === 1 ? sources[0].submittedDefinition : ''
+  const assignmentInfo = review?.assignedTo
+    ? <>Perēkli ir paņēmis apstrādē <strong>{review.assignedTo}</strong></>
+    : 'Perēkli neviens nav paņēmis apstrādē'
   const completionQuestion = review && (
     <div className="draft-actions">
       <p><strong>Vai uzskatāt, ka nepieciešams eksperta apstiprinājums?</strong></p>
@@ -265,12 +309,43 @@ export function SuggestionDetails({ item, onStatusChange, onDuplicate, onReviewU
         />
       )}
       <div className="review-heading">
-        <span className="muted">{suggestionStatusLabels[status]}</span>
+        <span className="muted">{reviewStatusLabels[status]}</span>
         <h2 className="suggestion-title">{displayedTerm}</h2>
         {reviewInProgress && review && (
           <EditButton label="Labot izskatīšanas nosaukumu" onClick={openTitleEditor} />
         )}
+        {review && status !== 'GARBAGE' && (
+          <div className="review-assignment">
+            <span className="muted">{assignmentInfo}</span>
+            <details className="review-assignment-menu" ref={assignmentMenuRef}
+              onBlur={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget)) {
+                  event.currentTarget.open = false
+                }
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Escape') {
+                  event.currentTarget.open = false
+                  event.currentTarget.querySelector('summary')?.focus()
+                }
+              }}>
+              <summary className="icon-button" title="Darbības ar perēkli" aria-label="Darbības ar perēkli">
+                <span aria-hidden="true">⋯</span>
+              </summary>
+              <div className="entity-action-menu">
+                {reviewInProgress && review.assignedTo === username && review.assignedTo ? (
+                  <button type="button" disabled={changingStatus}
+                    onClick={() => changeAssignment('READY_FOR_REVIEW')}>Atteikties</button>
+                ) : (
+                  <button type="button" disabled={changingStatus || !canTakeForReview}
+                    onClick={() => changeAssignment('IN_PROGRESS')}>Paņemt apstrādē</button>
+                )}
+              </div>
+            </details>
+          </div>
+        )}
       </div>
+      {statusError && !pendingCompletionStatus && <p className="error" role="alert">{statusError}</p>}
       {editingTitle && (
         <ConfirmationDialog
           title="Labot izskatīšanas nosaukumu"
@@ -283,7 +358,6 @@ export function SuggestionDetails({ item, onStatusChange, onDuplicate, onReviewU
           <label>
             Nosaukums
             <input
-              autoFocus
               value={editedTitle}
               onChange={(event) => setEditedTitle(event.target.value)}
               disabled={savingTitle}
@@ -305,7 +379,8 @@ export function SuggestionDetails({ item, onStatusChange, onDuplicate, onReviewU
         {(suggestion || review) && (
           <SuggestionIntake status={status} onStatusChange={changeStatus}
             review={review} onDuplicate={onDuplicate}
-            defaultOpen={workflow.intake.defaultOpen} readOnly={workflow.intake.readOnly} />
+            expanded={intakeOpen ?? workflow.intake.defaultOpen} onExpandedChange={setIntakeOpen}
+            readOnly={workflow.intake.readOnly} />
         )}
 
         {review && workflow.tezaurs.visible && (

@@ -13,7 +13,7 @@ import lv.tezaurs.suggestions.suggestion.dto.SuggestionResponse;
 import lv.tezaurs.suggestions.suggestion.dto.SuggestionSort;
 import lv.tezaurs.suggestions.suggestion.dto.ReviewResponse;
 import lv.tezaurs.suggestions.suggestion.dto.UpdateStatusRequest;
-import lv.tezaurs.suggestions.suggestion.entity.SuggestionStatus;
+import lv.tezaurs.suggestions.suggestion.entity.ReviewStatus;
 import lv.tezaurs.suggestions.suggestion.service.SuggestionService;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -26,15 +26,15 @@ class SuggestionControllerTest {
         SuggestionResponse response = new SuggestionResponse(42, "term", "definition", null,
                 null, null, null, null, Instant.EPOCH);
         SuggestionPageResponse page = new SuggestionPageResponse(List.of(response), 0, 1, 1);
-        UpdateStatusRequest request = new UpdateStatusRequest(SuggestionStatus.READY_FOR_REVIEW);
+        UpdateStatusRequest request = new UpdateStatusRequest(ReviewStatus.READY_FOR_REVIEW);
         ReviewResponse review = mock(ReviewResponse.class);
         when(service.list("", 0, 20, SuggestionSort.NEWEST))
                 .thenReturn(page);
-        when(service.changeStatus(response.id(), request)).thenReturn(review);
+        when(service.changeStatus(response.id(), request, null)).thenReturn(review);
 
         assertThat(controller.list("", 0, 20, SuggestionSort.NEWEST))
                 .isEqualTo(page);
-        assertThat(controller.changeStatus(response.id(), request)).isEqualTo(review);
+        assertThat(controller.changeStatus(response.id(), request, null)).isEqualTo(review);
     }
 
     @Test

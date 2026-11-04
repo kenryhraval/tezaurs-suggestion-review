@@ -90,14 +90,14 @@ export function UsageCheck({ review, onSaveDecision, defaultOpen, readOnly }: Pr
     }
   }
 
-  async function confirmDecision() {
-    if (!pendingDecision) {
+  async function saveDecision(decision: UsageDecision) {
+    if (saving) {
       return
     }
     setSaving(true)
     setError('')
     try {
-      if (await onSaveDecision(pendingDecision)) {
+      if (await onSaveDecision(decision)) {
         setPendingDecision(null)
         setExpanded(false)
       }
@@ -150,7 +150,7 @@ export function UsageCheck({ review, onSaveDecision, defaultOpen, readOnly }: Pr
 
   function chooseUsed() {
     setError('')
-    setPendingDecision('USED')
+    saveDecision('USED')
   }
 
   function chooseNotUsed() {
@@ -204,11 +204,9 @@ export function UsageCheck({ review, onSaveDecision, defaultOpen, readOnly }: Pr
         <label>Citāts<textarea name="citation" required maxLength={10000} rows={3} disabled={saving} /></label>
       </EditDialog>}
       {pendingDecision && <ConfirmationDialog busy={saving} error={error}
-        message={pendingDecision === 'USED'
-          ? 'Apstiprinot varēsiet sagatavot jaunā šķirkļa melnrakstu.'
-          : 'Kā rīkoties ar ieteikumu?'}
-        onConfirm={() => confirmDecision()} onCancel={() => setPendingDecision(null)}>
-        {pendingDecision !== 'USED' && <>
+        message="Kā rīkoties ar ieteikumu?"
+        onConfirm={() => saveDecision(pendingDecision)} onCancel={() => setPendingDecision(null)}>
+        <>
           <label className="checkbox-label"><input type="radio" name="usage-outcome" disabled={saving}
             checked={pendingDecision === 'NOT_CONFIRMED'} onChange={() => setPendingDecision('NOT_CONFIRMED')} />
             Atlikt: trūkst datu, izpēti var turpināt vēlāk.
@@ -217,7 +215,7 @@ export function UsageCheck({ review, onSaveDecision, defaultOpen, readOnly }: Pr
             checked={pendingDecision === 'INVENTED'} onChange={() => setPendingDecision('INVENTED')} />
             Izdomāts vārds.
           </label>
-        </>}
+        </>
       </ConfirmationDialog>}
       {deletingId && <ConfirmationDialog busy={saving} error={error}
         message="Noņemt šo atradumu no izskatīšanas?" onConfirm={() => removeEvidence()}

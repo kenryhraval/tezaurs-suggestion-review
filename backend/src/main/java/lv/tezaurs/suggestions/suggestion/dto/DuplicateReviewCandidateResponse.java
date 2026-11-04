@@ -2,12 +2,12 @@ package lv.tezaurs.suggestions.suggestion.dto;
 
 import java.util.UUID;
 import lv.tezaurs.suggestions.suggestion.entity.ReviewCase;
-import lv.tezaurs.suggestions.suggestion.entity.SuggestionStatus;
+import lv.tezaurs.suggestions.suggestion.entity.ReviewStatus;
 
 public record DuplicateReviewCandidateResponse(
         UUID id,
         String reviewedTerm,
-        SuggestionStatus status,
+        ReviewStatus status,
         long sourceCount) {
 
     public static DuplicateReviewCandidateResponse from(ReviewCase review, long sourceCount) {

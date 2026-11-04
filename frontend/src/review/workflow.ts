@@ -1,6 +1,6 @@
-import type { Review, SuggestionStatus } from '../api/types'
+import type { Review, ReviewStatus } from '../api/types'
 
-export function getReviewWorkflow(review: Review | null, queueStatus: SuggestionStatus) {
+export function getReviewWorkflow(review: Review | null, queueStatus: ReviewStatus) {
   const status = review?.status ?? queueStatus
   const isInProgress = status === 'IN_PROGRESS'
   const onlyIntakeIsVisible = status === 'NEW' || status === 'READY_FOR_REVIEW' || status === 'GARBAGE'

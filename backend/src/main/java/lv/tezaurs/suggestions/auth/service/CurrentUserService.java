@@ -3,11 +3,17 @@ package lv.tezaurs.suggestions.auth.service;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Optional;
+import lv.tezaurs.suggestions.common.error.ConflictException;
 import org.springframework.stereotype.Service;
 
 @Service
 public class CurrentUserService {
     private static final String BASIC_PREFIX = "Basic ";
+
+    public String requireUsername(String authorization) {
+        return usernameFrom(authorization)
+                .orElseThrow(() -> new ConflictException("Lai mainītu izskatīšanas statusu, jāpiesakās."));
+    }
 
     public Optional<String> usernameFrom(String authorization) {
         if (authorization == null

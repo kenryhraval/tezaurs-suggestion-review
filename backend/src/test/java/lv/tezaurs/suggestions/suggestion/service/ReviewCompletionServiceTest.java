@@ -16,7 +16,7 @@ import lv.tezaurs.suggestions.sense.entity.ReviewSense;
 import lv.tezaurs.suggestions.sense.repository.ReviewSenseRepository;
 import lv.tezaurs.suggestions.suggestion.entity.CompletionBlockReason;
 import lv.tezaurs.suggestions.suggestion.entity.ReviewCase;
-import lv.tezaurs.suggestions.suggestion.entity.SuggestionStatus;
+import lv.tezaurs.suggestions.suggestion.entity.ReviewStatus;
 import lv.tezaurs.suggestions.suggestion.entity.TezaursStatus;
 import org.junit.jupiter.api.Test;
 
@@ -104,7 +104,7 @@ class ReviewCompletionServiceTest {
 
     private static ReviewCase review() {
         ReviewCase review = new ReviewCase("vārds");
-        review.changeStatus(SuggestionStatus.IN_PROGRESS);
+        review.changeStatus(ReviewStatus.IN_PROGRESS);
         return review;
     }
 }

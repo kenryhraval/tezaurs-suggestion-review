@@ -6,7 +6,7 @@ import java.util.UUID;
 import jakarta.persistence.LockModeType;
 import lv.tezaurs.suggestions.suggestion.dto.ReviewCaseListItem;
 import lv.tezaurs.suggestions.suggestion.entity.ReviewCase;
-import lv.tezaurs.suggestions.suggestion.entity.SuggestionStatus;
+import lv.tezaurs.suggestions.suggestion.entity.ReviewStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -26,7 +26,7 @@ public interface ReviewCaseRepository extends JpaRepository<ReviewCase, UUID> {
             """)
     List<ReviewCase> findDuplicateCandidates(
             @Param("excludedCaseId") UUID excludedCaseId,
-            @Param("excludedStatus") SuggestionStatus excludedStatus,
+            @Param("excludedStatus") ReviewStatus excludedStatus,
             @Param("query") String query, Pageable pageable);
 
     @Query("""
@@ -48,7 +48,7 @@ public interface ReviewCaseRepository extends JpaRepository<ReviewCase, UUID> {
                    ))
             """)
     Page<ReviewCaseListItem> findForReviewQueue(
-            @Param("status") SuggestionStatus status,
+            @Param("status") ReviewStatus status,
             @Param("query") String query,
             Pageable pageable);
 }

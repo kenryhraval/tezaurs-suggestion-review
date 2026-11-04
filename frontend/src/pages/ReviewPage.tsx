@@ -3,11 +3,12 @@ import {
   changeReviewStatus,
   changeSuggestionStatus,
   getQueueItems,
+  getCurrentUser,
   linkDuplicateSuggestion,
 } from '../api/client'
 import { SuggestionDetails } from '../components/SuggestionDetails'
 import { SuggestionList } from '../components/SuggestionList'
-import type { QueueItem, Review, SuggestionSort, SuggestionStatus } from '../api/types'
+import type { QueueItem, Review, SuggestionSort, ReviewStatus } from '../api/types'
 
 const PAGE_SIZE = 20
 
@@ -28,7 +29,7 @@ function itemFromReview(review: Review): QueueItem {
 
 export function ReviewPage() {
   const [items, setItems] = useState<QueueItem[]>([])
-  const [status, setStatus] = useState<SuggestionStatus>('NEW')
+  const [status, setStatus] = useState<ReviewStatus>('NEW')
   const [sort, setSort] = useState<SuggestionSort>('NEWEST')
   const [search, setSearch] = useState('')
   const [query, setQuery] = useState('')
@@ -36,9 +37,29 @@ export function ReviewPage() {
   const [totalPages, setTotalPages] = useState(0)
   const [totalItems, setTotalItems] = useState(0)
   const [selected, setSelected] = useState<QueueItem | null>(null)
+  const [loadedReview, setLoadedReview] = useState<Review | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [reloadCount, setReloadCount] = useState(0)
+  const [username, setUsername] = useState<string | null>(null)
+
+  useEffect(() => {
+    let requestIsOutdated = false
+    async function loadCurrentUser() {
+      try {
+        const user = await getCurrentUser()
+        if (!requestIsOutdated) {
+          setUsername(user.username)
+        }
+      } catch {
+        if (!requestIsOutdated) {
+          setUsername(null)
+        }
+      }
+    }
+    loadCurrentUser()
+    return () => { requestIsOutdated = true }
+  }, [])
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -48,6 +69,7 @@ export function ReviewPage() {
       }
       setLoading(true)
       setSelected(null)
+      setLoadedReview(null)
       setPage(0)
       setQuery(nextQuery)
     }, 300)
@@ -98,9 +120,10 @@ export function ReviewPage() {
     }
   }, [status, query, page, sort, reloadCount])
 
-  function changeFilterStatus(nextStatus: SuggestionStatus) {
+  function changeFilterStatus(nextStatus: ReviewStatus) {
     setLoading(true)
     setSelected(null)
+    setLoadedReview(null)
     setStatus(nextStatus)
     setPage(0)
     if (nextStatus === 'NEW' && sort === 'MOST_SUGGESTIONS') {
@@ -111,6 +134,7 @@ export function ReviewPage() {
   function changeSort(nextSort: SuggestionSort) {
     setLoading(true)
     setSelected(null)
+    setLoadedReview(null)
     setSort(nextSort)
     setPage(0)
   }
@@ -118,6 +142,7 @@ export function ReviewPage() {
   function changePage(nextPage: number) {
     setLoading(true)
     setSelected(null)
+    setLoadedReview(null)
     setPage(nextPage)
   }
 
@@ -136,7 +161,7 @@ export function ReviewPage() {
 
   async function changeStatus(
     item: QueueItem,
-    nextStatus: SuggestionStatus,
+    nextStatus: ReviewStatus,
     keepOpen = false,
   ): Promise<Review | null> {
     setError('')
@@ -148,6 +173,7 @@ export function ReviewPage() {
         review = await changeReviewStatus(item.id, nextStatus)
       }
       const updated = itemFromReview(review)
+      setLoadedReview(review)
       removeItem(item, keepOpen ? updated : undefined)
       return review
     } catch (cause) {
@@ -160,6 +186,7 @@ export function ReviewPage() {
     setError('')
     try {
       const target = await linkDuplicateSuggestion(id, reviewId)
+      setLoadedReview(target)
       let source = items.find((item) => item.itemType === 'SUGGESTION' && item.id === id)
       if (selected?.itemType === 'REVIEW') {
         source = selected
@@ -175,6 +202,7 @@ export function ReviewPage() {
   }
 
   function handleReviewUpdated(review: Review) {
+    setLoadedReview(review)
     if (selected && review.status !== selected.status) {
       removeItem(selected, itemFromReview(review))
     } else {
@@ -188,6 +216,7 @@ export function ReviewPage() {
   function selectItem(key: string) {
     const selectedItem = items.find((item) => itemKey(item) === key)
     setSelected(selectedItem ?? null)
+    setLoadedReview(null)
   }
 
   return (
@@ -226,6 +255,8 @@ export function ReviewPage() {
           <SuggestionDetails
             key={itemKey(selected)}
             item={selected}
+            initialReview={selected.itemType === 'REVIEW' && loadedReview?.id === selected.id ? loadedReview : null}
+            username={username}
             onStatusChange={(nextStatus) => changeStatus(selected, nextStatus, true)}
             onReviewUpdated={handleReviewUpdated}
             onDuplicate={linkDuplicate}

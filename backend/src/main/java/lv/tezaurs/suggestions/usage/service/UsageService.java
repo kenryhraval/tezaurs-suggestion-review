@@ -10,7 +10,7 @@ import lv.tezaurs.suggestions.common.error.NotFoundException;
 import lv.tezaurs.suggestions.entry.service.EntryDraftService;
 import lv.tezaurs.suggestions.suggestion.dto.ReviewResponse;
 import lv.tezaurs.suggestions.suggestion.entity.ReviewCase;
-import lv.tezaurs.suggestions.suggestion.entity.SuggestionStatus;
+import lv.tezaurs.suggestions.suggestion.entity.ReviewStatus;
 import lv.tezaurs.suggestions.suggestion.entity.TezaursStatus;
 import lv.tezaurs.suggestions.suggestion.repository.ReviewCaseRepository;
 import lv.tezaurs.suggestions.suggestion.service.ReviewCompletionService;
@@ -50,8 +50,8 @@ public class UsageService {
 
     @Transactional
     public ReviewResponse decide(UUID caseId, UsageDecisionRequest request, String authorization) {
+        String username = currentUserService.requireUsername(authorization);
         ReviewCase review = requireUsageCase(caseId);
-        String username = currentUserService.usernameFrom(authorization).orElse(null);
         review.recordUsageDecision(request.decision(), request.note(), username);
         if (request.decision() == UsageDecision.USED) {
             entryDraftService.create(caseId);
@@ -104,8 +104,8 @@ public class UsageService {
         if (review.getTezaursStatus() != TezaursStatus.NOT_FOUND) {
             throw new ConflictException("Usage research is currently available only for new entries");
         }
-        if (review.getStatus() != SuggestionStatus.IN_PROGRESS && review.getStatus() != SuggestionStatus.INSUFFICIENT_DATA
-                && review.getStatus() != SuggestionStatus.INVENTED) {
+        if (review.getStatus() != ReviewStatus.IN_PROGRESS && review.getStatus() != ReviewStatus.INSUFFICIENT_DATA
+                && review.getStatus() != ReviewStatus.INVENTED) {
             throw new ConflictException("Usage evidence can only be changed in progress or while awaiting evidence");
         }
     }

@@ -13,14 +13,16 @@ import lv.tezaurs.suggestions.suggestion.dto.ReviewPageResponse;
 import lv.tezaurs.suggestions.suggestion.dto.ReviewResponse;
 import lv.tezaurs.suggestions.suggestion.dto.ReviewSort;
 import lv.tezaurs.suggestions.suggestion.dto.UpdateStatusRequest;
-import lv.tezaurs.suggestions.suggestion.entity.SuggestionStatus;
+import lv.tezaurs.suggestions.suggestion.entity.ReviewStatus;
 import lv.tezaurs.suggestions.suggestion.service.ReviewService;
 import lv.tezaurs.suggestions.tezaurs.dto.TezaursEntryCandidateResponse;
+import org.springframework.http.HttpHeaders;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -33,7 +35,7 @@ public class ReviewController {
 
     @GetMapping
     ReviewPageResponse list(
-            @RequestParam SuggestionStatus status,
+            @RequestParam ReviewStatus status,
             @RequestParam(defaultValue = "") String query,
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
@@ -48,8 +50,9 @@ public class ReviewController {
 
     @PostMapping("/{reviewId}/status")
     ReviewResponse changeStatus(
-            @PathVariable UUID reviewId, @Valid @RequestBody UpdateStatusRequest request) {
-        return service.changeStatus(reviewId, request);
+            @PathVariable UUID reviewId, @Valid @RequestBody UpdateStatusRequest request,
+            @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization) {
+        return service.changeStatus(reviewId, request, authorization);
     }
 
     @GetMapping("/duplicate-candidates")
@@ -71,8 +74,9 @@ public class ReviewController {
 
     @PostMapping("/{reviewId}/tezaurs-check")
     ReviewResponse recordTezaursCheck(@PathVariable UUID reviewId,
-                                      @Valid @RequestBody RecordTezaursCheckRequest request) {
-        return service.recordTezaursCheck(reviewId, request);
+                                      @Valid @RequestBody RecordTezaursCheckRequest request,
+                                      @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization) {
+        return service.recordTezaursCheck(reviewId, request, authorization);
     }
 
     @GetMapping("/{reviewId}/tezaurs-candidates")

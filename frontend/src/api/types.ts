@@ -1,4 +1,4 @@
-export type SuggestionStatus =
+export type ReviewStatus =
   | 'NEW'
   | 'READY_FOR_REVIEW'
   | 'GARBAGE'
@@ -48,7 +48,7 @@ export type SuggestionPage = {
 export type ReviewListItem = {
   id: string
   reviewedTerm: string
-  status: SuggestionStatus
+  status: ReviewStatus
   createdAt: string
   sourceCount: number
 }
@@ -71,7 +71,8 @@ export type QueuePage = {
 export type Review = {
   id: string
   reviewedTerm: string
-  status: SuggestionStatus
+  status: ReviewStatus
+  assignedTo: string | null
   tezaursStatus: TezaursStatus
   matchedEntryId: number | null
   usageDecision: UsageDecision
@@ -99,7 +100,7 @@ export type ReviewSource = {
 export type DuplicateReviewCandidate = {
   id: string
   reviewedTerm: string
-  status: SuggestionStatus
+  status: ReviewStatus
   sourceCount: number
 }
 

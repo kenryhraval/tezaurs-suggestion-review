@@ -17,7 +17,7 @@ import lv.tezaurs.suggestions.sense.entity.ReviewSense;
 import lv.tezaurs.suggestions.sense.repository.ReviewSenseRepository;
 import lv.tezaurs.suggestions.suggestion.service.ReviewCompletionService;
 import lv.tezaurs.suggestions.suggestion.entity.ReviewCase;
-import lv.tezaurs.suggestions.suggestion.entity.SuggestionStatus;
+import lv.tezaurs.suggestions.suggestion.entity.ReviewStatus;
 import lv.tezaurs.suggestions.suggestion.entity.TezaursStatus;
 import lv.tezaurs.suggestions.suggestion.repository.ReviewCaseRepository;
 import lv.tezaurs.suggestions.tezaurs.repository.TezaursSenseRepository;
@@ -47,7 +47,7 @@ public class SenseDraftService {
     @Transactional
     public SaveSenseDraftsResponse save(UUID caseId, SaveSenseDraftsRequest request) {
         ReviewCase reviewCase = requireCase(caseId);
-        if (reviewCase.getStatus() != SuggestionStatus.IN_PROGRESS) {
+        if (reviewCase.getStatus() != ReviewStatus.IN_PROGRESS) {
             throw new ConflictException("Sense drafts can only be edited while the case is in progress");
         }
         if (reviewCase.getTezaursStatus() == TezaursStatus.NOT_FOUND && !reviewCase.canEditEntryDraft()) {

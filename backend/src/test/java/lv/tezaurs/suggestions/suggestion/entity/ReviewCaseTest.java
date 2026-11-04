@@ -13,25 +13,25 @@ import org.junit.jupiter.params.provider.EnumSource;
 class ReviewCaseTest {
     @Test
     void enforcesTheTezaursWorkflowGraph() {
-        Map<SuggestionStatus, Set<SuggestionStatus>> expected = Map.of(
-                SuggestionStatus.NEW, Set.of(SuggestionStatus.READY_FOR_REVIEW,
-                        SuggestionStatus.IN_PROGRESS, SuggestionStatus.GARBAGE),
-                SuggestionStatus.READY_FOR_REVIEW, Set.of(SuggestionStatus.IN_PROGRESS,
-                        SuggestionStatus.COMPLETED, SuggestionStatus.GARBAGE),
-                SuggestionStatus.GARBAGE, Set.of(SuggestionStatus.READY_FOR_REVIEW),
-                SuggestionStatus.IN_PROGRESS, Set.of(SuggestionStatus.INVENTED,
-                        SuggestionStatus.ALREADY_EXISTS, SuggestionStatus.INSUFFICIENT_DATA,
-                        SuggestionStatus.NEEDS_EXPERT, SuggestionStatus.COMPLETED,
-                        SuggestionStatus.READY_FOR_REVIEW, SuggestionStatus.GARBAGE),
-                SuggestionStatus.INVENTED, Set.of(SuggestionStatus.IN_PROGRESS, SuggestionStatus.GARBAGE),
-                SuggestionStatus.ALREADY_EXISTS, Set.of(),
-                SuggestionStatus.INSUFFICIENT_DATA,
-                        Set.of(SuggestionStatus.IN_PROGRESS, SuggestionStatus.GARBAGE),
-                SuggestionStatus.NEEDS_EXPERT, Set.of(SuggestionStatus.IN_PROGRESS),
-                SuggestionStatus.COMPLETED, Set.of());
+        Map<ReviewStatus, Set<ReviewStatus>> expected = Map.of(
+                ReviewStatus.NEW, Set.of(ReviewStatus.READY_FOR_REVIEW,
+                        ReviewStatus.IN_PROGRESS, ReviewStatus.GARBAGE),
+                ReviewStatus.READY_FOR_REVIEW, Set.of(ReviewStatus.IN_PROGRESS,
+                        ReviewStatus.COMPLETED, ReviewStatus.GARBAGE),
+                ReviewStatus.GARBAGE, Set.of(ReviewStatus.READY_FOR_REVIEW),
+                ReviewStatus.IN_PROGRESS, Set.of(ReviewStatus.INVENTED,
+                        ReviewStatus.ALREADY_EXISTS, ReviewStatus.INSUFFICIENT_DATA,
+                        ReviewStatus.NEEDS_EXPERT, ReviewStatus.COMPLETED,
+                        ReviewStatus.READY_FOR_REVIEW, ReviewStatus.GARBAGE),
+                ReviewStatus.INVENTED, Set.of(ReviewStatus.IN_PROGRESS, ReviewStatus.GARBAGE),
+                ReviewStatus.ALREADY_EXISTS, Set.of(),
+                ReviewStatus.INSUFFICIENT_DATA,
+                        Set.of(ReviewStatus.IN_PROGRESS, ReviewStatus.GARBAGE),
+                ReviewStatus.NEEDS_EXPERT, Set.of(ReviewStatus.IN_PROGRESS),
+                ReviewStatus.COMPLETED, Set.of());
 
-        for (SuggestionStatus source : SuggestionStatus.values()) {
-            for (SuggestionStatus target : SuggestionStatus.values()) {
+        for (ReviewStatus source : ReviewStatus.values()) {
+            for (ReviewStatus target : ReviewStatus.values()) {
                 assertThat(source.canTransitionTo(target))
                         .as("transition %s -> %s", source, target)
                         .isEqualTo(expected.get(source).contains(target));
@@ -43,10 +43,10 @@ class ReviewCaseTest {
     void startsNewAndOwnsItsWorkflowState() {
         ReviewCase review = new ReviewCase("submitted");
 
-        assertThat(review.getStatus()).isEqualTo(SuggestionStatus.NEW);
-        review.changeStatus(SuggestionStatus.READY_FOR_REVIEW);
-        review.changeStatus(SuggestionStatus.IN_PROGRESS);
-        assertThat(review.getStatus()).isEqualTo(SuggestionStatus.IN_PROGRESS);
+        assertThat(review.getStatus()).isEqualTo(ReviewStatus.NEW);
+        review.changeStatus(ReviewStatus.READY_FOR_REVIEW);
+        review.changeStatus(ReviewStatus.IN_PROGRESS);
+        assertThat(review.getStatus()).isEqualTo(ReviewStatus.IN_PROGRESS);
     }
 
     @Test
@@ -62,13 +62,13 @@ class ReviewCaseTest {
     @Test
     void validatesStatusAndEvidenceTransitions() {
         ReviewCase review = new ReviewCase("submitted");
-        review.changeStatus(SuggestionStatus.READY_FOR_REVIEW);
+        review.changeStatus(ReviewStatus.READY_FOR_REVIEW);
 
         ReviewCase inProgress = inProgressReview();
-        assertThatThrownBy(() -> inProgress.changeStatus(SuggestionStatus.ALREADY_EXISTS))
+        assertThatThrownBy(() -> inProgress.changeStatus(ReviewStatus.ALREADY_EXISTS))
                 .isInstanceOf(ConflictException.class);
         inProgress.recordTezaursCheck(TezaursStatus.MEANING_ALREADY_EXISTS, 42);
-        assertThat(inProgress.getStatus()).isEqualTo(SuggestionStatus.ALREADY_EXISTS);
+        assertThat(inProgress.getStatus()).isEqualTo(ReviewStatus.ALREADY_EXISTS);
     }
 
     @ParameterizedTest
@@ -77,9 +77,9 @@ class ReviewCaseTest {
         ReviewCase review = inProgressReview();
         review.recordTezaursCheck(previousDecision, 42);
 
-        review.changeStatus(SuggestionStatus.ALREADY_EXISTS);
+        review.changeStatus(ReviewStatus.ALREADY_EXISTS);
 
-        assertThat(review.getStatus()).isEqualTo(SuggestionStatus.ALREADY_EXISTS);
+        assertThat(review.getStatus()).isEqualTo(ReviewStatus.ALREADY_EXISTS);
         assertThat(review.getTezaursStatus()).isEqualTo(TezaursStatus.MEANING_ALREADY_EXISTS);
         assertThat(review.getMatchedEntryId()).isEqualTo(42);
     }
@@ -90,10 +90,10 @@ class ReviewCaseTest {
         review.recordTezaursCheck(TezaursStatus.NOT_FOUND, null);
         review.recordUsageDecision(lv.tezaurs.suggestions.usage.entity.UsageDecision.USED, null, null);
 
-        assertThatThrownBy(() -> review.changeStatus(SuggestionStatus.ALREADY_EXISTS))
+        assertThatThrownBy(() -> review.changeStatus(ReviewStatus.ALREADY_EXISTS))
                 .isInstanceOf(ConflictException.class)
                 .hasMessage("Select the matching Tēzaurs entry");
-        assertThat(review.getStatus()).isEqualTo(SuggestionStatus.IN_PROGRESS);
+        assertThat(review.getStatus()).isEqualTo(ReviewStatus.IN_PROGRESS);
         assertThat(review.getTezaursStatus()).isEqualTo(TezaursStatus.NOT_FOUND);
     }
 
@@ -109,11 +109,11 @@ class ReviewCaseTest {
     }
 
     @ParameterizedTest
-    @EnumSource(value = SuggestionStatus.class, names = {"IN_PROGRESS", "ALREADY_EXISTS"}, mode = EnumSource.Mode.EXCLUDE)
-    void requiresResumingBeforeChangingTheTezaursCheck(SuggestionStatus status) {
+    @EnumSource(value = ReviewStatus.class, names = {"IN_PROGRESS", "ALREADY_EXISTS"}, mode = EnumSource.Mode.EXCLUDE)
+    void requiresResumingBeforeChangingTheTezaursCheck(ReviewStatus status) {
         ReviewCase review = inProgressReview();
         review.recordTezaursCheck(TezaursStatus.NOT_FOUND, null);
-        if (status == SuggestionStatus.NEW) review = new ReviewCase("submitted");
+        if (status == ReviewStatus.NEW) review = new ReviewCase("submitted");
         else review.changeStatus(status);
         ReviewCase paused = review;
         TezaursStatus previousCheck = paused.getTezaursStatus();
@@ -127,11 +127,11 @@ class ReviewCaseTest {
     }
 
     @ParameterizedTest
-    @EnumSource(value = SuggestionStatus.class, names = "IN_PROGRESS", mode = EnumSource.Mode.EXCLUDE)
-    void requiresResumingBeforeChangingTheTitle(SuggestionStatus status) {
+    @EnumSource(value = ReviewStatus.class, names = "IN_PROGRESS", mode = EnumSource.Mode.EXCLUDE)
+    void requiresResumingBeforeChangingTheTitle(ReviewStatus status) {
         ReviewCase review = inProgressReview();
         review.recordTezaursCheck(TezaursStatus.MEANING_NOT_FOUND, 42);
-        if (status == SuggestionStatus.NEW) review = new ReviewCase("submitted");
+        if (status == ReviewStatus.NEW) review = new ReviewCase("submitted");
         else review.changeStatus(status);
         ReviewCase paused = review;
 
@@ -143,8 +143,8 @@ class ReviewCaseTest {
 
     private static ReviewCase inProgressReview() {
         ReviewCase review = new ReviewCase("submitted");
-        review.changeStatus(SuggestionStatus.READY_FOR_REVIEW);
-        review.changeStatus(SuggestionStatus.IN_PROGRESS);
+        review.changeStatus(ReviewStatus.READY_FOR_REVIEW);
+        review.changeStatus(ReviewStatus.IN_PROGRESS);
         return review;
     }
 
@@ -153,6 +153,6 @@ class ReviewCaseTest {
         ReviewCase review = inProgressReview();
         review.recordTezaursCheck(TezaursStatus.MEANING_ALREADY_EXISTS, 42);
         review.recordTezaursCheck(TezaursStatus.MEANING_NEEDS_EDITING, 42);
-        assertThat(review.getStatus()).isEqualTo(SuggestionStatus.IN_PROGRESS);
+        assertThat(review.getStatus()).isEqualTo(ReviewStatus.IN_PROGRESS);
     }
 }

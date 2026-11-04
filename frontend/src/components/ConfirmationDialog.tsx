@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { Dialog } from './Dialog'
 
 type Props = {
@@ -14,9 +14,24 @@ type Props = {
 export function ConfirmationDialog({
   message, title = 'Apstiprināt izvēli', children, busy, error, onConfirm, onCancel,
 }: Props) {
+  const confirmButtonRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    if (!busy) {
+      confirmButtonRef.current?.focus({ focusVisible: true })
+    }
+  }, [busy])
+
   return (
     <Dialog title={title} busy={busy} onCancel={onCancel}>
-      <form onSubmit={(event) => {
+      <form onKeyDown={(event) => {
+        const input = event.target
+        if (event.key === 'Enter' && input instanceof HTMLInputElement
+            && (input.type === 'checkbox' || input.type === 'radio')) {
+          event.preventDefault()
+          event.currentTarget.requestSubmit()
+        }
+      }} onSubmit={(event) => {
         event.preventDefault()
         if (!busy) {
           onConfirm()
@@ -26,8 +41,8 @@ export function ConfirmationDialog({
         {children}
         {error && <p className="error" role="alert">{error}</p>}
         <div className="confirmation-actions">
-          <button autoFocus={!children} disabled={busy} onClick={onCancel} type="button">Atcelt</button>
-          <button className="confirmation-confirm" aria-busy={busy} disabled={busy}
+          <button disabled={busy} onClick={onCancel} type="button">Atcelt</button>
+          <button ref={confirmButtonRef} className="confirmation-confirm" aria-busy={busy} disabled={busy}
             type="submit">Apstiprināt</button>
         </div>
       </form>

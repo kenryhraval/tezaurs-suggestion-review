@@ -18,7 +18,7 @@ import lv.tezaurs.suggestions.entry.entity.ReviewLexeme;
 import lv.tezaurs.suggestions.entry.repository.ReviewEntryRepository;
 import lv.tezaurs.suggestions.entry.repository.ReviewLexemeRepository;
 import lv.tezaurs.suggestions.suggestion.entity.ReviewCase;
-import lv.tezaurs.suggestions.suggestion.entity.SuggestionStatus;
+import lv.tezaurs.suggestions.suggestion.entity.ReviewStatus;
 import lv.tezaurs.suggestions.suggestion.entity.TezaursStatus;
 import lv.tezaurs.suggestions.suggestion.repository.ReviewCaseRepository;
 import lv.tezaurs.suggestions.tezaurs.repository.TezaursLexemeRoleRepository;
@@ -111,7 +111,7 @@ class LexemeDraftServiceTest {
     @Test
     void completedCasesDoNotAllowLexemeChanges() {
         ReviewCase review = reviewWithoutTezaursEntry();
-        review.changeStatus(SuggestionStatus.COMPLETED);
+        review.changeStatus(ReviewStatus.COMPLETED);
         when(caseRepository.findById(review.getId())).thenReturn(Optional.of(review));
         assertThatThrownBy(() -> service.create(review.getId(), request("vārds", false)))
                 .isInstanceOf(ConflictException.class);
@@ -119,8 +119,8 @@ class LexemeDraftServiceTest {
 
     private static ReviewCase reviewWithoutTezaursEntry() {
         ReviewCase review = new ReviewCase("jauns vārds");
-        review.changeStatus(SuggestionStatus.READY_FOR_REVIEW);
-        review.changeStatus(SuggestionStatus.IN_PROGRESS);
+        review.changeStatus(ReviewStatus.READY_FOR_REVIEW);
+        review.changeStatus(ReviewStatus.IN_PROGRESS);
         review.recordTezaursCheck(TezaursStatus.NOT_FOUND, null);
         review.recordUsageDecision(lv.tezaurs.suggestions.usage.entity.UsageDecision.USED, null, null);
         return review;

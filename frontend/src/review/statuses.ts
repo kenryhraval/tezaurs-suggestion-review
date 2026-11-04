@@ -1,6 +1,6 @@
-import type { SuggestionStatus } from '../api/types'
+import type { ReviewStatus } from '../api/types'
 
-export const suggestionStatusLabels: Record<SuggestionStatus, string> = {
+export const reviewStatusLabels: Record<ReviewStatus, string> = {
   NEW: 'Jauns',
   READY_FOR_REVIEW: 'Skatāms',
   GARBAGE: 'Atkritums',
@@ -12,7 +12,7 @@ export const suggestionStatusLabels: Record<SuggestionStatus, string> = {
   NEEDS_EXPERT: 'Vajag ekspertu',
 }
 
-export const suggestionStatusTransitions: Record<SuggestionStatus, SuggestionStatus[]> = {
+export const reviewStatusTransitions: Record<ReviewStatus, ReviewStatus[]> = {
   NEW: ['READY_FOR_REVIEW', 'IN_PROGRESS', 'GARBAGE'],
   READY_FOR_REVIEW: ['IN_PROGRESS', 'COMPLETED', 'GARBAGE'],
   GARBAGE: ['READY_FOR_REVIEW'],

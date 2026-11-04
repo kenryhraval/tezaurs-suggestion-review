@@ -20,7 +20,7 @@ import lv.tezaurs.suggestions.sense.dto.SenseDraftResponse;
 import lv.tezaurs.suggestions.sense.entity.ReviewSense;
 import lv.tezaurs.suggestions.sense.repository.ReviewSenseRepository;
 import lv.tezaurs.suggestions.suggestion.entity.ReviewCase;
-import lv.tezaurs.suggestions.suggestion.entity.SuggestionStatus;
+import lv.tezaurs.suggestions.suggestion.entity.ReviewStatus;
 import lv.tezaurs.suggestions.suggestion.entity.TezaursStatus;
 import lv.tezaurs.suggestions.suggestion.repository.ReviewCaseRepository;
 import lv.tezaurs.suggestions.tezaurs.repository.TezaursSenseRepository;
@@ -67,8 +67,8 @@ class SenseDraftServiceTest {
     @Test
     void savesAFullSenseDraftAndAllowsCompletion() {
         ReviewCase review = new ReviewCase("vārds");
-        review.changeStatus(SuggestionStatus.READY_FOR_REVIEW);
-        review.changeStatus(SuggestionStatus.IN_PROGRESS);
+        review.changeStatus(ReviewStatus.READY_FOR_REVIEW);
+        review.changeStatus(ReviewStatus.IN_PROGRESS);
         review.recordTezaursCheck(TezaursStatus.MEANING_NOT_FOUND, 42);
         when(caseRepository.findById(review.getId())).thenReturn(Optional.of(review));
         when(senseRepository.findAllByCaseIdAndTargetEntryIdOrderByOrderNoAscIdAsc(review.getId(), review.getMatchedEntryId()))
@@ -80,7 +80,7 @@ class SenseDraftServiceTest {
                 .extracting(SenseDraftResponse::gloss)
                 .isEqualTo("Jauna nozīme");
         assertThat(response.review().canComplete()).isTrue();
-        review.changeStatus(SuggestionStatus.COMPLETED);
+        review.changeStatus(ReviewStatus.COMPLETED);
         assertThatThrownBy(() -> service.save(review.getId(), request(null, null)))
                 .isInstanceOf(ConflictException.class);
     }
@@ -88,8 +88,8 @@ class SenseDraftServiceTest {
     @Test
     void rejectsASenseThatIsItsOwnParent() {
         ReviewCase review = new ReviewCase("vārds");
-        review.changeStatus(SuggestionStatus.READY_FOR_REVIEW);
-        review.changeStatus(SuggestionStatus.IN_PROGRESS);
+        review.changeStatus(ReviewStatus.READY_FOR_REVIEW);
+        review.changeStatus(ReviewStatus.IN_PROGRESS);
         review.recordTezaursCheck(TezaursStatus.MEANING_NOT_FOUND, 42);
         UUID senseId = UUID.randomUUID();
         when(caseRepository.findById(review.getId())).thenReturn(Optional.of(review));
@@ -121,8 +121,8 @@ class SenseDraftServiceTest {
                 .isInstanceOf(NotFoundException.class);
 
         ReviewCase unchecked = new ReviewCase("vārds");
-        unchecked.changeStatus(SuggestionStatus.READY_FOR_REVIEW);
-        unchecked.changeStatus(SuggestionStatus.IN_PROGRESS);
+        unchecked.changeStatus(ReviewStatus.READY_FOR_REVIEW);
+        unchecked.changeStatus(ReviewStatus.IN_PROGRESS);
         when(caseRepository.findById(unchecked.getId())).thenReturn(Optional.of(unchecked));
 
         assertThatThrownBy(() -> service.save(unchecked.getId(), request(null, null)))
@@ -292,8 +292,8 @@ class SenseDraftServiceTest {
 
     private static ReviewCase reviewWithMissingMeaning() {
         ReviewCase review = new ReviewCase("vārds");
-        review.changeStatus(SuggestionStatus.READY_FOR_REVIEW);
-        review.changeStatus(SuggestionStatus.IN_PROGRESS);
+        review.changeStatus(ReviewStatus.READY_FOR_REVIEW);
+        review.changeStatus(ReviewStatus.IN_PROGRESS);
         review.recordTezaursCheck(TezaursStatus.MEANING_NOT_FOUND, 42);
         return review;
     }

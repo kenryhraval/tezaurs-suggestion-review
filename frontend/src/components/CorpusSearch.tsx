@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { getCorpora, searchCorpus } from '../api/client'
 import type { CorpusOption, CorpusExample, CorpusSearchResult, SaveUsageEvidence, UsageEvidence } from '../api/types'
 import { SavedUsageEvidence } from './SavedUsageEvidence'
@@ -73,6 +73,7 @@ function compareMatchCounts(first: CorpusSearchState, second: CorpusSearchState)
 }
 
 export function CorpusSearch({ reviewId, term, evidence, saving, onSave, onRemove, onAddSource }: Props) {
+  const searchInputId = useId()
   const [corpusSearches, setCorpusSearches] = useState<CorpusSearchState[]>([])
   const [searching, setSearching] = useState(true)
   const [error, setError] = useState('')
@@ -197,10 +198,17 @@ export function CorpusSearch({ reviewId, term, evidence, saving, onSave, onRemov
   return (
     <div className="usage-search">
       <form className="corpus-controls" onSubmit={submitSearch}>
-        <label><span className="muted">Meklējamais vārds</span>
-          <input value={searchInput} required maxLength={255} title="Enter — meklēt"
+        <label className="muted" htmlFor={searchInputId}>Meklējamais vārds</label>
+        <div className="corpus-search-field">
+          <input id={searchInputId} value={searchInput} required maxLength={255}
             onChange={(event) => setSearchInput(event.target.value)} />
-        </label>
+          <button className="icon-button" type="submit" aria-label="Meklēt korpusos">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
+              <circle cx="10" cy="10" r="6" />
+              <path d="m15 15 6 6" />
+            </svg>
+          </button>
+        </div>
       </form>
       <p className="muted">{searchSummary}</p>
       {error && <p className="error" role="alert">{error}</p>}

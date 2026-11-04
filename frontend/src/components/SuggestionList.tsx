@@ -1,7 +1,7 @@
-import { suggestionStatusLabels } from '../review/statuses'
-import type { QueueItem, SuggestionSort, SuggestionStatus } from '../api/types'
+import { reviewStatusLabels } from '../review/statuses'
+import type { QueueItem, SuggestionSort, ReviewStatus } from '../api/types'
 
-const statuses: SuggestionStatus[] = [
+const statuses: ReviewStatus[] = [
   'NEW',
   'READY_FOR_REVIEW',
   'IN_PROGRESS',
@@ -15,7 +15,7 @@ const statuses: SuggestionStatus[] = [
 
 type Props = {
   items: QueueItem[]
-  status: SuggestionStatus
+  status: ReviewStatus
   sort: SuggestionSort
   search: string
   selectedKey: string | null
@@ -24,7 +24,7 @@ type Props = {
   totalPages: number
   totalItems: number
   onSelect: (key: string) => void
-  onFilterStatusChange: (status: SuggestionStatus) => void
+  onFilterStatusChange: (status: ReviewStatus) => void
   onSortChange: (sort: SuggestionSort) => void
   onSearchChange: (search: string) => void
   onPageChange: (page: number) => void
@@ -62,11 +62,11 @@ export function SuggestionList({
         <label>
           Statuss
           <select
-            onChange={(event) => onFilterStatusChange(event.target.value as SuggestionStatus)}
+            onChange={(event) => onFilterStatusChange(event.target.value as ReviewStatus)}
             value={status}
           >
             {statuses.map((value) => (
-              <option key={value} value={value}>{suggestionStatusLabels[value]}</option>
+              <option key={value} value={value}>{reviewStatusLabels[value]}</option>
             ))}
           </select>
         </label>
@@ -98,7 +98,7 @@ export function SuggestionList({
 
       <div className="suggestion-group-heading">
         <h3>
-          {suggestionStatusLabels[status]}
+          {reviewStatusLabels[status]}
           <span className="suggestion-count">{totalItems}</span>
         </h3>
       </div>

@@ -95,7 +95,7 @@ export function TezaursCheckForm({
   const [pendingStatus, setPendingStatus] = useState<TezaursStatus>(status)
   const [pendingSenseEdit, setPendingSenseEdit] = useState(editExistingSenses)
   const [saving, setSaving] = useState(false)
-  const [confirmation, setConfirmation] = useState<TezaursStatus | null>(null)
+  const [confirmation, setConfirmation] = useState<'MEANING_ALREADY_EXISTS' | null>(null)
   const [confirmationError, setConfirmationError] = useState('')
   const [expanded, setExpanded] = useState(defaultOpen)
   let selectedEntryId: number | null = null
@@ -271,12 +271,15 @@ export function TezaursCheckForm({
     if (status === 'NOT_FOUND' && selection === NOT_FOUND) {
       return
     }
-    setConfirmationError('')
-    setConfirmation('NOT_FOUND')
+    saveCheck('NOT_FOUND', null)
   }
 
   function chooseMeaning(nextStatus: 'MEANING_ALREADY_EXISTS' | 'MEANING_NOT_FOUND') {
     if (nextStatus === 'MEANING_NOT_FOUND' && nextStatus === status && selectedEntryId === matchedEntryId) {
+      return
+    }
+    if (nextStatus === 'MEANING_NOT_FOUND') {
+      saveCheck(nextStatus, selectedEntryId)
       return
     }
     setPendingSenseEdit(nextStatus === 'MEANING_ALREADY_EXISTS' && selectedEntryId === matchedEntryId && editExistingSenses)
@@ -284,50 +287,52 @@ export function TezaursCheckForm({
     setConfirmation(nextStatus)
   }
 
-  async function confirmCheck() {
-    if (!confirmation || saving) {
+  async function saveCheck(nextStatus: TezaursStatus, entryId: number | null) {
+    if (saving) {
       return
     }
     setSaving(true)
+    setServerError('')
+    setConfirmationError('')
     try {
-      let nextStatus = confirmation
-      if (confirmation === 'MEANING_ALREADY_EXISTS' && pendingSenseEdit) {
-        nextStatus = 'MEANING_NEEDS_EDITING'
-      }
-      const entryIdToSave = confirmation === 'NOT_FOUND' ? null : selectedEntryId
-      const saved = await onSave(nextStatus, entryIdToSave)
+      const saved = await onSave(nextStatus, entryId)
       if (saved) {
         setPendingSenseEdit(nextStatus === 'MEANING_NEEDS_EDITING')
         setPendingStatus(nextStatus)
-        if (confirmation === 'NOT_FOUND') {
+        if (nextStatus === 'NOT_FOUND') {
           setSelection(NOT_FOUND)
         }
         setConfirmation(null)
         closeDropdown()
         setExpanded(false)
       } else {
+        setServerError('Neizdevās saglabāt izvēli. Mēģiniet vēlreiz.')
         setConfirmationError('Neizdevās saglabāt izvēli. Mēģiniet vēlreiz.')
       }
     } catch (cause) {
-      setConfirmationError(cause instanceof Error ? cause.message : 'Neizdevās saglabāt izvēli.')
+      const message = cause instanceof Error ? cause.message : 'Neizdevās saglabāt izvēli.'
+      setServerError(message)
+      setConfirmationError(message)
     } finally {
       setSaving(false)
     }
   }
 
-  let confirmationMessage = 'Šķirkļa nav Tēzaurā. Apstiprinot varēsiet pārbaudīt vārda lietojumu.'
-  if (confirmation === 'MEANING_ALREADY_EXISTS') {
-    confirmationMessage = pendingSenseEdit
-      ? 'Izskatīšana paliks statusā “Apstrādē”. Varēsiet labot esošo nozīmi melnrakstā; Tēzaura dati netiks mainīti.'
-      : 'Apstiprinot izskatīšana tiks slēgta ar statusu “Jau ir”.'
-  } else if (confirmation === 'MEANING_NOT_FOUND') {
-    confirmationMessage = `Šķirklī “${selectedCandidate?.humanKey ?? ''}” ieteiktās nozīmes nav. Apstiprinot varēsiet pievienot jaunu nozīmi.`
+  function confirmCheck() {
+    if (!confirmation) {
+      return
+    }
+    const nextStatus = pendingSenseEdit ? 'MEANING_NEEDS_EDITING' : confirmation
+    saveCheck(nextStatus, selectedEntryId)
   }
-  if (caseClosed && (confirmation !== 'MEANING_ALREADY_EXISTS' || pendingSenseEdit)) {
+
+  let confirmationMessage = pendingSenseEdit
+    ? 'Izskatīšana paliks statusā “Apstrādē”. Varēsiet labot esošo nozīmi melnrakstā; Tēzaura dati netiks mainīti.'
+    : 'Apstiprinot izskatīšana tiks slēgta ar statusu “Jau ir”.'
+  if (caseClosed && pendingSenseEdit) {
     confirmationMessage += ' Izskatīšana atgriezīsies statusā “Apstrādē”.'
   }
-  const nextEntryId = confirmation === 'NOT_FOUND' ? null : selectedEntryId
-  if (confirmation && nextEntryId !== matchedEntryId) {
+  if (confirmation && selectedEntryId !== matchedEntryId) {
     confirmationMessage += ' Iepriekšējie melnraksti paliks saglabāti pie iepriekšējās šķirkļa izvēles.'
   }
 
@@ -403,6 +408,7 @@ export function TezaursCheckForm({
                   <button
                     aria-pressed={selection === NOT_FOUND}
                     className="tezaurs-dropdown-special"
+                    disabled={saving}
                     onClick={chooseNotFound}
                     onFocus={() => setPreviewEntryId(null)}
                     onMouseEnter={() => setPreviewEntryId(null)}
@@ -448,20 +454,20 @@ export function TezaursCheckForm({
       )}
       {confirmation && (
         <ConfirmationDialog
-          message={confirmation === 'MEANING_ALREADY_EXISTS' ? '' : confirmationMessage}
+          message=""
           busy={saving}
           error={confirmationError}
           onConfirm={() => confirmCheck()}
           onCancel={cancelConfirmation}
         >
-          {confirmation === 'MEANING_ALREADY_EXISTS' && <>
+          <>
             <label className="checkbox-label">
-              <input autoFocus type="checkbox" checked={pendingSenseEdit} disabled={saving}
+              <input type="checkbox" checked={pendingSenseEdit} disabled={saving}
                 onChange={(event) => setPendingSenseEdit(event.target.checked)} />
               Vēlos labot esošo nozīmi
             </label>
             <p>{confirmationMessage}</p>
-          </>}
+          </>
         </ConfirmationDialog>
       )}
     </section>
