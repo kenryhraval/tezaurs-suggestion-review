@@ -1,15 +1,15 @@
 import { useEffect, useState, type ChangeEvent, type FocusEvent, type KeyboardEvent } from 'react'
-import { getDuplicateReviewCandidates } from '../api/client'
-import { reviewStatusLabels } from '../review/statuses'
-import type { DuplicateReviewCandidate, Review } from '../api/types'
-import { ConfirmationDialog } from './ConfirmationDialog'
+import { getDuplicateReviewCandidates } from '../../api/client'
+import { reviewStatusLabels } from '../../review/statuses'
+import type { DuplicateReviewCandidate, Review } from '../../api/types'
+import { ConfirmationDialog } from '../shared/ConfirmationDialog'
 
 type Props = {
   currentCase: Review
   onSelect: (reviewId: string) => Promise<void>
 }
 
-export function DuplicateReviewCombobox({ currentCase, onSelect }: Props) {
+export function DuplicateCaseCombobox({ currentCase, onSelect }: Props) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [candidates, setCandidates] = useState<DuplicateReviewCandidate[]>([])

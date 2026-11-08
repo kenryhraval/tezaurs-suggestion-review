@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import type { Review, ReviewStatus } from '../api/types'
-import { reviewStatusLabels, reviewStatusTransitions } from '../review/statuses'
-import { ConfirmationDialog } from './ConfirmationDialog'
-import { DuplicateReviewCombobox } from './DuplicateReviewCombobox'
+import type { Review, ReviewStatus } from '../../api/types'
+import { reviewStatusLabels, reviewStatusTransitions } from '../../review/statuses'
+import { ConfirmationDialog } from '../shared/ConfirmationDialog'
+import { DuplicateCaseCombobox } from './DuplicateCaseCombobox'
 
 const intakeChoices: ReviewStatus[] = ['GARBAGE', 'READY_FOR_REVIEW']
 
@@ -16,7 +16,7 @@ type Props = {
   onDuplicate: (sourceId: number, caseId: string) => Promise<void>
 }
 
-export function SuggestionIntake({ status, onStatusChange, review, onDuplicate,
+export function ReviewIntake({ status, onStatusChange, review, onDuplicate,
   expanded: expandedByUser, onExpandedChange, readOnly }: Props) {
   const [confirmingTrash, setConfirmingTrash] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -85,7 +85,7 @@ export function SuggestionIntake({ status, onStatusChange, review, onDuplicate,
           {selectedStatus === 'READY_FOR_REVIEW' && review && (
             <div className="meaning-existence-check">
               <p><strong>Vai ieteikums attiecas uz esošu perēkli, vai jāsāk jauns?</strong></p>
-              <DuplicateReviewCombobox
+              <DuplicateCaseCombobox
                 currentCase={review}
                 onSelect={(targetId) => onDuplicate(review.sources[0].id, targetId)}
               />

@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useId, useRef, useState } from 'react'
-import { tezaursEntryUrl } from '../config/tezaurs'
-import { EditButton } from './EditButton'
+import { tezaursEntryUrl } from '../../config/tezaurs'
+import { EditButton } from '../shared/EditButton'
 
 type Action = {
   label: string

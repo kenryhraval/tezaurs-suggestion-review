@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ChangeEvent, type FocusEvent, type KeyboardEvent, type SyntheticEvent } from 'react'
-import { getTezaursCandidates, getTezaursEntry } from '../api/client'
-import type { TezaursEntryCandidate, TezaursEntryDetails, TezaursStatus } from '../api/types'
-import { ConfirmationDialog } from './ConfirmationDialog'
+import { getTezaursCandidates, getTezaursEntry } from '../../api/client'
+import type { TezaursEntryCandidate, TezaursEntryDetails, TezaursStatus } from '../../api/types'
+import { ConfirmationDialog } from '../shared/ConfirmationDialog'
 import { TezaursEntryLink } from './TezaursEntryLink'
 
 type Props = {

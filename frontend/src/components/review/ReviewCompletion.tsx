@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { ReviewStatus } from '../api/types'
+import type { ReviewStatus } from '../../api/types'
 
 type Props = {
   status: ReviewStatus

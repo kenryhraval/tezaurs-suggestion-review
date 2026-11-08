@@ -1,4 +1,4 @@
-import type { FlagMap, FlagValue, TezaursFlagDefinition } from '../api/types'
+import type { FlagMap, FlagValue, TezaursFlagDefinition } from '../../api/types'
 
 type Props = {
   scope: 'E' | 'L' | 'R' | 'S'

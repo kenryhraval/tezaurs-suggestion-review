@@ -7,7 +7,7 @@ import {
   getTezaursFormOptions,
   updateEntryDraft,
   updateLexemeDraft,
-} from '../api/client'
+} from '../../api/client'
 import type {
   EntryDraft,
   FlagMap,
@@ -16,14 +16,13 @@ import type {
   SaveEntryDraft,
   SaveLexemeDraft,
   TezaursFormOptions,
-  TezaursEntryDetails,
-} from '../api/types'
+} from '../../api/types'
 import { FlagEditor } from './FlagEditor'
 import { RestrictionEditor } from './RestrictionEditor'
-import { EditDialog } from './EditDialog'
-import { EntryDisplay } from './ExistingEntryDetails'
-import { draftGrammarData } from '../drafts/grammar'
-import { ConfirmationDialog } from './ConfirmationDialog'
+import { EditDialog } from '../shared/EditDialog'
+import { EntryDisplay } from '../tezaurs/EntryDisplay'
+import { buildDraftEntryView } from '../../draft/entryView'
+import { ConfirmationDialog } from '../shared/ConfirmationDialog'
 
 type Props = {
   reviewId: string
@@ -64,52 +63,6 @@ function lexemeRequest(lexeme: LexemeDraft): SaveLexemeDraft {
     pronunciations: lexeme.pronunciations,
     flags: lexeme.flags,
     structuralRestrictions: lexeme.structuralRestrictions,
-  }
-}
-
-function draftEntryView(
-  draft: EntryDraft,
-  options: TezaursFormOptions,
-): TezaursEntryDetails {
-  return {
-    id: 0,
-    heading: draft.heading,
-    humanKey: draft.humanKey,
-    typeId: draft.typeId,
-    type: options.entryTypes.find((type) => type.id === draft.typeId)?.label ?? null,
-    hidden: false,
-    notes: draft.notes,
-    data: {
-      ...draftGrammarData(null, draft.flags),
-      Etymology: draft.etymology,
-      Normative: draft.normativeComment,
-      SciName: draft.scientificName,
-      Source: draft.source,
-    },
-    lexemes: draft.lexemes.map((lexeme, index) => {
-      const paradigm = options.paradigms.find((item) => item.id === lexeme.paradigmId)
-      return {
-        id: index,
-        lemma: lexeme.lemma,
-        roleId: lexeme.roleId,
-        role: options.lexemeRoles.find((item) => item.id === lexeme.roleId)?.label ?? null,
-        paradigmId: lexeme.paradigmId,
-        paradigmLegacyNo: paradigm?.legacyNo ?? null,
-        paradigmCode: paradigm?.code ?? null,
-        paradigm: paradigm?.label ?? null,
-        paradigmData: paradigm?.data ?? null,
-        stem1: lexeme.stem1,
-        stem2: lexeme.stem2,
-        stem3: lexeme.stem3,
-        hidden: false,
-        data: { ...draftGrammarData(null, lexeme.flags, lexeme.structuralRestrictions),
-          Pronunciations: lexeme.pronunciations },
-        extras: null,
-      }
-    }),
-    senses: [],
-    examples: [],
-    sources: [],
   }
 }
 
@@ -304,14 +257,14 @@ export function EntryDraftForm({ reviewId, onReviewUpdated, children, editable, 
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    const data = new FormData(event.currentTarget)
+    const formData = new FormData(event.currentTarget)
     function optionalFormValue(name: string) {
-      const formValue = String(data.get(name) ?? '').trim()
+      const formValue = String(formData.get(name) ?? '').trim()
       return formValue === '' ? null : formValue
     }
-    const request: SaveEntryDraft = {
-      heading: String(data.get('heading')),
-      typeId: Number(data.get('typeId')),
+    const entryRequest: SaveEntryDraft = {
+      heading: String(formData.get('heading')),
+      typeId: Number(formData.get('typeId')),
       etymology: optionalFormValue('etymology'),
       normativeComment: optionalFormValue('normativeComment'),
       scientificName: optionalFormValue('scientificName'),
@@ -323,9 +276,9 @@ export function EntryDraftForm({ reviewId, onReviewUpdated, children, editable, 
     setSaving(true)
     setError('')
     try {
-      const response = await updateEntryDraft(reviewId, request)
-      setDraft(response.draft)
-      onReviewUpdated(response.review)
+      const savedEntryResponse = await updateEntryDraft(reviewId, entryRequest)
+      setDraft(savedEntryResponse.draft)
+      onReviewUpdated(savedEntryResponse.review)
       setEditingEntry(false)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Neizdevās saglabāt šķirkļa melnrakstu.')
@@ -400,7 +353,7 @@ export function EntryDraftForm({ reviewId, onReviewUpdated, children, editable, 
 
   return renderSection(
     <>
-      <EntryDisplay entry={draftEntryView(draft, options)}
+      <EntryDisplay entry={buildDraftEntryView(draft, options)}
         onEditEntry={editable ? openEntryEditor : undefined}
         onEditLexeme={editable ? openLexemeEditor : undefined}
         onAddLexeme={editable ? addLexeme : undefined}

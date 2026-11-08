@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { UsageEvidence } from '../api/types'
+import type { UsageEvidence } from '../../api/types'
 import { SavedUsageEvidence } from './SavedUsageEvidence'
 
 type Props = {

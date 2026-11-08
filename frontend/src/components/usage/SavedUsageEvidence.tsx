@@ -1,4 +1,4 @@
-import type { UsageEvidence } from '../api/types'
+import type { UsageEvidence } from '../../api/types'
 import type { ReactNode } from 'react'
 import { UsageSourceLink } from './UsageSourceLink'
 

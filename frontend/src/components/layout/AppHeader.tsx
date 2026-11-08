@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { getSuggestionCounts } from '../api/client'
-import headerImage from '../assets/tip-header.svg'
-import searchIcon from '../assets/search.svg'
+import { getSuggestionCounts } from '../../api/client'
+import headerImage from '../../assets/tip-header.svg'
+import searchIcon from '../../assets/search.svg'
 
 type Props = {
   reloadCount: number

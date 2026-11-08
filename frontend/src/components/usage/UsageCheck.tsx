@@ -1,9 +1,9 @@
 import { useEffect, useState, type FormEvent, type SyntheticEvent } from 'react'
-import { deleteUsageEvidence, getUsageEvidence, saveUsageEvidence } from '../api/client'
-import type { Review, SaveUsageEvidence, UsageDecision, UsageEvidence } from '../api/types'
-import { ConfirmationDialog } from './ConfirmationDialog'
+import { deleteUsageEvidence, getUsageEvidence, saveUsageEvidence } from '../../api/client'
+import type { Review, SaveUsageEvidence, UsageDecision, UsageEvidence } from '../../api/types'
+import { ConfirmationDialog } from '../shared/ConfirmationDialog'
 import { CorpusSearch } from './CorpusSearch'
-import { EditDialog } from './EditDialog'
+import { EditDialog } from '../shared/EditDialog'
 import { SelectedUsageEvidence } from './SelectedUsageEvidence'
 
 type Props = {

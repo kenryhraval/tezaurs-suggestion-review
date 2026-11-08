@@ -6,9 +6,9 @@ import {
   getCurrentUser,
   linkDuplicateSuggestion,
 } from '../api/client'
-import { SuggestionDetails } from '../components/SuggestionDetails'
-import { SuggestionList } from '../components/SuggestionList'
-import { AppHeader } from '../components/AppHeader'
+import { ReviewDetails } from '../components/review/ReviewDetails'
+import { SuggestionList } from '../components/review/SuggestionList'
+import { AppHeader } from '../components/layout/AppHeader'
 import type { QueueItem, Review, SuggestionSort, ReviewStatus } from '../api/types'
 
 const PAGE_SIZE = 20
@@ -260,7 +260,7 @@ export function ReviewPage() {
         )}
 
         {selected && (
-          <SuggestionDetails
+          <ReviewDetails
             key={itemKey(selected)}
             item={selected}
             initialReview={selected.itemType === 'REVIEW' && loadedReview?.id === selected.id ? loadedReview : null}

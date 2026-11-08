@@ -1,4 +1,4 @@
-import type { FlagMap, TezaursFlagDefinition, TezaursOption, RestrictionFrequency } from '../api/types'
+import type { FlagMap, TezaursFlagDefinition, TezaursOption, RestrictionFrequency } from '../../api/types'
 import { FlagEditor } from './FlagEditor'
 
 type Props = {

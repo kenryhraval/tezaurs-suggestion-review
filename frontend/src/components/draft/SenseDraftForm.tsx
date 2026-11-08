@@ -4,7 +4,7 @@ import {
   getTezaursEntry,
   getTezaursFormOptions,
   saveSenseDrafts,
-} from '../api/client'
+} from '../../api/client'
 import type {
   Review,
   SaveSenseDraft,
@@ -12,14 +12,14 @@ import type {
   TezaursEntryDetails,
   TezaursSenseDetails,
   FlagMap,
-} from '../api/types'
+} from '../../api/types'
 import { FlagEditor } from './FlagEditor'
 import { RestrictionEditor } from './RestrictionEditor'
-import { SenseDetails } from './ExistingEntryDetails'
-import { EditDialog } from './EditDialog'
-import { SenseActions } from './TezaursActions'
-import { ConfirmationDialog } from './ConfirmationDialog'
-import { draftGrammarData } from '../drafts/grammar'
+import { SenseDetails } from '../tezaurs/EntryDisplay'
+import { EditDialog } from '../shared/EditDialog'
+import { SenseActions } from '../tezaurs/TezaursActions'
+import { ConfirmationDialog } from '../shared/ConfirmationDialog'
+import { buildDisplayedSenses } from '../../draft/senseView'
 
 type Props = {
   reviewId: string
@@ -33,14 +33,6 @@ type Props = {
 
 type SenseEditAction = 'edit' | 'move' | 'promote'
 
-type DisplayedSense = {
-  key: string
-  parentKey: string | null
-  draftIndex: number | null
-  sense: TezaursSenseDetails
-  isNew: boolean
-}
-
 function newSense(gloss: string): SaveSenseDraft {
   return {
     gloss,
@@ -49,91 +41,6 @@ function newSense(gloss: string): SaveSenseDraft {
     flags: {},
     structuralRestrictions: null,
   }
-}
-
-function buildDisplayedSenses(existingEntry: TezaursEntryDetails | null, draftSenses: SaveSenseDraft[]) {
-  const existingSenses = existingEntry?.senses ?? []
-  const displayedSenses: DisplayedSense[] = []
-
-  for (const sense of existingSenses) {
-    const savedDraft = draftSenses.find((draft) => draft.id && draft.sourceSenseId === sense.id)
-    if (savedDraft) {
-      continue
-    }
-
-    let parentKey: string | null = null
-    if (sense.parentSenseId !== null) {
-      const parentDraft = draftSenses.find((draft) => draft.id && draft.sourceSenseId === sense.parentSenseId)
-      if (parentDraft) {
-        parentKey = `draft:${parentDraft.id}`
-      } else {
-        parentKey = `tezaurs:${sense.parentSenseId}`
-      }
-    }
-    displayedSenses.push({
-      key: `tezaurs:${sense.id}`,
-      parentKey,
-      draftIndex: null,
-      sense,
-      isNew: false,
-    })
-  }
-
-  draftSenses.forEach((draft, index) => {
-    if (!draft.id) {
-      return
-    }
-
-    const originalSense = existingSenses.find((sense) => sense.id === draft.sourceSenseId)
-    let parentKey = draft.parentDraftSenseId ? `draft:${draft.parentDraftSenseId}` : null
-    if (draft.parentTezaursSenseId) {
-      const parentDraft = draftSenses.find((sense) => sense.sourceSenseId === draft.parentTezaursSenseId)
-      if (parentDraft) {
-        parentKey = `draft:${parentDraft.id}`
-      } else {
-        parentKey = `tezaurs:${draft.parentTezaursSenseId}`
-      }
-    }
-
-    displayedSenses.push({
-      key: `draft:${draft.id}`,
-      parentKey,
-      draftIndex: index,
-      isNew: existingEntry !== null && !draft.sourceSenseId,
-      sense: {
-        id: draft.sourceSenseId ?? index,
-        parentSenseId: null,
-        orderNo: index,
-        senseTag: null,
-        gloss: draft.gloss,
-        hidden: false,
-        examples: originalSense?.examples ?? [],
-        data: draftGrammarData(originalSense?.data, draft.flags, draft.structuralRestrictions),
-      },
-    })
-  })
-
-  const originalSenseOrder = new Map(existingSenses.map((sense, index) => [sense.id, index]))
-  displayedSenses.sort((left, right) => {
-    if (left.isNew !== right.isNew) {
-      return left.isNew ? 1 : -1
-    }
-    if (left.isNew) {
-      return 0
-    }
-
-    const leftPosition = originalSenseOrder.get(left.sense.id) ?? 0
-    const rightPosition = originalSenseOrder.get(right.sense.id) ?? 0
-    return leftPosition - rightPosition
-  })
-
-  for (const sense of displayedSenses) {
-    const parentIsVisible = displayedSenses.some((parent) => parent.key === sense.parentKey)
-    if (sense.parentKey && !parentIsVisible) {
-      sense.parentKey = null
-    }
-  }
-  return displayedSenses
 }
 
 export function SenseDraftForm({
@@ -260,24 +167,24 @@ export function SenseDraftForm({
     }
   }
 
-  function editOriginalSense(source: TezaursSenseDetails, action: SenseEditAction) {
-    const gram = source.data?.Gram as {
+  function editOriginalSense(existingSense: TezaursSenseDetails, action: SenseEditAction) {
+    const grammarData = existingSense.data?.Gram as {
       Flags?: FlagMap
       StructuralRestrictions?: Record<string, unknown> | Record<string, unknown>[]
     } | undefined
-    const restrictions = gram?.StructuralRestrictions
-    const draft: SaveSenseDraft = {
-      sourceSenseId: source.id,
-      gloss: source.gloss ?? '',
+    const structuralRestrictions = grammarData?.StructuralRestrictions
+    const senseDraft: SaveSenseDraft = {
+      sourceSenseId: existingSense.id,
+      gloss: existingSense.gloss ?? '',
       parentDraftSenseId: null,
-      parentTezaursSenseId: action === 'promote' ? null : source.parentSenseId,
-      flags: gram?.Flags ?? {},
-      structuralRestrictions: Array.isArray(restrictions) ? { AND: restrictions } : restrictions ?? null,
+      parentTezaursSenseId: action === 'promote' ? null : existingSense.parentSenseId,
+      flags: grammarData?.Flags ?? {},
+      structuralRestrictions: Array.isArray(structuralRestrictions) ? { AND: structuralRestrictions } : structuralRestrictions ?? null,
     }
     setError('')
     setEditingParent(action !== 'edit')
     setEditingIndex(senses.length)
-    setSenses((current) => [...current, draft])
+    setSenses((currentSenses) => [...currentSenses, senseDraft])
   }
 
   async function saveSenses(nextSenses = senses) {

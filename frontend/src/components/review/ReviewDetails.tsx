@@ -1,4 +1,4 @@
-import { UsageCheck } from './UsageCheck'
+import { UsageCheck } from '../usage/UsageCheck'
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   correctReviewTerm,
@@ -6,8 +6,8 @@ import {
   getReview,
   saveTezaursCheck,
   saveUsageDecision,
-} from '../api/client'
-import { reviewStatusLabels, reviewStatusTransitions } from '../review/statuses'
+} from '../../api/client'
+import { reviewStatusLabels, reviewStatusTransitions } from '../../review/statuses'
 import type {
   QueueItem,
   Review,
@@ -16,16 +16,16 @@ import type {
   ReviewStatus,
   TezaursStatus,
   UsageDecision,
-} from '../api/types'
-import { getReviewWorkflow } from '../review/workflow'
-import { TezaursCheckForm } from './TezaursCheckForm'
-import { SuggestionIntake } from './SuggestionIntake'
-import { EntryDraftForm } from './EntryDraftForm'
-import { ExistingEntryDetails } from './ExistingEntryDetails'
-import { SenseDraftForm } from './SenseDraftForm'
+} from '../../api/types'
+import { getReviewWorkflow } from '../../review/workflow'
+import { TezaursCheckForm } from '../tezaurs/TezaursCheckForm'
+import { ReviewIntake } from './ReviewIntake'
+import { EntryDraftForm } from '../draft/EntryDraftForm'
+import { ExistingEntryDetails } from '../tezaurs/ExistingEntryDetails'
+import { SenseDraftForm } from '../draft/SenseDraftForm'
 import { SuggestionSourcesTable } from './SuggestionSourcesTable'
-import { ConfirmationDialog } from './ConfirmationDialog'
-import { EditButton } from './EditButton'
+import { ConfirmationDialog } from '../shared/ConfirmationDialog'
+import { EditButton } from '../shared/EditButton'
 import { ReviewCompletion } from './ReviewCompletion'
 
 type Props = {
@@ -95,7 +95,7 @@ function useSuggestionReview(reviewId: string | null, initialReview: Review | nu
   return { review: review?.id === reviewId ? review : null, updateReview, error }
 }
 
-export function SuggestionDetails({ item, initialReview, username, onStatusChange, onDuplicate, onReviewUpdated }: Props) {
+export function ReviewDetails({ item, initialReview, username, onStatusChange, onDuplicate, onReviewUpdated }: Props) {
   const [intakeOpen, setIntakeOpen] = useState<boolean | null>(null)
   const [error, setError] = useState('')
   const [pendingCompletionStatus, setPendingCompletionStatus] = useState<'NEEDS_EXPERT' | 'COMPLETED' | null>(null)
@@ -352,7 +352,7 @@ export function SuggestionDetails({ item, initialReview, username, onStatusChang
 
       <Fragment key={workflow.sectionResetKey}>
         {(suggestion || review) && (
-          <SuggestionIntake status={status} onStatusChange={changeStatus}
+          <ReviewIntake status={status} onStatusChange={changeStatus}
             review={review} onDuplicate={onDuplicate}
             expanded={intakeOpen ?? workflow.intake.defaultOpen} onExpandedChange={setIntakeOpen}
             readOnly={workflow.intake.readOnly} />

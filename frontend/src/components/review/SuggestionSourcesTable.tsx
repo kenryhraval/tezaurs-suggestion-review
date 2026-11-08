@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import type { ReviewSource } from '../api/types'
-import { ConfirmationDialog } from './ConfirmationDialog'
+import type { ReviewSource } from '../../api/types'
+import { ConfirmationDialog } from '../shared/ConfirmationDialog'
 
 type Props = {
   sources: ReviewSource[]

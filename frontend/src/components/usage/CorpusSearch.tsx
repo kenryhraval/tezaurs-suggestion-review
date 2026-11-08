@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { getCorpora, searchCorpus } from '../api/client'
-import type { CorpusOption, CorpusExample, CorpusSearchResult, SaveUsageEvidence, UsageEvidence } from '../api/types'
+import { getCorpora, searchCorpus } from '../../api/client'
+import type { CorpusOption, CorpusExample, CorpusSearchResult, SaveUsageEvidence, UsageEvidence } from '../../api/types'
 import { SavedUsageEvidence } from './SavedUsageEvidence'
 import { UsageSourceLink } from './UsageSourceLink'
 
@@ -29,13 +29,13 @@ function createCorpusSearchState(corpus: CorpusOption): CorpusSearchState {
     error: '', requestId: 0, requestedPage: 1 }
 }
 
-async function loadCorpusPage(reviewId: string, query: string, group: CorpusSearchState, page: number) {
+async function loadCorpusPage(reviewId: string, query: string, corpusSearch: CorpusSearchState, page: number) {
   try {
-    const result = await searchCorpus(reviewId, query, group.id, page)
-    return { ...group, loading: false, result, error: '', requestedPage: page }
+    const result = await searchCorpus(reviewId, query, corpusSearch.id, page)
+    return { ...corpusSearch, loading: false, result, error: '', requestedPage: page }
   } catch (cause) {
     const error = cause instanceof Error ? cause.message : 'Neizdevās meklēt korpusā.'
-    return { ...group, loading: false, error, requestedPage: page }
+    return { ...corpusSearch, loading: false, error, requestedPage: page }
   }
 }
 
@@ -44,16 +44,16 @@ async function searchCorpora(
   query: string,
   corpusSearches: CorpusSearchState[],
   shouldContinueSearching: () => boolean,
-  onResult: (group: CorpusSearchState) => void,
+  onResult: (corpusSearch: CorpusSearchState) => void,
 ) {
   const completedCorpora: CorpusSearchState[] = []
   let nextCorpusIndex = 0
 
   async function searchNextCorpus() {
     while (shouldContinueSearching() && nextCorpusIndex < corpusSearches.length) {
-      const group = corpusSearches[nextCorpusIndex]
+      const corpusSearch = corpusSearches[nextCorpusIndex]
       nextCorpusIndex += 1
-      const result = await loadCorpusPage(reviewId, query, group, 1)
+      const result = await loadCorpusPage(reviewId, query, corpusSearch, 1)
       if (!shouldContinueSearching()) {
         return
       }
@@ -118,19 +118,19 @@ export function CorpusSearch({ reviewId, term, evidence, saving, onSave, onRemov
     }
   }, [reviewId, query, retry])
 
-  function updateCorpusSearch(updated: CorpusSearchState) {
-    setCorpusSearches((current) => current.map((group) => group.id === updated.id ? updated : group))
+  function updateCorpusSearch(updatedCorpusSearch: CorpusSearchState) {
+    setCorpusSearches((current) => current.map((corpusSearch) => corpusSearch.id === updatedCorpusSearch.id ? updatedCorpusSearch : corpusSearch))
   }
 
-  async function loadCorpusPageNumber(group: CorpusSearchState, page: number) {
+  async function loadCorpusPageNumber(corpusSearch: CorpusSearchState, page: number) {
     nextPageRequestId.current += 1
     const requestId = nextPageRequestId.current
-    const loadingGroup = { ...group, loading: true, error: '', requestId }
-    updateCorpusSearch(loadingGroup)
-    const updated = await loadCorpusPage(reviewId, query, loadingGroup, page)
+    const loadingCorpusSearch = { ...corpusSearch, loading: true, error: '', requestId }
+    updateCorpusSearch(loadingCorpusSearch)
+    const updatedCorpusSearch = await loadCorpusPage(reviewId, query, loadingCorpusSearch, page)
     setCorpusSearches((current) => current.map((item) => {
-      const isCurrentRequest = item.id === group.id && item.requestId === requestId
-      return isCurrentRequest ? updated : item
+      const isCurrentRequest = item.id === corpusSearch.id && item.requestId === requestId
+      return isCurrentRequest ? updatedCorpusSearch : item
     }))
   }
 
@@ -158,11 +158,11 @@ export function CorpusSearch({ reviewId, term, evidence, saving, onSave, onRemov
       reference: example.reference || null, note: null })
   }
 
-  const selectedCorpusSearch = corpusSearches.find((group) => group.id === selectedCorpusId)
+  const selectedCorpusSearch = corpusSearches.find((corpusSearch) => corpusSearch.id === selectedCorpusId)
   const selectedCorpusResult = selectedCorpusSearch?.result
-  const corpusMatches = corpusSearches.filter((group) => group.result && group.result.total > 0)
+  const corpusMatches = corpusSearches.filter((corpusSearch) => corpusSearch.result && corpusSearch.result.total > 0)
     .sort(compareMatchCounts)
-  const searchFailed = corpusSearches.some((group) => group.error)
+  const searchFailed = corpusSearches.some((corpusSearch) => corpusSearch.error)
   let emptyResultsMessage = 'Korpusos sakritību nav.'
   if (searching) {
     emptyResultsMessage = 'Meklēšana turpinās...'
@@ -195,11 +195,11 @@ export function CorpusSearch({ reviewId, term, evidence, saving, onSave, onRemov
       {(error || searchFailed) && <button className="btn btn-sm btn-outline-secondary" type="button" disabled={searching}
         onClick={() => startSearch(query)}>Atkārtot meklēšanu</button>}
       {corpusMatches.length > 0 ? <ul className="corpus-badges" aria-label="Korpusu meklēšanas rezultāti">
-        {corpusMatches.map((group) => (
-          <li key={group.id}>
-            <button type="button" aria-pressed={group.id === selectedCorpusId}
-              onClick={() => setSelectedCorpusId(group.id)}>
-              {group.label}<span>{group.result?.total}</span>
+        {corpusMatches.map((corpusSearch) => (
+          <li key={corpusSearch.id}>
+            <button type="button" aria-pressed={corpusSearch.id === selectedCorpusId}
+              onClick={() => setSelectedCorpusId(corpusSearch.id)}>
+              {corpusSearch.label}<span>{corpusSearch.result?.total}</span>
             </button>
           </li>
         ))}
