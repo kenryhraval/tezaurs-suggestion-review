@@ -22,9 +22,9 @@ export function EditDialog({ title, busy, error, onSubmit, onCancel, children, w
       }}>
         {children}
         {error && <p className="error" role="alert">{error}</p>}
-        <div className="confirmation-actions">
-          <button disabled={busy} onClick={onCancel} type="button">Atcelt</button>
-          <button disabled={busy} aria-busy={busy} type="submit">
+        <div className="modal-footer">
+          <button className="btn btn-sm btn-secondary" disabled={busy} onClick={onCancel} type="button">Atcelt</button>
+          <button className="btn btn-sm btn-primary" disabled={busy} aria-busy={busy} type="submit">
             {busy ? 'Saglabā...' : 'Saglabāt'}
           </button>
         </div>

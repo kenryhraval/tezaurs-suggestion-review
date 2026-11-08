@@ -72,7 +72,7 @@ export type Review = {
   id: string
   reviewedTerm: string
   status: ReviewStatus
-  assignedTo: string | null
+  lastStatusChangedBy: string
   tezaursStatus: TezaursStatus
   matchedEntryId: number | null
   usageDecision: UsageDecision

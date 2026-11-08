@@ -1,4 +1,4 @@
-import { useEffect, useState, type ChangeEvent, type FocusEvent, type KeyboardEvent, type SyntheticEvent } from 'react'
+import { useEffect, useRef, useState, type ChangeEvent, type FocusEvent, type KeyboardEvent, type SyntheticEvent } from 'react'
 import { getTezaursCandidates, getTezaursEntry } from '../api/client'
 import type { TezaursEntryCandidate, TezaursEntryDetails, TezaursStatus } from '../api/types'
 import { ConfirmationDialog } from './ConfirmationDialog'
@@ -6,6 +6,7 @@ import { TezaursEntryLink } from './TezaursEntryLink'
 
 type Props = {
   reviewId: string
+  reviewedTerm: string
   status: TezaursStatus
   matchedEntryId: number | null
   caseClosed?: boolean
@@ -15,14 +16,6 @@ type Props = {
 }
 
 const NOT_FOUND = 'not-found'
-const checkDescriptions = {
-  NOT_CHECKED: 'Pārbaude Tēzaurā nav veikta.',
-  FOUND: 'Šķirklis ir Tēzaurā; nozīme vēl nav pārbaudīta.',
-  NOT_FOUND: 'Šķirkļa nav Tēzaurā.',
-  MEANING_NEEDS_EDITING: 'Nozīme jau ir Tēzaurā; esošā nozīme jāprecizē.',
-  MEANING_ALREADY_EXISTS: 'Šķirklis un ieteiktā nozīme jau ir Tēzaurā.',
-  MEANING_NOT_FOUND: 'Šķirklis ir Tēzaurā; jāpievieno jauna nozīme.',
-}
 
 function initialSelection(status: TezaursStatus, matchedEntryId: number | null) {
   if (status === 'NOT_FOUND') {
@@ -61,18 +54,9 @@ function EntryDescription({ candidate }: { candidate: TezaursEntryCandidate }) {
   )
 }
 
-function EntryDetails({ candidate }: { candidate: TezaursEntryCandidate }) {
-  return (
-    <>
-      <strong>{candidate.heading}</strong>{' '}
-      <small>{candidate.humanKey}</small>
-      <EntryDescription candidate={candidate} />
-    </>
-  )
-}
-
 export function TezaursCheckForm({
   reviewId,
+  reviewedTerm,
   status,
   matchedEntryId,
   caseClosed = false,
@@ -87,9 +71,8 @@ export function TezaursCheckForm({
   const [selection, setSelection] = useState(() => initialSelection(status, matchedEntryId))
   const [customSelection, setCustomSelection] = useState<TezaursEntryCandidate | null>(null)
   const [dropdownOpen, setDropdownOpen] = useState(false)
-  const [previewEntryId, setPreviewEntryId] = useState<number | null>(null)
-  const [query, setQuery] = useState('')
-  const [searchResults, setSearchResults] = useState<TezaursEntryCandidate[]>([])
+  const [expandedEntryIds, setExpandedEntryIds] = useState<number[]>([])
+  const [query, setQuery] = useState(reviewedTerm)
   const [searching, setSearching] = useState(false)
   const [searchError, setSearchError] = useState('')
   const [pendingStatus, setPendingStatus] = useState<TezaursStatus>(status)
@@ -97,7 +80,8 @@ export function TezaursCheckForm({
   const [saving, setSaving] = useState(false)
   const [confirmation, setConfirmation] = useState<'MEANING_ALREADY_EXISTS' | null>(null)
   const [confirmationError, setConfirmationError] = useState('')
-  const [expanded, setExpanded] = useState(defaultOpen)
+  const [expandedByUser, setExpanded] = useState(defaultOpen)
+  const dropdownRef = useRef<HTMLDivElement>(null)
   let selectedEntryId: number | null = null
   if (selection !== '' && Number.isInteger(Number(selection))) {
     selectedEntryId = Number(selection)
@@ -108,17 +92,11 @@ export function TezaursCheckForm({
     selectedCandidate = customSelection
   }
 
-  let visibleCandidates = candidates
-  const selectionIsInResults = candidates.some((candidate) => candidate.id === selectedCandidate?.id)
-  if (selectedCandidate && !selectionIsInResults) {
-    visibleCandidates = [...candidates, selectedCandidate]
-  }
-
   const searchTerm = query.trim()
-  const displayedCandidates = searchTerm === '' ? visibleCandidates : searchResults
-  let previewCandidate = displayedCandidates.find((candidate) => candidate.id === previewEntryId)
-  if (!previewCandidate && selectedCandidate?.id === previewEntryId) {
-    previewCandidate = selectedCandidate
+  let displayedCandidates = candidates
+  const selectionIsInResults = candidates.some((candidate) => candidate.id === selectedCandidate?.id)
+  if (selectedCandidate && !selectionIsInResults && searchTerm === reviewedTerm.trim()) {
+    displayedCandidates = [selectedCandidate, ...candidates]
   }
   const confirmed = status === 'NOT_FOUND'
     || status === 'MEANING_ALREADY_EXISTS'
@@ -126,6 +104,8 @@ export function TezaursCheckForm({
     || status === 'MEANING_NOT_FOUND'
   const hasChanges = pendingStatus !== status || selectedEntryId !== matchedEntryId
     || pendingSenseEdit !== editExistingSenses
+  const canCollapse = readOnly || (confirmed && !hasChanges)
+  const expanded = expandedByUser || !canCollapse
 
   useEffect(() => {
     let requestIsOutdated = false
@@ -162,20 +142,16 @@ export function TezaursCheckForm({
 
   useEffect(() => {
     const term = query.trim()
-    if (!dropdownOpen || term.length === 1) {
+    if (!dropdownOpen || term === '') {
       return
     }
 
     let requestIsOutdated = false
     async function searchEntries() {
       try {
-        const loaded = await getTezaursCandidates(reviewId, term || undefined)
+        const loaded = await getTezaursCandidates(reviewId, term)
         if (!requestIsOutdated) {
-          if (term === '') {
-            setCandidates(loaded)
-          } else {
-            setSearchResults(loaded)
-          }
+          setCandidates(loaded)
         }
       } catch (cause) {
         if (!requestIsOutdated) {
@@ -190,22 +166,35 @@ export function TezaursCheckForm({
       }
     }
 
-    const searchDelay = term === '' ? 0 : 300
+    const searchDelay = term === reviewedTerm.trim() ? 0 : 300
     const timeout = window.setTimeout(searchEntries, searchDelay)
 
     return () => {
       requestIsOutdated = true
       window.clearTimeout(timeout)
     }
-  }, [dropdownOpen, query, reviewId])
+  }, [dropdownOpen, query, reviewId, reviewedTerm])
+
+  useEffect(() => {
+    if (!dropdownOpen) {
+      return
+    }
+    function closeDropdownOutside(event: PointerEvent) {
+      if (!dropdownRef.current?.contains(event.target as Node)) {
+        setDropdownOpen(false)
+        setSearching(false)
+      }
+    }
+    document.addEventListener('pointerdown', closeDropdownOutside)
+    return () => document.removeEventListener('pointerdown', closeDropdownOutside)
+  }, [dropdownOpen])
 
   function openDropdown() {
-    setQuery('')
+    setQuery(reviewedTerm)
     setCandidates([])
-    setSearchResults([])
     setSearchError('')
-    setSearching(true)
-    setPreviewEntryId(selectedEntryId)
+    setSearching(reviewedTerm.trim() !== '')
+    setExpandedEntryIds(selectedEntryId === null ? [] : [selectedEntryId])
     setDropdownOpen(true)
   }
 
@@ -242,7 +231,7 @@ export function TezaursCheckForm({
   }
 
   function closeDropdownOnBlur(event: FocusEvent<HTMLDivElement>) {
-    if (!event.currentTarget.contains(event.relatedTarget)) {
+    if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget)) {
       closeDropdown()
     }
   }
@@ -250,10 +239,14 @@ export function TezaursCheckForm({
   function changeQuery(event: ChangeEvent<HTMLInputElement>) {
     const value = event.target.value
     setQuery(value)
-    setSearchResults([])
+    setCandidates([])
     setSearchError('')
-    setPreviewEntryId(null)
-    setSearching(value.trim().length >= 2)
+    setExpandedEntryIds([])
+    setSearching(value.trim() !== '')
+  }
+
+  function showCandidateMeanings(entryId: number) {
+    setExpandedEntryIds((current) => current.includes(entryId) ? current : [...current, entryId])
   }
 
   function chooseCandidate(candidate: TezaursEntryCandidate) {
@@ -337,10 +330,13 @@ export function TezaursCheckForm({
   }
 
   return (
-    <section className="tezaurs-check">
+    <section className={`tezaurs-check review-section${expanded ? ' is-open' : ''}`}>
       <details open={expanded} onToggle={toggleSection}>
-        <summary className={!expanded && confirmed && (readOnly || !hasChanges) ? 'confirmed' : undefined}>
-          <strong>2. Pārbaude Tēzaurā</strong>
+        <summary className={!expanded && confirmed && (readOnly || !hasChanges) ? 'section-title confirmed' : 'section-title'}
+          aria-disabled={!canCollapse} onClick={(event) => {
+            if (!canCollapse) event.preventDefault()
+          }}>
+          2. Pārbaude Tēzaurā
         </summary>
 
         {serverError && <p className="error">{serverError}</p>}
@@ -350,6 +346,7 @@ export function TezaursCheckForm({
           <p className="muted">Izvēlieties atbilstošo šķirkli vai norādiet, ka tāda nav.</p>
           <div
             className="tezaurs-dropdown"
+            ref={dropdownRef}
             onBlur={closeDropdownOnBlur}
             onKeyDown={closeDropdownOnEscape}
           >
@@ -378,51 +375,47 @@ export function TezaursCheckForm({
                 <div className="tezaurs-combobox-search">
                   <label>
                     Meklēt šķirkli
-                    <input autoFocus onChange={changeQuery} type="search" value={query} />
+                    <input className="form-control form-control-sm" autoFocus onChange={changeQuery} type="search" value={query} />
                   </label>
 
-                  {searchTerm.length === 1 && <small>Ievadiet vēl vienu burtu.</small>}
                   {searching && <small>Meklē...</small>}
                   {searchError && <small className="error">{searchError}</small>}
-                  {!searching && !searchError && searchTerm.length >= 2
-                    && searchResults.length === 0 && <small>Nekas netika atrasts.</small>}
+                  {!searching && !searchError && searchTerm !== ''
+                    && displayedCandidates.length === 0 && <small>Nekas netika atrasts.</small>}
                 </div>
 
                 <div className="tezaurs-dropdown-options">
                   {displayedCandidates.map((candidate) => (
-                    <div className="tezaurs-option"
-                      key={candidate.id}
-                      onFocus={() => setPreviewEntryId(candidate.id)}
-                      onMouseEnter={() => setPreviewEntryId(candidate.id)}
-                    >
-                      <button aria-pressed={candidate.id === selectedEntryId}
-                        onClick={() => chooseCandidate(candidate)} type="button">
-                        <span className="tezaurs-option-label">
-                          <strong>{candidate.heading}</strong>
-                          <small>{candidate.humanKey}</small>
-                        </span>
-                      </button>
-                      <TezaursEntryLink humanKey={candidate.humanKey} />
+                    <div key={candidate.id}>
+                      <div className="tezaurs-option">
+                        <button aria-pressed={candidate.id === selectedEntryId} disabled={saving}
+                          onFocus={() => showCandidateMeanings(candidate.id)}
+                          onMouseEnter={() => showCandidateMeanings(candidate.id)}
+                          onClick={() => chooseCandidate(candidate)} type="button">
+                          <span className="tezaurs-option-label">
+                            <strong>{candidate.heading}</strong>
+                            <small>{candidate.humanKey}</small>
+                          </span>
+                        </button>
+                        <TezaursEntryLink humanKey={candidate.humanKey} />
+                      </div>
+                      {expandedEntryIds.includes(candidate.id) && (
+                        <div className="tezaurs-dropdown-preview">
+                          <EntryDescription candidate={candidate} />
+                        </div>
+                      )}
                     </div>
                   ))}
-                  <button
-                    aria-pressed={selection === NOT_FOUND}
-                    className="tezaurs-dropdown-special"
-                    disabled={saving}
-                    onClick={chooseNotFound}
-                    onFocus={() => setPreviewEntryId(null)}
-                    onMouseEnter={() => setPreviewEntryId(null)}
-                    type="button"
-                  >
-                    Šķirkļa nav Tēzaurā
-                  </button>
                 </div>
-
-                {previewCandidate && (
-                  <div className="tezaurs-dropdown-preview">
-                    <EntryDetails candidate={previewCandidate} />
-                  </div>
-                )}
+                <button
+                  aria-pressed={selection === NOT_FOUND}
+                  className="tezaurs-dropdown-special"
+                  disabled={saving}
+                  onClick={chooseNotFound}
+                  type="button"
+                >
+                  Šķirkļa nav Tēzaurā
+                </button>
               </div>
             )}
           </div>
@@ -433,11 +426,11 @@ export function TezaursCheckForm({
                 Vai iesniegtā nozīme jau ir šķirklī “{selectedCandidate.heading}”?
               </strong></p>
               <div className="tezaurs-answer-actions">
-                <button aria-pressed={pendingStatus === 'MEANING_ALREADY_EXISTS' || pendingStatus === 'MEANING_NEEDS_EDITING'} disabled={saving}
+                <button className="btn btn-sm btn-outline-secondary" aria-pressed={pendingStatus === 'MEANING_ALREADY_EXISTS' || pendingStatus === 'MEANING_NEEDS_EDITING'} disabled={saving}
                   onClick={() => chooseMeaning('MEANING_ALREADY_EXISTS')} type="button">
                   Jā, nozīme jau ir
                 </button>
-                <button aria-pressed={pendingStatus === 'MEANING_NOT_FOUND'} disabled={saving}
+                <button className="btn btn-sm btn-outline-secondary" aria-pressed={pendingStatus === 'MEANING_NOT_FOUND'} disabled={saving}
                   onClick={() => chooseMeaning('MEANING_NOT_FOUND')} type="button">
                   Nē, tā ir jauna nozīme
                 </button>
@@ -447,11 +440,6 @@ export function TezaursCheckForm({
         </fieldset>
 
       </details>
-      {!expanded && confirmed && (readOnly || !hasChanges) && (
-        <p className="muted">
-          {checkDescriptions[status]}
-        </p>
-      )}
       {confirmation && (
         <ConfirmationDialog
           message=""

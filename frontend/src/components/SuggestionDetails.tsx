@@ -26,6 +26,7 @@ import { SenseDraftForm } from './SenseDraftForm'
 import { SuggestionSourcesTable } from './SuggestionSourcesTable'
 import { ConfirmationDialog } from './ConfirmationDialog'
 import { EditButton } from './EditButton'
+import { ReviewCompletion } from './ReviewCompletion'
 
 type Props = {
   item: QueueItem
@@ -104,7 +105,6 @@ export function SuggestionDetails({ item, initialReview, username, onStatusChang
   const [editedTitle, setEditedTitle] = useState('')
   const [savingTitle, setSavingTitle] = useState(false)
   const [titleError, setTitleError] = useState('')
-  const assignmentMenuRef = useRef<HTMLDetailsElement>(null)
   const suggestion = item.itemType === 'SUGGESTION' ? item : null
   const requestedReviewId = item.itemType === 'REVIEW' ? item.id : null
   const reviewState = useSuggestionReview(requestedReviewId, initialReview)
@@ -113,20 +113,10 @@ export function SuggestionDetails({ item, initialReview, username, onStatusChang
   const workflow = getReviewWorkflow(review, item.status)
   const status = workflow.status
   const reviewInProgress = status === 'IN_PROGRESS'
-  const canTakeForReview = review !== null
-    && (reviewStatusTransitions[status].includes('IN_PROGRESS') || (reviewInProgress && !review.assignedTo))
-    && (!review.assignedTo || review.assignedTo === username)
+  const canTakeForReview = review !== null && username !== null
+    && reviewStatusTransitions[status].includes('IN_PROGRESS')
 
-  useEffect(() => {
-    function closeAssignmentMenuOutside(event: PointerEvent) {
-      const menu = assignmentMenuRef.current
-      if (menu?.open && !menu.contains(event.target as Node)) {
-        menu.open = false
-      }
-    }
-    document.addEventListener('pointerdown', closeAssignmentMenuOutside)
-    return () => document.removeEventListener('pointerdown', closeAssignmentMenuOutside)
-  }, [])
+  const canGiveUpReview = reviewInProgress && username !== null && review?.lastStatusChangedBy === username
 
   async function changeStatus(status: ReviewStatus) {
     const updatedReview = await onStatusChange(status)
@@ -140,11 +130,6 @@ export function SuggestionDetails({ item, initialReview, username, onStatusChang
   async function changeAssignment(nextStatus: 'IN_PROGRESS' | 'READY_FOR_REVIEW') {
     if (changingStatus) {
       return
-    }
-    const menu = assignmentMenuRef.current
-    if (menu) {
-      menu.open = false
-      menu.querySelector('summary')?.focus()
     }
     setChangingStatus(true)
     setStatusError('')
@@ -258,21 +243,16 @@ export function SuggestionDetails({ item, initialReview, username, onStatusChang
     sources = review.sources
   }
   const initialGloss = sources.length === 1 ? sources[0].submittedDefinition : ''
-  const assignmentInfo = review?.assignedTo
-    ? <>Perēkli ir paņēmis apstrādē <strong>{review.assignedTo}</strong></>
-    : 'Perēkli neviens nav paņēmis apstrādē'
-  const completionQuestion = review && (
-    <div className="draft-actions">
-      <p><strong>Vai uzskatāt, ka nepieciešams eksperta apstiprinājums?</strong></p>
-      <div className="tezaurs-answer-actions">
-        <button type="button" disabled={!reviewInProgress}
-          onClick={() => requestReviewCompletion('NEEDS_EXPERT')}>Jā, vajag</button>
-        <button type="button" disabled={!reviewInProgress || !review.canComplete}
-          onClick={() => requestReviewCompletion('COMPLETED')}>Nē, nevajag</button>
-      </div>
-    </div>
-  )
-
+  let statusInfo: ReactNode = null
+  if (review && status !== 'NEW') {
+    if (status === 'READY_FOR_REVIEW') {
+      statusInfo = 'Perēkli neviens nav paņēmis apstrādē'
+    } else if (reviewInProgress) {
+      statusInfo = <>Perēkli paņēma apstrādē <strong>{review.lastStatusChangedBy}</strong></>
+    } else {
+      statusInfo = <>Stāvokļa maiņu veica lietotājs <strong>{review.lastStatusChangedBy}</strong></>
+    }
+  }
   function renderEntry(senses: ReactNode, onAddSense?: () => void) {
     if (!review) {
       return null
@@ -280,14 +260,16 @@ export function SuggestionDetails({ item, initialReview, username, onStatusChang
     if (workflow.draft.newEntry) {
       return (
         <EntryDraftForm reviewId={review.id} editable={!workflow.draft.readOnly}
-          onReviewUpdated={reviewState.updateReview} onAddSense={onAddSense} footer={completionQuestion} defaultOpen={workflow.draft.defaultOpen}>
+          canCollapse={workflow.draft.readOnly || review.canComplete} complete={workflow.draft.complete}
+          onReviewUpdated={reviewState.updateReview} onAddSense={onAddSense} defaultOpen={workflow.draft.defaultOpen}>
           {senses}
         </EntryDraftForm>
       )
     }
     if (review.matchedEntryId !== null) {
       return (
-        <ExistingEntryDetails entryId={review.matchedEntryId} onAddSense={onAddSense} footer={completionQuestion} defaultOpen={workflow.draft.defaultOpen}>
+        <ExistingEntryDetails entryId={review.matchedEntryId} onAddSense={onAddSense} defaultOpen={workflow.draft.defaultOpen}
+          canCollapse={workflow.draft.readOnly || review.canComplete} complete={workflow.draft.complete}>
           {senses}
         </ExistingEntryDetails>
       )
@@ -314,37 +296,30 @@ export function SuggestionDetails({ item, initialReview, username, onStatusChang
         {reviewInProgress && review && (
           <EditButton label="Labot izskatīšanas nosaukumu" onClick={openTitleEditor} />
         )}
-        {review && status !== 'GARBAGE' && (
-          <div className="review-assignment">
-            <span className="muted">{assignmentInfo}</span>
-            <details className="review-assignment-menu" ref={assignmentMenuRef}
-              onBlur={(event) => {
-                if (!event.currentTarget.contains(event.relatedTarget)) {
-                  event.currentTarget.open = false
-                }
-              }}
-              onKeyDown={(event) => {
-                if (event.key === 'Escape') {
-                  event.currentTarget.open = false
-                  event.currentTarget.querySelector('summary')?.focus()
-                }
-              }}>
-              <summary className="icon-button" title="Darbības ar perēkli" aria-label="Darbības ar perēkli">
-                <span aria-hidden="true">⋯</span>
-              </summary>
-              <div className="entity-action-menu">
-                {reviewInProgress && review.assignedTo === username && review.assignedTo ? (
-                  <button type="button" disabled={changingStatus}
-                    onClick={() => changeAssignment('READY_FOR_REVIEW')}>Atteikties</button>
-                ) : (
-                  <button type="button" disabled={changingStatus || !canTakeForReview}
-                    onClick={() => changeAssignment('IN_PROGRESS')}>Paņemt apstrādē</button>
-                )}
-              </div>
-            </details>
-          </div>
-        )}
       </div>
+      {review && status !== 'NEW' && (
+        <div className="review-assignment">
+          {canGiveUpReview ? (
+            <button className="icon-button text-danger" type="button" disabled={changingStatus}
+              title="Atteikties no apstrādes" aria-label="Atteikties no apstrādes"
+              onClick={() => changeAssignment('READY_FOR_REVIEW')}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <rect x="5" y="4" width="5" height="16" />
+                <rect x="14" y="4" width="5" height="16" />
+              </svg>
+            </button>
+          ) : canTakeForReview && (
+            <button className="icon-button text-success" type="button" disabled={changingStatus}
+              title="Paņemt apstrādē" aria-label="Paņemt apstrādē"
+              onClick={() => changeAssignment('IN_PROGRESS')}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M6 3v18l15-9Z" />
+              </svg>
+            </button>
+          )}
+          <span>{statusInfo}</span>
+        </div>
+      )}
       {statusError && !pendingCompletionStatus && <p className="error" role="alert">{statusError}</p>}
       {editingTitle && (
         <ConfirmationDialog
@@ -357,7 +332,7 @@ export function SuggestionDetails({ item, initialReview, username, onStatusChang
         >
           <label>
             Nosaukums
-            <input
+            <input className="form-control form-control-sm"
               value={editedTitle}
               onChange={(event) => setEditedTitle(event.target.value)}
               disabled={savingTitle}
@@ -384,13 +359,11 @@ export function SuggestionDetails({ item, initialReview, username, onStatusChang
         )}
 
         {review && workflow.tezaurs.visible && (
-          <TezaursCheckForm reviewId={review.id} status={review.tezaursStatus}
+          <TezaursCheckForm reviewId={review.id} reviewedTerm={review.reviewedTerm} status={review.tezaursStatus}
             matchedEntryId={review.matchedEntryId} caseClosed={status === 'ALREADY_EXISTS'}
             readOnly={workflow.tezaurs.readOnly} defaultOpen={workflow.tezaurs.defaultOpen}
             onSave={handleTezaursCheck} />
         )}
-
-        {status === 'ALREADY_EXISTS' && completionQuestion}
 
         {review && workflow.usage.visible && (
           <UsageCheck review={review} onSaveDecision={handleUsageDecision}
@@ -402,6 +375,10 @@ export function SuggestionDetails({ item, initialReview, username, onStatusChang
             onReviewUpdated={reviewState.updateReview} reviewId={review.id}
             editExistingSenses={review.tezaursStatus === 'MEANING_NEEDS_EDITING'}
             editable={!workflow.draft.readOnly} renderEntry={renderEntry} />
+        )}
+        {review && workflow.completion.visible && (
+          <ReviewCompletion status={status} canComplete={review.canComplete} busy={changingStatus}
+            onComplete={requestReviewCompletion} />
         )}
       </Fragment>
     </article>

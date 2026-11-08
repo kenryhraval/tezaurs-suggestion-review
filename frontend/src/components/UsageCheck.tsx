@@ -14,7 +14,7 @@ type Props = {
 }
 
 export function UsageCheck({ review, onSaveDecision, defaultOpen, readOnly }: Props) {
-  const [expanded, setExpanded] = useState(defaultOpen)
+  const [expandedByUser, setExpanded] = useState(defaultOpen)
   const [evidence, setEvidence] = useState<UsageEvidence[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -25,6 +25,8 @@ export function UsageCheck({ review, onSaveDecision, defaultOpen, readOnly }: Pr
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const editable = !readOnly
   const decided = review.usageDecision !== 'NOT_CHECKED'
+  const canCollapse = readOnly || decided
+  const expanded = expandedByUser || !canCollapse
 
   useEffect(() => {
     let requestIsOutdated = false
@@ -163,18 +165,14 @@ export function UsageCheck({ review, onSaveDecision, defaultOpen, readOnly }: Pr
     await addEvidence(request)
   }
 
-  let decisionSummary = 'Nē, neatzīstu. Trūkst datu.'
-  if (review.usageDecision === 'USED') {
-    decisionSummary = 'Jā, atzīstu.'
-  } else if (review.usageDecision === 'INVENTED') {
-    decisionSummary = 'Nē, neatzīstu. Izdomāts vārds.'
-  }
-
   return (
-    <section className="usage-check">
+    <section className={`usage-check review-section${expanded ? ' is-open' : ''}`}>
       <details open={expanded} onToggle={toggleSection}>
-        <summary className={!expanded && decided ? 'confirmed' : undefined}>
-          <strong>3. Lietojuma pārbaude</strong>
+        <summary className={!expanded && decided ? 'section-title confirmed' : 'section-title'}
+          aria-disabled={!canCollapse} onClick={(event) => {
+            if (!canCollapse) event.preventDefault()
+          }}>
+          3. Lietojuma pārbaude
         </summary>
         {editable && <>
           {searchStarted && <CorpusSearch reviewId={review.id} term={review.reviewedTerm}
@@ -184,24 +182,25 @@ export function UsageCheck({ review, onSaveDecision, defaultOpen, readOnly }: Pr
         </>}
         {error && <p className="error" role="alert">{error}</p>}
         {loading && <p className="muted">Ielādē saglabātos atradumus...</p>}
+        {readOnly && !loading && !error && evidence.length === 0 && (
+          <p className="muted">Nav atzīmētu piemēru.</p>
+        )}
         <SelectedUsageEvidence evidence={evidence} busy={saving}
           onRemove={editable ? requestEvidenceRemoval : undefined} />
-        {editable && <>
-          <p><strong>Vai atzīstat, ka vārdu lieto?</strong></p>
-          <div>
-            <button type="button" aria-pressed={review.usageDecision === 'USED'} disabled={saving || loading}
-              onClick={chooseUsed}>Jā, atzīstu</button>{' '}
-            <button type="button" aria-pressed={review.usageDecision === 'NOT_CONFIRMED' || review.usageDecision === 'INVENTED'} disabled={saving || loading}
-              onClick={chooseNotUsed}>Nē, neatzīstu</button>
-          </div>
-        </>}
+        {readOnly && review.usageNote && <p>{review.usageNote}</p>}
+        <p><strong>Vai atzīstat, ka vārdu lieto?</strong></p>
+        <div>
+          <button className="btn btn-sm btn-outline-secondary" type="button" aria-pressed={review.usageDecision === 'USED'} disabled={readOnly || saving || loading}
+            onClick={chooseUsed}>Jā, atzīstu</button>{' '}
+          <button className="btn btn-sm btn-outline-secondary" type="button" aria-pressed={review.usageDecision === 'NOT_CONFIRMED' || review.usageDecision === 'INVENTED'} disabled={readOnly || saving || loading}
+            onClick={chooseNotUsed}>Nē, neatzīstu</button>
+        </div>
       </details>
-      {!expanded && decided && <p className="muted">{decisionSummary}</p>}
       {addingSource && <EditDialog title="Pievienot citu avotu" busy={saving} error={error} wide={false}
         onSubmit={(event) => addExternalEvidence(event)}
         onCancel={closeSourceForm}>
-        <label>Avota saite<input autoFocus name="url" type="url" required maxLength={4000} disabled={saving} /></label>
-        <label>Citāts<textarea name="citation" required maxLength={10000} rows={3} disabled={saving} /></label>
+        <label>Avota saite<input className="form-control form-control-sm" autoFocus name="url" type="url" required maxLength={4000} disabled={saving} /></label>
+        <label>Citāts<textarea className="form-control form-control-sm" name="citation" required maxLength={10000} rows={3} disabled={saving} /></label>
       </EditDialog>}
       {pendingDecision && <ConfirmationDialog busy={saving} error={error}
         message="Kā rīkoties ar ieteikumu?"

@@ -41,16 +41,15 @@ export function SuggestionSourcesTable({ sources, onDetach }: Props) {
   }
 
   return (
-    <section className="suggestion-sources">
-      <h3>{sources.length === 1 ? 'Iesniegtais ieteikums' : `Iesniegtie ieteikumi (${sources.length})`}</h3>
-      <div className="suggestion-sources-table">
-        <table>
+    <section className="suggestion-sources" aria-label="Iesniegtie ieteikumi">
+      <div className="table-responsive">
+        <table className="table table-sm table-bordered">
           <thead>
             <tr>
               <th>Vārds</th>
               <th>Nozīme</th>
               <th>Piemērs</th>
-              <th>Papildu informācija</th>
+              <th>Papildu</th>
               {canDetach && <th>Darbības</th>}
             </tr>
           </thead>

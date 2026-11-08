@@ -30,6 +30,7 @@ class CurrentUserServiceTest {
         assertThat(service.usernameFrom(null)).isEmpty();
         assertThat(service.usernameFrom("Bearer token")).isEmpty();
         assertThat(service.usernameFrom("Basic not-base64")).isEmpty();
+        assertThat(service.usernameFrom(basicAuthorization("   ", "secret"))).isEmpty();
         assertThat(service.usernameFrom("Basic " + Base64.getEncoder().encodeToString(
                 "missing-separator".getBytes(StandardCharsets.ISO_8859_1)))).isEmpty();
         assertThatThrownBy(() -> service.requireUsername(null)).isInstanceOf(ConflictException.class);

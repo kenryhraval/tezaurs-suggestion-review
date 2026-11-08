@@ -66,10 +66,10 @@ class SenseDraftServiceTest {
 
     @Test
     void savesAFullSenseDraftAndAllowsCompletion() {
-        ReviewCase review = new ReviewCase("vārds");
-        review.changeStatus(ReviewStatus.READY_FOR_REVIEW);
-        review.changeStatus(ReviewStatus.IN_PROGRESS);
-        review.recordTezaursCheck(TezaursStatus.MEANING_NOT_FOUND, 42);
+        ReviewCase review = new ReviewCase("vārds", "reviewer");
+        review.changeStatus(ReviewStatus.READY_FOR_REVIEW, "reviewer");
+        review.changeStatus(ReviewStatus.IN_PROGRESS, "reviewer");
+        review.recordTezaursCheck(TezaursStatus.MEANING_NOT_FOUND, 42, "reviewer");
         when(caseRepository.findById(review.getId())).thenReturn(Optional.of(review));
         when(senseRepository.findAllByCaseIdAndTargetEntryIdOrderByOrderNoAscIdAsc(review.getId(), review.getMatchedEntryId()))
                 .thenReturn(List.of());
@@ -80,17 +80,17 @@ class SenseDraftServiceTest {
                 .extracting(SenseDraftResponse::gloss)
                 .isEqualTo("Jauna nozīme");
         assertThat(response.review().canComplete()).isTrue();
-        review.changeStatus(ReviewStatus.COMPLETED);
+        review.changeStatus(ReviewStatus.COMPLETED, "reviewer");
         assertThatThrownBy(() -> service.save(review.getId(), request(null, null)))
                 .isInstanceOf(ConflictException.class);
     }
 
     @Test
     void rejectsASenseThatIsItsOwnParent() {
-        ReviewCase review = new ReviewCase("vārds");
-        review.changeStatus(ReviewStatus.READY_FOR_REVIEW);
-        review.changeStatus(ReviewStatus.IN_PROGRESS);
-        review.recordTezaursCheck(TezaursStatus.MEANING_NOT_FOUND, 42);
+        ReviewCase review = new ReviewCase("vārds", "reviewer");
+        review.changeStatus(ReviewStatus.READY_FOR_REVIEW, "reviewer");
+        review.changeStatus(ReviewStatus.IN_PROGRESS, "reviewer");
+        review.recordTezaursCheck(TezaursStatus.MEANING_NOT_FOUND, 42, "reviewer");
         UUID senseId = UUID.randomUUID();
         when(caseRepository.findById(review.getId())).thenReturn(Optional.of(review));
 
@@ -120,9 +120,9 @@ class SenseDraftServiceTest {
         assertThatThrownBy(() -> service.findAll(missingId))
                 .isInstanceOf(NotFoundException.class);
 
-        ReviewCase unchecked = new ReviewCase("vārds");
-        unchecked.changeStatus(ReviewStatus.READY_FOR_REVIEW);
-        unchecked.changeStatus(ReviewStatus.IN_PROGRESS);
+        ReviewCase unchecked = new ReviewCase("vārds", "reviewer");
+        unchecked.changeStatus(ReviewStatus.READY_FOR_REVIEW, "reviewer");
+        unchecked.changeStatus(ReviewStatus.IN_PROGRESS, "reviewer");
         when(caseRepository.findById(unchecked.getId())).thenReturn(Optional.of(unchecked));
 
         assertThatThrownBy(() -> service.save(unchecked.getId(), request(null, null)))
@@ -200,7 +200,7 @@ class SenseDraftServiceTest {
     @Test
     void copiesOnlyTheSenseTheReviewerSavesAndLeavesTheDictionaryUntouched() {
         ReviewCase review = reviewWithMissingMeaning();
-        review.recordTezaursCheck(TezaursStatus.MEANING_NEEDS_EDITING, 42);
+        review.recordTezaursCheck(TezaursStatus.MEANING_NEEDS_EDITING, 42, "reviewer");
         TezaursSense original = mock(TezaursSense.class);
         when(original.getId()).thenReturn(7);
         when(original.getData()).thenReturn(Map.of("Gram", Map.of("Flags", Map.of("Piezīmes", "legacy"))));
@@ -223,7 +223,7 @@ class SenseDraftServiceTest {
     @Test
     void rejectsCyclesThroughOriginalSensesWhenEditingAnExistingSense() {
         ReviewCase review = reviewWithMissingMeaning();
-        review.recordTezaursCheck(TezaursStatus.MEANING_NEEDS_EDITING, 42);
+        review.recordTezaursCheck(TezaursStatus.MEANING_NEEDS_EDITING, 42, "reviewer");
         TezaursSense parent = mock(TezaursSense.class);
         TezaursSense child = mock(TezaursSense.class);
         when(parent.getId()).thenReturn(7);
@@ -255,7 +255,7 @@ class SenseDraftServiceTest {
     @Test
     void savingAnExistingSenseDraftAllowsCompletionWhenEditingWasChosen() {
         ReviewCase review = reviewWithMissingMeaning();
-        review.recordTezaursCheck(TezaursStatus.MEANING_NEEDS_EDITING, 42);
+        review.recordTezaursCheck(TezaursStatus.MEANING_NEEDS_EDITING, 42, "reviewer");
         ReviewSense original = new ReviewSense(review.getId());
         original.recordSource(7);
         original.update("Esoša nozīme", null, null, 1, Map.of(), null);
@@ -291,10 +291,10 @@ class SenseDraftServiceTest {
     }
 
     private static ReviewCase reviewWithMissingMeaning() {
-        ReviewCase review = new ReviewCase("vārds");
-        review.changeStatus(ReviewStatus.READY_FOR_REVIEW);
-        review.changeStatus(ReviewStatus.IN_PROGRESS);
-        review.recordTezaursCheck(TezaursStatus.MEANING_NOT_FOUND, 42);
+        ReviewCase review = new ReviewCase("vārds", "reviewer");
+        review.changeStatus(ReviewStatus.READY_FOR_REVIEW, "reviewer");
+        review.changeStatus(ReviewStatus.IN_PROGRESS, "reviewer");
+        review.recordTezaursCheck(TezaursStatus.MEANING_NOT_FOUND, 42, "reviewer");
         return review;
     }
 
@@ -316,8 +316,8 @@ class SenseDraftServiceTest {
         assertThatThrownBy(() -> service.save(review.getId(), request(newEntrySense.getId(), null)))
                 .isInstanceOf(ConflictException.class);
 
-        review.recordTezaursCheck(TezaursStatus.NOT_FOUND, null);
-        review.recordUsageDecision(lv.tezaurs.suggestions.usage.entity.UsageDecision.USED, null, null);
+        review.recordTezaursCheck(TezaursStatus.NOT_FOUND, null, "reviewer");
+        review.recordUsageDecision(lv.tezaurs.suggestions.usage.entity.UsageDecision.USED, null, "reviewer");
         assertThat(service.findAll(review.getId())).singleElement().extracting(SenseDraftResponse::id).isEqualTo(newEntrySense.getId());
     }
 }

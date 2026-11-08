@@ -55,6 +55,11 @@ export async function getCurrentUser(): Promise<{ username: string | null }> {
   return response.json()
 }
 
+export async function getSuggestionCounts(): Promise<{ suggestions: number; cases: number }> {
+  const response = await request('/api/suggestions/counts')
+  return response.json()
+}
+
 export async function getSuggestions(
   query: string,
   page: number,
@@ -147,12 +152,9 @@ export async function changeReviewStatus(
 
 export async function getDuplicateReviewCandidates(
   query: string,
-  excludedCaseId?: string,
+  excludedCaseId: string,
 ): Promise<DuplicateReviewCandidate[]> {
-  const parameters = new URLSearchParams({ query })
-  if (excludedCaseId) {
-    parameters.set('excludedCaseId', excludedCaseId)
-  }
+  const parameters = new URLSearchParams({ query, excludedCaseId })
   const response = await request(`/api/reviews/duplicate-candidates?${parameters}`)
   return response.json()
 }

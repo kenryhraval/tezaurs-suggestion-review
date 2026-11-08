@@ -36,8 +36,8 @@ public class ReviewCase {
     @Column(nullable = false, length = 32)
     private ReviewStatus status;
 
-    @Column(name = "assigned_to")
-    private String assignedTo;
+    @Column(name = "last_status_changed_by", nullable = false)
+    private String lastStatusChangedBy;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "tezaurs_status", nullable = false, length = 32)
@@ -74,7 +74,8 @@ public class ReviewCase {
     @OneToMany(mappedBy = "reviewCase", fetch = FetchType.LAZY)
     private List<CaseSuggestion> sources = new ArrayList<>();
 
-    public ReviewCase(String submittedTerm) {
+    public ReviewCase(String submittedTerm, String username) {
+        this.lastStatusChangedBy = requireStatusAuthor(username);
         this.id = UUID.randomUUID();
         this.reviewedTerm = submittedTerm;
         this.status = ReviewStatus.NEW;
@@ -85,7 +86,7 @@ public class ReviewCase {
         sources.add(source);
     }
 
-    public void changeStatus(ReviewStatus newStatus) {
+    public void changeStatus(ReviewStatus newStatus, String username) {
         status.requireTransitionTo(newStatus);
         if (newStatus == ReviewStatus.ALREADY_EXISTS) {
             if (matchedEntryId == null) {
@@ -93,27 +94,13 @@ public class ReviewCase {
             }
             tezaursStatus = TezaursStatus.MEANING_ALREADY_EXISTS;
         }
-        status = newStatus;
-        if (newStatus == ReviewStatus.READY_FOR_REVIEW || newStatus == ReviewStatus.GARBAGE) {
-            assignedTo = null;
-        }
+        updateStatus(newStatus, username);
     }
 
     public void takeForReview(String username) {
-        if (assignedTo != null && !assignedTo.equals(username)) {
-            throw new ConflictException("Izskatīšanu jau paņēmis lietotājs “" + assignedTo + "”.");
-        }
         if (status != ReviewStatus.IN_PROGRESS) {
-            changeStatus(ReviewStatus.IN_PROGRESS);
+            changeStatus(ReviewStatus.IN_PROGRESS, username);
         }
-        assignedTo = username;
-    }
-
-    public void giveUpReview(String username) {
-        if (assignedTo != null && !assignedTo.equals(username)) {
-            throw new ConflictException("Atteikties no apstrādes var tikai lietotājs, kurš to paņēmis.");
-        }
-        changeStatus(ReviewStatus.READY_FOR_REVIEW);
     }
 
     public void correctTerm(String term) {
@@ -137,15 +124,15 @@ public class ReviewCase {
         usageDecidedBy = username;
         usageDecidedAt = Instant.now();
         if (decision == UsageDecision.USED) {
-            status = ReviewStatus.IN_PROGRESS;
+            updateStatus(ReviewStatus.IN_PROGRESS, username);
         } else if (decision == UsageDecision.NOT_CONFIRMED) {
-            status = ReviewStatus.INSUFFICIENT_DATA;
+            updateStatus(ReviewStatus.INSUFFICIENT_DATA, username);
         } else {
-            status = ReviewStatus.INVENTED;
+            updateStatus(ReviewStatus.INVENTED, username);
         }
     }
 
-    public void recordTezaursCheck(TezaursStatus newTezaursStatus, Integer selectedEntryId) {
+    public void recordTezaursCheck(TezaursStatus newTezaursStatus, Integer selectedEntryId, String username) {
         if (status != ReviewStatus.IN_PROGRESS && status != ReviewStatus.ALREADY_EXISTS) {
             throw new ConflictException("Resume the case in Apstrādē before changing the Tēzaurs check");
         }
@@ -158,14 +145,37 @@ public class ReviewCase {
         boolean shouldReopenCase = this.status == ReviewStatus.ALREADY_EXISTS
                 && newTezaursStatus != TezaursStatus.MEANING_ALREADY_EXISTS;
         if (shouldReopenCase) {
-            status = ReviewStatus.IN_PROGRESS;
+            updateStatus(ReviewStatus.IN_PROGRESS, username);
+            resetUsageDecision();
         }
         this.tezaursStatus = newTezaursStatus;
         this.matchedEntryId = selectedEntryId;
         if (newTezaursStatus == TezaursStatus.MEANING_ALREADY_EXISTS
                 && status != ReviewStatus.ALREADY_EXISTS) {
-            changeStatus(ReviewStatus.ALREADY_EXISTS);
+            changeStatus(ReviewStatus.ALREADY_EXISTS, username);
         }
+    }
+
+    private void resetUsageDecision() {
+        usageDecision = UsageDecision.NOT_CHECKED;
+        usageNote = null;
+        usageDecidedBy = null;
+        usageDecidedAt = null;
+    }
+
+    private void updateStatus(ReviewStatus newStatus, String username) {
+        if (status != newStatus) {
+            String author = requireStatusAuthor(username);
+            status = newStatus;
+            lastStatusChangedBy = author;
+        }
+    }
+
+    private static String requireStatusAuthor(String username) {
+        if (username == null || username.isBlank()) {
+            throw new IllegalArgumentException("A status author is required");
+        }
+        return username;
     }
 
     public boolean canEditEntryDraft() {

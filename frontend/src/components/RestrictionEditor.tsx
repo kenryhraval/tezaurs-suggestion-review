@@ -25,7 +25,7 @@ export function RestrictionEditor({
 }: Props) {
   if (!restriction) {
     return (
-      <button type="button" onClick={() => onChange({})}>
+      <button className="btn btn-sm btn-outline-secondary" type="button" onClick={() => onChange({})}>
         Pievienot ierobežojumu
       </button>
     )
@@ -35,7 +35,7 @@ export function RestrictionEditor({
     return (
       <div className="restriction-editor">
         <p>Sarežģītu ierobežojumu šī forma vēl neatbalsta.</p>
-        <button type="button" onClick={() => onChange(null)}>Noņemt ierobežojumu</button>
+        <button className="btn btn-sm btn-outline-secondary" type="button" onClick={() => onChange(null)}>Noņemt ierobežojumu</button>
       </div>
     )
   }
@@ -44,7 +44,7 @@ export function RestrictionEditor({
     return (
       <div className="restriction-editor">
         <p className="error">Ierobežojumu izvēles nav ielādētas. Pārstartējiet backend.</p>
-        <button type="button" onClick={() => onChange(null)}>Noņemt ierobežojumu</button>
+        <button className="btn btn-sm btn-outline-secondary" type="button" onClick={() => onChange(null)}>Noņemt ierobežojumu</button>
       </div>
     )
   }
@@ -89,7 +89,7 @@ export function RestrictionEditor({
       <strong>Ierobežojums</strong>
       <label>
         Veids
-        <select value={restrictionType} onChange={(event) => updateType(event.target.value)}>
+        <select className="custom-select custom-select-sm" value={restrictionType} onChange={(event) => updateType(event.target.value)}>
           <option value="">Izvēlieties</option>
           {types.map((option) => (
             <option key={option.id} value={option.label}>{option.label}</option>
@@ -98,7 +98,7 @@ export function RestrictionEditor({
       </label>
       <label>
         Biežums
-        <select
+        <select className="custom-select custom-select-sm"
           value={frequency}
           onChange={(event) => onChange({
             ...restriction,
@@ -121,14 +121,14 @@ export function RestrictionEditor({
           />
           <label>
             Valodas materiāls
-            <input
+            <input className="form-control form-control-sm"
               onChange={(event) => updateLanguageMaterial(event.target.value)}
               value={languageMaterial.join(' | ')}
             />
           </label>
         </>
       )}
-      <button type="button" onClick={() => onChange(null)}>Noņemt ierobežojumu</button>
+      <button className="btn btn-sm btn-outline-secondary" type="button" onClick={() => onChange(null)}>Noņemt ierobežojumu</button>
     </div>
   )
 }

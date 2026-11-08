@@ -3,6 +3,7 @@ package lv.tezaurs.suggestions.suggestion.service;
 import lombok.RequiredArgsConstructor;
 import lv.tezaurs.suggestions.common.error.NotFoundException;
 import lv.tezaurs.suggestions.suggestion.dto.ReviewResponse;
+import lv.tezaurs.suggestions.suggestion.dto.SuggestionCountsResponse;
 import lv.tezaurs.suggestions.suggestion.dto.SuggestionPageResponse;
 import lv.tezaurs.suggestions.suggestion.dto.SuggestionResponse;
 import lv.tezaurs.suggestions.suggestion.dto.SuggestionSort;
@@ -10,7 +11,9 @@ import lv.tezaurs.suggestions.suggestion.dto.UpdateStatusRequest;
 import lv.tezaurs.suggestions.suggestion.dto.LinkDuplicateRequest;
 import lv.tezaurs.suggestions.suggestion.entity.IncubatorSuggestion;
 import lv.tezaurs.suggestions.suggestion.entity.ReviewCase;
+import lv.tezaurs.suggestions.suggestion.entity.ReviewStatus;
 import lv.tezaurs.suggestions.suggestion.repository.IncubatorSuggestionRepository;
+import lv.tezaurs.suggestions.suggestion.repository.ReviewCaseRepository;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
@@ -22,6 +25,13 @@ public class SuggestionService {
     private final ReviewCompletionService completionService;
     private final IncubatorSuggestionRepository sourceSuggestionRepository;
     private final ReviewService reviewService;
+    private final ReviewCaseRepository caseRepository;
+
+    @Transactional(readOnly = true)
+    public SuggestionCountsResponse counts() {
+        return new SuggestionCountsResponse(sourceSuggestionRepository.count(),
+                caseRepository.countByStatusNot(ReviewStatus.GARBAGE));
+    }
 
     @Transactional(readOnly = true)
     public SuggestionPageResponse list(String query, int page, int size, SuggestionSort sort) {

@@ -17,7 +17,6 @@ type Props = {
   items: QueueItem[]
   status: ReviewStatus
   sort: SuggestionSort
-  search: string
   selectedKey: string | null
   loading: boolean
   page: number
@@ -26,7 +25,6 @@ type Props = {
   onSelect: (key: string) => void
   onFilterStatusChange: (status: ReviewStatus) => void
   onSortChange: (sort: SuggestionSort) => void
-  onSearchChange: (search: string) => void
   onPageChange: (page: number) => void
 }
 
@@ -42,7 +40,6 @@ export function SuggestionList({
   items,
   status,
   sort,
-  search,
   selectedKey,
   loading,
   page,
@@ -51,49 +48,29 @@ export function SuggestionList({
   onSelect,
   onFilterStatusChange,
   onSortChange,
-  onSearchChange,
   onPageChange,
 }: Props) {
   return (
-    <aside>
-      <h2>Ieteikumi</h2>
-
+    <aside aria-label="Ieteikumu saraksts">
       <div className="suggestion-filters">
-        <label>
-          Statuss
-          <select
-            onChange={(event) => onFilterStatusChange(event.target.value as ReviewStatus)}
-            value={status}
-          >
-            {statuses.map((value) => (
-              <option key={value} value={value}>{reviewStatusLabels[value]}</option>
-            ))}
-          </select>
-        </label>
-
-        <label>
-          Meklēt
-          <input
-            onChange={(event) => onSearchChange(event.target.value)}
-            placeholder="Vārds vai nozīme"
-            type="search"
-            value={search}
-          />
-        </label>
-
-        <label>
-          Kārtot
-          <select
-            onChange={(event) => onSortChange(event.target.value as SuggestionSort)}
-            value={sort}
-          >
-            <option value="NEWEST">Jaunākie</option>
-            <option value="OLDEST">Vecākie</option>
-            {status !== 'NEW' && (
-              <option value="MOST_SUGGESTIONS">Visvairāk ieteikumu</option>
-            )}
-          </select>
-        </label>
+        <select className="custom-select custom-select-sm" aria-label="Statuss"
+          onChange={(event) => onFilterStatusChange(event.target.value as ReviewStatus)}
+          value={status}
+        >
+          {statuses.map((value) => (
+            <option key={value} value={value}>{reviewStatusLabels[value]}</option>
+          ))}
+        </select>
+        <select className="custom-select custom-select-sm" aria-label="Kārtot"
+          onChange={(event) => onSortChange(event.target.value as SuggestionSort)}
+          value={sort}
+        >
+          <option value="NEWEST">Jaunākie</option>
+          <option value="OLDEST">Vecākie</option>
+          {status !== 'NEW' && (
+            <option value="MOST_SUGGESTIONS">Visvairāk ieteikumu</option>
+          )}
+        </select>
       </div>
 
       <div className="suggestion-group-heading">
@@ -107,14 +84,14 @@ export function SuggestionList({
       {!loading && items.length === 0 && <p className="empty-group">Nav ieteikumu.</p>}
 
       {!loading && items.length > 0 && (
-        <ul className="suggestion-list">
+        <ul className="list-group suggestion-list">
           {items.map((item) => (
             <li
-              className={itemKey(item) === selectedKey ? 'selected' : undefined}
+              className="list-group-item p-0 overflow-hidden"
               key={itemKey(item)}
             >
               <button
-                className="suggestion-select"
+                className={itemKey(item) === selectedKey ? 'list-group-item-action suggestion-select selected' : 'list-group-item-action suggestion-select'}
                 onClick={() => onSelect(itemKey(item))}
                 type="button"
               >
@@ -133,16 +110,18 @@ export function SuggestionList({
 
       {totalPages > 1 && (
         <div className="suggestion-pagination">
-          <button disabled={page === 0} onClick={() => onPageChange(page - 1)} type="button">
-            Iepriekšējā
+          <button className="btn btn-sm btn-outline-secondary" aria-label="Iepriekšējā lapa" title="Iepriekšējā lapa"
+            disabled={page === 0} onClick={() => onPageChange(page - 1)} type="button">
+            ‹
           </button>
           <span>{page + 1} / {totalPages}</span>
-          <button
+          <button className="btn btn-sm btn-outline-secondary"
+            aria-label="Nākamā lapa" title="Nākamā lapa"
             disabled={page + 1 >= totalPages}
             onClick={() => onPageChange(page + 1)}
             type="button"
           >
-            Nākamā
+            ›
           </button>
         </div>
       )}

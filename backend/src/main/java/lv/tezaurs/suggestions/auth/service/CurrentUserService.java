@@ -29,7 +29,8 @@ public class CurrentUserService {
             if (separator <= 0) {
                 return Optional.empty();
             }
-            return Optional.of(credentials.substring(0, separator));
+            String username = credentials.substring(0, separator);
+            return username.isBlank() ? Optional.empty() : Optional.of(username);
         } catch (IllegalArgumentException exception) {
             return Optional.empty();
         }

@@ -26,8 +26,12 @@ export function Dialog({ title, busy, wide = false, onCancel, children }: Props)
           onCancel()
         }
       }}>
-      <h3 id={titleId}>{title}</h3>
-      {children}
+      <div className="modal-content">
+        <div className="modal-header">
+          <h3 className="modal-title h5" id={titleId}>{title}</h3>
+        </div>
+        <div className="modal-body">{children}</div>
+      </div>
     </dialog>
   )
 }

@@ -13,7 +13,9 @@ Tēzaurs.
 - The first decision creates a preliminary case in `Skatāms` or `Atkritums`,
   so it survives reloads. “Paņemt apstrādē?” starts work separately and records
   the proxy-authenticated username. “Atteikties no apstrādes” returns the case to
-  `Skatāms`, clears the assignment and preserves saved work.
+  `Skatāms` and preserves saved work. `last_status_changed_by` identifies who
+  took an active case; there is no separate ownership lock. Claiming a case
+  preserves its Tēzaurs check, usage decision, examples and drafts.
   Choosing an existing case moves all its sources to the destination case.
 - Merging keeps the destination's data and status. After confirmation, the source
   case and its drafts are deleted; draft differences are not merged.

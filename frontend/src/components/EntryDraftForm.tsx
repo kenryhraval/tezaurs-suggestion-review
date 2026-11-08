@@ -30,7 +30,8 @@ type Props = {
   onReviewUpdated: (review: Review) => void
   children?: ReactNode
   defaultOpen: boolean
-  footer?: ReactNode
+  canCollapse: boolean
+  complete: boolean
   editable: boolean
   onAddSense?: () => void
 }
@@ -112,7 +113,8 @@ function draftEntryView(
   }
 }
 
-export function EntryDraftForm({ reviewId, onReviewUpdated, children, footer, editable, onAddSense, defaultOpen }: Props) {
+export function EntryDraftForm({ reviewId, onReviewUpdated, children, editable, onAddSense, defaultOpen, canCollapse, complete }: Props) {
+  const [expanded, setExpanded] = useState(defaultOpen)
   const [draft, setDraft] = useState<EntryDraft | null>(null)
   const [options, setOptions] = useState<TezaursFormOptions | null>(null)
   const [lexemes, setLexemes] = useState<LexemeDraft[]>([])
@@ -373,8 +375,20 @@ export function EntryDraftForm({ reviewId, onReviewUpdated, children, footer, ed
     setError('')
   }
 
+  function renderSection(content: ReactNode) {
+    return (
+      <details open={expanded || !canCollapse} onToggle={(event) => setExpanded(event.currentTarget.open)}
+        className="entry-draft-section existing-entry review-section">
+        <summary className={!expanded && complete ? 'section-title confirmed' : 'section-title'} aria-disabled={!canCollapse} onClick={(event) => {
+          if (!canCollapse) event.preventDefault()
+        }}>4. Labojumu melnraksts</summary>
+        {content}
+      </details>
+    )
+  }
+
   if (loading) {
-    return <p className="muted">Ielādē šķirkļa formu...</p>
+    return renderSection(<p className="muted">Ielādē šķirkļa formu...</p>)
   }
   if (!options || !draft) {
     return <p className="error">{error || 'Šķirkļa forma nav pieejama.'}</p>
@@ -384,10 +398,8 @@ export function EntryDraftForm({ reviewId, onReviewUpdated, children, footer, ed
   const savedLexemes = lexemes.filter((lexeme) => lexeme.id !== null)
   const primaryLexemeId = savedLexemes.find((lexeme) => lexeme.primary)?.id ?? ''
 
-  return (
-    <details open={defaultOpen} className="entry-draft-section existing-entry">
-      <summary><strong>4. Jauna šķirkļa melnraksts</strong></summary>
-
+  return renderSection(
+    <>
       <EntryDisplay entry={draftEntryView(draft, options)}
         onEditEntry={editable ? openEntryEditor : undefined}
         onEditLexeme={editable ? openLexemeEditor : undefined}
@@ -397,7 +409,7 @@ export function EntryDraftForm({ reviewId, onReviewUpdated, children, footer, ed
         canDeleteLexeme={(index) => draft.lexemes.length > 1 && !draft.lexemes[index].primary}
         lexemeControls={editable && savedLexemes.length > 1 && (
           <label>Galvenā leksēma
-            <select value={primaryLexemeId} disabled={savingLexemeIndex !== null}
+            <select className="custom-select custom-select-sm" value={primaryLexemeId} disabled={savingLexemeIndex !== null}
               onChange={(event) => selectPrimary(event.target.value)}>
               {savedLexemes.map((lexeme) => <option key={lexeme.id} value={lexeme.id ?? ''}>{lexeme.lemma}</option>)}
             </select>
@@ -405,7 +417,6 @@ export function EntryDraftForm({ reviewId, onReviewUpdated, children, footer, ed
         )}>
         {children}
       </EntryDisplay>
-      {footer}
 
       {editingEntry && (
         <EditDialog title="Labot šķirkli" busy={saving} error={error}
@@ -414,11 +425,11 @@ export function EntryDraftForm({ reviewId, onReviewUpdated, children, footer, ed
             <legend>Šķirklis</legend>
             <label>
               Šķirkļa vārds
-              <input autoFocus defaultValue={draft.heading} maxLength={255} name="heading" required />
+              <input className="form-control form-control-sm" autoFocus defaultValue={draft.heading} maxLength={255} name="heading" required />
             </label>
             <label>
               Šķirkļa tips
-              <select defaultValue={entryTypeId} name="typeId">
+              <select className="custom-select custom-select-sm" defaultValue={entryTypeId} name="typeId">
                 {options.entryTypes.map((option) => (
                   <option key={option.id} value={option.id}>{option.label || option.code}</option>
                 ))}
@@ -429,11 +440,11 @@ export function EntryDraftForm({ reviewId, onReviewUpdated, children, footer, ed
 
           <fieldset>
             <legend>Papildu informācija</legend>
-            <label>Cilme<textarea defaultValue={draft?.etymology ?? ''} name="etymology" rows={2} /></label>
-            <label>Normatīvais komentārs<textarea defaultValue={draft?.normativeComment ?? ''} name="normativeComment" rows={2} /></label>
-            <label>Zinātniskais nosaukums<input defaultValue={draft?.scientificName ?? ''} name="scientificName" /></label>
-            <label>Avots<input defaultValue={draft?.source ?? ''} name="source" /></label>
-            <label>Iekšējās piezīmes<textarea defaultValue={draft?.notes ?? ''} name="notes" rows={3} /></label>
+            <label>Cilme<textarea className="form-control form-control-sm" defaultValue={draft?.etymology ?? ''} name="etymology" rows={2} /></label>
+            <label>Normatīvais komentārs<textarea className="form-control form-control-sm" defaultValue={draft?.normativeComment ?? ''} name="normativeComment" rows={2} /></label>
+            <label>Zinātniskais nosaukums<input className="form-control form-control-sm" defaultValue={draft?.scientificName ?? ''} name="scientificName" /></label>
+            <label>Avots<input className="form-control form-control-sm" defaultValue={draft?.source ?? ''} name="source" /></label>
+            <label>Iekšējās piezīmes<textarea className="form-control form-control-sm" defaultValue={draft?.notes ?? ''} name="notes" rows={3} /></label>
           </fieldset>
 
         </EditDialog>
@@ -452,7 +463,7 @@ export function EntryDraftForm({ reviewId, onReviewUpdated, children, footer, ed
                 }}>
                 <label>
                   Pamatforma
-                  <input
+                  <input className="form-control form-control-sm"
                     autoFocus
                     maxLength={255}
                     onChange={(event) => replaceLexeme(index, {
@@ -465,7 +476,7 @@ export function EntryDraftForm({ reviewId, onReviewUpdated, children, footer, ed
                 </label>
                 <label>
                   Loma šķirklī
-                  <select
+                  <select className="custom-select custom-select-sm"
                     onChange={(event) => replaceLexeme(index, {
                       ...lexeme,
                       roleId: Number(event.target.value),
@@ -479,7 +490,7 @@ export function EntryDraftForm({ reviewId, onReviewUpdated, children, footer, ed
                 </label>
                 <label>
                   Paradigma
-                  <select
+                  <select className="custom-select custom-select-sm"
                     onChange={(event) => replaceLexeme(index, {
                       ...lexeme,
                       paradigmId: event.target.value ? Number(event.target.value) : null,
@@ -496,7 +507,7 @@ export function EntryDraftForm({ reviewId, onReviewUpdated, children, footer, ed
                   <div className="stem-fields">
                     <label>
                       Pamatformas celms
-                      <input
+                      <input className="form-control form-control-sm"
                         onChange={(event) => replaceLexeme(index, {
                           ...lexeme,
                           stem1: event.target.value || null,
@@ -507,7 +518,7 @@ export function EntryDraftForm({ reviewId, onReviewUpdated, children, footer, ed
                     {selectedParadigm.stems >= 2 && (
                       <label>
                         Tagadnes celms
-                        <input
+                        <input className="form-control form-control-sm"
                           onChange={(event) => replaceLexeme(index, {
                             ...lexeme,
                             stem2: event.target.value || null,
@@ -519,7 +530,7 @@ export function EntryDraftForm({ reviewId, onReviewUpdated, children, footer, ed
                     {selectedParadigm.stems >= 3 && (
                       <label>
                         Pagātnes celms
-                        <input
+                        <input className="form-control form-control-sm"
                           onChange={(event) => replaceLexeme(index, {
                             ...lexeme,
                             stem3: event.target.value || null,
@@ -532,7 +543,7 @@ export function EntryDraftForm({ reviewId, onReviewUpdated, children, footer, ed
                 )}
                 <label>
                   Izrunas varianti
-                  <input
+                  <input className="form-control form-control-sm"
                     onChange={(event) => replaceLexeme(index, {
                       ...lexeme,
                       pronunciations: event.target.value
@@ -573,6 +584,6 @@ export function EntryDraftForm({ reviewId, onReviewUpdated, children, footer, ed
         />
       )}
       {error && !editingEntry && editingLexemeIndex === null && deletingLexemeIndex === null && <p className="error">{error}</p>}
-    </details>
+    </>
   )
 }

@@ -14,7 +14,7 @@ public record ReviewResponse(
         UUID id,
         String reviewedTerm,
         ReviewStatus status,
-        String assignedTo,
+        String lastStatusChangedBy,
         TezaursStatus tezaursStatus,
         Integer matchedEntryId,
         UsageDecision usageDecision,
@@ -28,7 +28,7 @@ public record ReviewResponse(
 
     public static ReviewResponse from(ReviewCase review, CompletionBlockReason blockReason) {
         return new ReviewResponse(review.getId(), review.getReviewedTerm(), review.getStatus(),
-                review.getAssignedTo(),
+                review.getLastStatusChangedBy(),
                 review.getTezaursStatus(), review.getMatchedEntryId(),
                 review.getUsageDecision(), review.getUsageNote(), review.getUsageDecidedBy(), review.getUsageDecidedAt(),
                 blockReason == null, blockReason, review.getCreatedAt(),

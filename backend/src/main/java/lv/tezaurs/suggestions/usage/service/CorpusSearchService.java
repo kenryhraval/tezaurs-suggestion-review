@@ -20,7 +20,7 @@ import lv.tezaurs.suggestions.usage.dto.CorpusSearchResponse;
 
 @Service
 public class CorpusSearchService {
-    private static final int PAGE_SIZE = 5;
+    private static final int PAGE_SIZE = 25;
     private static final String CASE_INSENSITIVE_PREFIX = "(?i)";
     private final HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
     private final JsonMapper json = JsonMapper.builder().build();
@@ -88,13 +88,14 @@ public class CorpusSearchService {
         StringBuilder combinedText = new StringBuilder();
         for (JsonNode segment : segments) {
             boolean isAnnotation = segment.path("class").asString("").equals("attr");
-            if (isAnnotation) {
+            boolean isStructure = segment.path("class").asString("").equals("strc");
+            if (isAnnotation || isStructure) {
                 continue;
             }
             String segmentText = segment.path("str").asString("");
             combinedText.append(segmentText);
         }
-        return combinedText.toString();
+        return CorpusTextFormatter.format(combinedText.toString());
     }
 
     private static String buildCorpusQuery(String term, Corpus corpus) {

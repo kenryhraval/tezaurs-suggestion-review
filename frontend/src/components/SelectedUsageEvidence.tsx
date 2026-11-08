@@ -8,7 +8,7 @@ type Props = {
   onRemove?: (id: string) => void
 }
 
-const PAGE_SIZE = 5
+const PAGE_SIZE = 25
 
 export function SelectedUsageEvidence({ evidence, busy, onRemove }: Props) {
   const [page, setPage] = useState(0)
@@ -37,10 +37,10 @@ export function SelectedUsageEvidence({ evidence, busy, onRemove }: Props) {
       {visibleEvidence.map((item) => <SavedUsageEvidence key={item.id} evidence={item} busy={busy}
         onRemove={onRemove ? () => onRemove(item.id) : undefined} />)}
       {pageCount > 1 && <nav className="corpus-pagination" aria-label="Atzīmēto piemēru lapošana">
-        <button type="button" title="Iepriekšējā lapa" aria-label="Iepriekšējā lapa" disabled={currentPage === 0}
+        <button className="btn btn-sm btn-outline-secondary" type="button" title="Iepriekšējā lapa" aria-label="Iepriekšējā lapa" disabled={currentPage === 0}
           onClick={() => setPage(currentPage - 1)}>‹</button>
         <small aria-live="polite">{currentPage + 1} / {pageCount}</small>
-        <button type="button" title="Nākamā lapa" aria-label="Nākamā lapa" disabled={currentPage + 1 === pageCount}
+        <button className="btn btn-sm btn-outline-secondary" type="button" title="Nākamā lapa" aria-label="Nākamā lapa" disabled={currentPage + 1 === pageCount}
           onClick={() => setPage(currentPage + 1)}>›</button>
       </nav>}
     </section>

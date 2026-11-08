@@ -5,6 +5,7 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import lv.tezaurs.suggestions.suggestion.dto.ReviewResponse;
+import lv.tezaurs.suggestions.suggestion.dto.SuggestionCountsResponse;
 import lv.tezaurs.suggestions.suggestion.dto.SuggestionPageResponse;
 import lv.tezaurs.suggestions.suggestion.dto.SuggestionSort;
 import lv.tezaurs.suggestions.suggestion.dto.UpdateStatusRequest;
@@ -25,6 +26,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class SuggestionController {
     private final SuggestionService service;
+
+    @GetMapping("/counts")
+    SuggestionCountsResponse counts() {
+        return service.counts();
+    }
 
     @GetMapping
     SuggestionPageResponse list(

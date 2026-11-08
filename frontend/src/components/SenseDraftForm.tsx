@@ -347,8 +347,7 @@ export function SenseDraftForm({
         }
       }
       return (
-        <div key={item.key}>
-          <SenseDetails number={showNumber ? number : ''} sense={item.sense} isNew={item.isNew}
+          <SenseDetails key={item.key} number={showNumber ? number : ''} sense={item.sense} isNew={item.isNew}
             actions={
               <SenseActions subsense={parentKey !== null}
                 onEdit={canEdit ? () => openEditor('edit') : undefined}
@@ -366,9 +365,9 @@ export function SenseDraftForm({
                   setDeletingIndex(draftIndex)
                 } : undefined}
               />
-            } />
-          <div className="existing-subsenses">{renderSenses(item.key, number)}</div>
-        </div>
+            }>
+            {renderSenses(item.key, number)}
+          </SenseDetails>
       )
     })
   }
@@ -394,7 +393,7 @@ export function SenseDraftForm({
                 error={error} onCancel={cancelSenseEdit} onSubmit={() => saveSenses()}>
                 {!editingParent && <label>
                   Skaidrojums
-                  <textarea
+                  <textarea className="form-control form-control-sm"
                     autoFocus
                     onChange={(event) => replaceSense(index, {
                       ...sense,
@@ -408,7 +407,7 @@ export function SenseDraftForm({
                 {(existingSenses.length > 0 || senses.some((item) => item.id && item.id !== sense.id)) && (
                   <label>
                     Virsnozīme
-                    <select value={parentValue} onChange={(event) => updateParent(index, event.target.value)}>
+                    <select className="custom-select custom-select-sm" value={parentValue} onChange={(event) => updateParent(index, event.target.value)}>
                       <option value="">Nav</option>
                       {existingSenses.filter((item) => !senses.some((draft) => draft.sourceSenseId === item.id)).map((item) => (
                         <option key={`tezaurs-${item.id}`} value={`tezaurs:${item.id}`}>

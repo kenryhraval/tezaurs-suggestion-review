@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useRef, type FormEvent, type KeyboardEvent, type ReactNode } from 'react'
 import { Dialog } from './Dialog'
 
 type Props = {
@@ -22,27 +22,39 @@ export function ConfirmationDialog({
     }
   }, [busy])
 
+  function handleKeyDown(event: KeyboardEvent<HTMLFormElement>) {
+    if (event.key !== 'Enter') {
+      return
+    }
+
+    const input = event.target
+    if (!(input instanceof HTMLInputElement)) {
+      return
+    }
+
+    const isChoiceInput = input.type === 'checkbox' || input.type === 'radio'
+    if (isChoiceInput) {
+      event.preventDefault()
+      event.currentTarget.requestSubmit()
+    }
+  }
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!busy) {
+      onConfirm()
+    }
+  }
+
   return (
     <Dialog title={title} busy={busy} onCancel={onCancel}>
-      <form onKeyDown={(event) => {
-        const input = event.target
-        if (event.key === 'Enter' && input instanceof HTMLInputElement
-            && (input.type === 'checkbox' || input.type === 'radio')) {
-          event.preventDefault()
-          event.currentTarget.requestSubmit()
-        }
-      }} onSubmit={(event) => {
-        event.preventDefault()
-        if (!busy) {
-          onConfirm()
-        }
-      }}>
+      <form onKeyDown={handleKeyDown} onSubmit={handleSubmit}>
         {message && <p>{message}</p>}
         {children}
         {error && <p className="error" role="alert">{error}</p>}
-        <div className="confirmation-actions">
-          <button disabled={busy} onClick={onCancel} type="button">Atcelt</button>
-          <button ref={confirmButtonRef} className="confirmation-confirm" aria-busy={busy} disabled={busy}
+        <div className="modal-footer">
+          <button className="btn btn-sm btn-light border" disabled={busy} onClick={onCancel} type="button">Atcelt</button>
+          <button ref={confirmButtonRef} className="btn btn-sm btn-light border text-danger" aria-busy={busy} disabled={busy}
             type="submit">Apstiprināt</button>
         </div>
       </form>

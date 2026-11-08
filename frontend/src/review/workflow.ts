@@ -16,6 +16,8 @@ export function getReviewWorkflow(review: Review | null, queueStatus: ReviewStat
   const showReviewSections = hasReview && !onlyIntakeIsVisible
   const needsTezaursAnswer = review?.tezaursStatus === 'NOT_CHECKED' || review?.tezaursStatus === 'FOUND'
   const canShowNewEntryDraft = entryIsMissing && usageIsConfirmed
+  const showDraft = showReviewSections && status !== 'ALREADY_EXISTS'
+    && (needsSenseDraft || canShowNewEntryDraft)
 
   let sectionResetKey = `source:${status}`
   if (review) {
@@ -41,11 +43,14 @@ export function getReviewWorkflow(review: Review | null, queueStatus: ReviewStat
       readOnly: !canEditUsageCheck,
     },
     draft: {
-      visible: showReviewSections && status !== 'ALREADY_EXISTS'
-        && (needsSenseDraft || canShowNewEntryDraft),
+      visible: showDraft,
       defaultOpen: isInProgress,
       readOnly: !isInProgress,
       newEntry: entryIsMissing,
+      complete: review?.canComplete === true || status === 'NEEDS_EXPERT' || status === 'COMPLETED',
+    },
+    completion: {
+      visible: status !== 'NEEDS_EXPERT' && (showDraft || status === 'ALREADY_EXISTS'),
     },
   }
 }

@@ -2,11 +2,12 @@ type Props = {
   label: string
   disabled?: boolean
   onClick: () => void
+  className?: string
 }
 
-export function EditButton({ label, disabled, onClick }: Props) {
+export function EditButton({ label, disabled, onClick, className = 'icon-button' }: Props) {
   return (
-    <button type="button" className="icon-button edit-button" title={label} aria-label={label}
+    <button type="button" className={`${className} edit-button`} title={label} aria-label={label}
       disabled={disabled} onClick={onClick}>
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
         stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

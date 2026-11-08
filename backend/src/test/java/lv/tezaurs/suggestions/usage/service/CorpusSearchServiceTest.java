@@ -56,7 +56,7 @@ class CorpusSearchServiceTest {
         var result = search("lemt", Corpus.LVK2022, 2);
         assertThat(result.total()).isEqualTo(42);
         assertThat(result.page()).isEqualTo(2);
-        assertThat(result.pageSize()).isEqualTo(5);
+        assertThat(result.pageSize()).isEqualTo(25);
         assertThat(result.examples()).singleElement().satisfies(example -> {
             assertThat(example.citation()).isEqualTo("Viņš lemj par lietu.");
             assertThat(example.reference()).isEqualTo("Avots=tests; ID=doc-1");
@@ -65,8 +65,25 @@ class CorpusSearchServiceTest {
             assertThat(example.sourceLabel()).isEqualTo("tests");
             assertThat(example.sourceUrl()).isNull();
         });
-        assertThat(requestQuery).contains("corpname=LVK2022", "q=q[lc=\"lemt\"|lemma_lc=\"lemt\"]", "fromp=2", "viewmode=sen");
+        assertThat(requestQuery).contains("corpname=LVK2022", "q=q[lc=\"lemt\"|lemma_lc=\"lemt\"]", "fromp=2", "viewmode=sen", "pagesize=25");
         assertThat(result.url()).doesNotContain("format=json");
+    }
+
+    @Test
+    void removesCorpusMarkupWithoutLosingTheHighlightedMatchOrTextSpacing() {
+        responseBody = """
+                {"concsize":1,"Lines":[{"toknum":12,
+                "Left":[{"str":"<doc id='1'>","class":"strc"},{"str":"<p>Viņš &amp; viņa ","class":""}],
+                "Kwic":[{"str":"lemj","class":"col0"}],
+                "Right":[{"str":" par lietu.</p> <p>Tālāk.</p>","class":""}],"Refs":[]}]}
+                """;
+
+        assertThat(search("lemt", Corpus.LVK2022, 1).examples()).singleElement().satisfies(example -> {
+            assertThat(example.left()).isEqualTo(" Viņš & viņa ");
+            assertThat(example.match()).isEqualTo("lemj");
+            assertThat(example.right()).isEqualTo(" par lietu. Tālāk. ");
+            assertThat(example.citation()).isEqualTo("Viņš & viņa lemj par lietu. Tālāk.");
+        });
     }
 
     @Test

@@ -59,14 +59,14 @@ export function FlagEditor({ scope, definitions, flags, onChange }: Props) {
         inputText = currentValue.join(' | ')
       }
       return (
-        <input value={inputText} onChange={(event) => updateFreeText(flag, event.target.value)}
+        <input className="form-control form-control-sm" value={inputText} onChange={(event) => updateFreeText(flag, event.target.value)}
           placeholder={flag.multiple ? 'Vērtības atdaliet ar |' : 'Vērtība'} />
       )
     }
 
     if (!flag.multiple) {
       return (
-        <select value={typeof currentValue === 'string' ? currentValue : ''}
+        <select className="custom-select custom-select-sm" value={typeof currentValue === 'string' ? currentValue : ''}
           onChange={(event) => updateFlag(flag.name, event.target.value || null)}>
           <option value="">Izvēlieties</option>
           {flag.values.map((value) => <option key={value} value={value}>{value}</option>)}
@@ -89,13 +89,13 @@ export function FlagEditor({ scope, definitions, flags, onChange }: Props) {
 
     return (
       <div>
-        <select value="" onChange={(event) => addValue(event.target.value)}>
+        <select className="custom-select custom-select-sm" value="" onChange={(event) => addValue(event.target.value)}>
           <option value="">Pievienot vērtību</option>
           {remainingValues.map((value) => <option key={value} value={value}>{value}</option>)}
         </select>
         <div className="selected-flag-values">
           {selectedValues.map((value) => (
-            <button key={value} type="button" onClick={() => removeValue(value)}>{value} ×</button>
+            <button className="btn btn-sm btn-outline-secondary" key={value} type="button" onClick={() => removeValue(value)}>{value} ×</button>
           ))}
         </div>
       </div>
@@ -106,7 +106,7 @@ export function FlagEditor({ scope, definitions, flags, onChange }: Props) {
     <div className="flag-editor">
       <label>
         Pazīmes
-        <select value="" onChange={(event) => addFlag(event.target.value)}>
+        <select className="custom-select custom-select-sm" value="" onChange={(event) => addFlag(event.target.value)}>
           <option value="">Pievienot pazīmi</option>
           {unselectedFlags.map((flag) => (
             <option key={flag.name} value={flag.name}>{flag.label}</option>
@@ -118,7 +118,7 @@ export function FlagEditor({ scope, definitions, flags, onChange }: Props) {
         <div className="flag-row" key={flag.name} title={flag.description ?? undefined}>
           <span>{flag.label}</span>
           {renderFlagInput(flag)}
-          <button type="button" onClick={() => removeFlag(flag.name)}>Noņemt</button>
+          <button className="btn btn-sm btn-outline-secondary" type="button" onClick={() => removeFlag(flag.name)}>Noņemt</button>
         </div>
       ))}
     </div>

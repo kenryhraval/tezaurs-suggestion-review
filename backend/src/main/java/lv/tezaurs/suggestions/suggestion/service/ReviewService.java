@@ -67,11 +67,11 @@ public class ReviewService {
         if (reviewSourceRepository.existsById(source.getId())) {
             throw new ConflictException("The source suggestion already belongs to a review");
         }
-        ReviewCase review = create(source);
+        ReviewCase review = create(source, username);
         if (status == ReviewStatus.IN_PROGRESS) {
             review.takeForReview(username);
         } else {
-            review.changeStatus(status);
+            review.changeStatus(status, username);
         }
         return review;
     }
@@ -86,11 +86,8 @@ public class ReviewService {
         }
         if (request.status() == ReviewStatus.IN_PROGRESS) {
             review.takeForReview(username);
-        } else if (request.status() == ReviewStatus.READY_FOR_REVIEW
-                && review.getStatus() == ReviewStatus.IN_PROGRESS) {
-            review.giveUpReview(username);
         } else {
-            review.changeStatus(request.status());
+            review.changeStatus(request.status(), username);
         }
         return completionService.response(review);
     }
@@ -155,14 +152,14 @@ public class ReviewService {
 
     @Transactional
     public ReviewResponse recordTezaursCheck(UUID reviewId, RecordTezaursCheckRequest request, String authorization) {
-        currentUserService.requireUsername(authorization);
+        String username = currentUserService.requireUsername(authorization);
         ReviewCase review = requireReview(reviewId);
         if (request.status().entryExists()
                 && (request.matchedEntryId() == null
                 || !tezaursEntryRepository.existsById(request.matchedEntryId()))) {
             throw new ConflictException("The selected Tēzaurs entry does not exist");
         }
-        review.recordTezaursCheck(request.status(), request.matchedEntryId());
+        review.recordTezaursCheck(request.status(), request.matchedEntryId(), username);
         return completionService.response(review);
     }
 
@@ -179,9 +176,9 @@ public class ReviewService {
                 .orElseThrow(() -> new NotFoundException("Review " + id + " was not found"));
     }
 
-    private ReviewCase create(IncubatorSuggestion source) {
+    private ReviewCase create(IncubatorSuggestion source, String username) {
         ReviewCase review = reviewRepository.save(
-                new ReviewCase(source.getLemma()));
+                new ReviewCase(source.getLemma(), username));
         reviewSourceRepository.save(
                 new CaseSuggestion(source, review));
         return review;

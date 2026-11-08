@@ -36,12 +36,26 @@ class UsageServiceTest {
 
     @BeforeEach
     void prepareCase() {
-        review = new ReviewCase("vārds");
-        review.changeStatus(ReviewStatus.IN_PROGRESS);
-        review.recordTezaursCheck(TezaursStatus.NOT_FOUND, null);
+        review = new ReviewCase("vārds", "reviewer");
+        review.changeStatus(ReviewStatus.IN_PROGRESS, "reviewer");
+        review.recordTezaursCheck(TezaursStatus.NOT_FOUND, null, "reviewer");
         when(cases.findById(review.getId())).thenReturn(Optional.of(review));
         when(cases.findLockedById(review.getId())).thenReturn(Optional.of(review));
         when(evidence.save(any())).thenAnswer(call -> call.getArgument(0));
+    }
+
+    @Test
+    void displaysSavedCorpusCitationsWithoutMarkupAndPreservesTheStoredText() {
+        var request = new SaveEvidenceRequest(EvidenceSource.CORPUS, Corpus.LVK2022, 123L,
+                "vārds", "<p>Pirmais.</p><p>Otrais &amp; trešais.</p>",
+                "https://korpuss.lv", null, null);
+        UsageEvidence saved = new UsageEvidence(review.getId(), request, "reviewer");
+        when(evidence.findByCaseIdOrderByCreatedAtAscIdAsc(review.getId())).thenReturn(List.of(saved));
+
+        assertThat(service.evidence(review.getId())).singleElement().satisfies(response ->
+                assertThat(response.citation()).isEqualTo("Pirmais. Otrais & trešais."));
+        assertThat(saved.getCitation()).isEqualTo(request.citation());
+        assertThat(CorpusTextFormatter.format("2 < 5; &lt;vārds&gt;")).isEqualTo("2 < 5; <vārds>");
     }
 
     @Test
@@ -49,6 +63,7 @@ class UsageServiceTest {
         assertThat(review.canEditEntryDraft()).isFalse();
         service.decide(review.getId(), new UsageDecisionRequest(UsageDecision.NOT_CONFIRMED, "Nav datu"), "Basic dXNlcjpwYXNz");
         assertThat(review.getStatus()).isEqualTo(ReviewStatus.INSUFFICIENT_DATA);
+        assertThat(review.getLastStatusChangedBy()).isEqualTo("user");
         verifyNoInteractions(drafts);
         service.decide(review.getId(), new UsageDecisionRequest(UsageDecision.USED, " Pazīstu šo vārdu. "), "Basic dXNlcjpwYXNz");
         assertThat(review.getStatus()).isEqualTo(ReviewStatus.IN_PROGRESS);
@@ -124,14 +139,14 @@ class UsageServiceTest {
     void rejectsUnsupportedDecisionsAndWritesToClosedOrExistingEntryCases() {
         assertThatThrownBy(() -> service.decide(review.getId(), new UsageDecisionRequest(UsageDecision.NOT_CHECKED, null), "Basic dXNlcjpwYXNz"))
                 .isInstanceOf(ConflictException.class);
-        review.changeStatus(ReviewStatus.COMPLETED);
+        review.changeStatus(ReviewStatus.COMPLETED, "reviewer");
         assertThatThrownBy(() -> service.decide(review.getId(), new UsageDecisionRequest(UsageDecision.USED, null), "Basic dXNlcjpwYXNz"))
                 .isInstanceOf(ConflictException.class);
         assertThatThrownBy(() -> service.addEvidence(review.getId(), external("https://example.com"), null))
                 .isInstanceOf(ConflictException.class);
-        ReviewCase other = new ReviewCase("lemt");
-        other.changeStatus(ReviewStatus.IN_PROGRESS);
-        other.recordTezaursCheck(TezaursStatus.MEANING_NOT_FOUND, 100);
+        ReviewCase other = new ReviewCase("lemt", "reviewer");
+        other.changeStatus(ReviewStatus.IN_PROGRESS, "reviewer");
+        other.recordTezaursCheck(TezaursStatus.MEANING_NOT_FOUND, 100, "reviewer");
         when(cases.findById(other.getId())).thenReturn(Optional.of(other));
         assertThatThrownBy(() -> service.evidence(other.getId())).isInstanceOf(ConflictException.class);
         assertThatThrownBy(() -> service.evidence(UUID.randomUUID())).isInstanceOf(NotFoundException.class);

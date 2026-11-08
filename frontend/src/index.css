@@ -1,9 +1,10 @@
 :root {
-  font-family: Arial, sans-serif;
-  color: #222;
-  background: #f7f7f7;
+  --theme-color-dark: #a0055f;
+  --theme-color-lite: #f7e4ef;
 }
 
 body {
   margin: 0;
+  color: #424242;
+  background: #f0f0f0;
 }

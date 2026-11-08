@@ -17,6 +17,8 @@ type ActionsProps = {
 }
 
 function EntityActions({ kind, label, onEdit, items }: ActionsProps) {
+  const buttonVariants = { entry: 'primary', lexeme: 'warning', sense: 'success' }
+  const buttonClassName = `btn btn-sm btn-${buttonVariants[kind]}`
   const [open, setOpen] = useState(false)
   const container = useRef<HTMLSpanElement>(null)
   const toggle = useRef<HTMLButtonElement>(null)
@@ -36,7 +38,7 @@ function EntityActions({ kind, label, onEdit, items }: ActionsProps) {
   }, [open])
 
   return (
-    <span className={`entity-actions entity-actions-${kind}`} ref={container}
+    <span className="btn-group entity-actions" ref={container}
       onBlur={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget)) {
           setOpen(false)
@@ -48,21 +50,21 @@ function EntityActions({ kind, label, onEdit, items }: ActionsProps) {
           toggle.current?.focus()
         }
       }}>
-      <EditButton label={`Rediģēt ${label}`} disabled={!onEdit} onClick={() => onEdit?.()} />
-      <button className="action-toggle" type="button" ref={toggle}
+      <EditButton className={buttonClassName} label={`Rediģēt ${label}`} disabled={!onEdit} onClick={() => onEdit?.()} />
+      <button className={`${buttonClassName} action-toggle`} type="button" ref={toggle}
         title="Papildu darbības" aria-label={`Papildu darbības: ${label}`}
         aria-expanded={open} aria-controls={menuId} onClick={() => setOpen(!open)}>
         <span aria-hidden="true">▾</span>
       </button>
       {open && (
-        <span className="entity-action-menu" id={menuId}>
+        <span className="dropdown-menu show entity-action-menu" id={menuId}>
           {items.map((item) => (
             <Fragment key={item.label}>
-              {item.separator && <span className="entity-action-separator" aria-hidden="true" />}
+              {item.separator && <span className="dropdown-divider" aria-hidden="true" />}
               {item.href ? (
-                <a href={item.href} target="_blank" rel="noreferrer" onClick={() => setOpen(false)}>{item.label}</a>
+                <a className="dropdown-item" href={item.href} target="_blank" rel="noreferrer" onClick={() => setOpen(false)}>{item.label}</a>
               ) : (
-                <button type="button" disabled={!item.onClick} onClick={() => {
+                <button className="dropdown-item" type="button" disabled={!item.onClick} onClick={() => {
                   setOpen(false)
                   toggle.current?.focus()
                   item.onClick?.()
@@ -145,7 +147,7 @@ export function SenseActions({ subsense, onEdit, onAddSubsense, onMove, onPromot
   return (
     <>
       <EntityActions kind="sense" label={subsense ? 'apakšnozīmi' : 'nozīmi'} onEdit={onEdit} items={items} />
-      <button type="button" className="synonym-action" title="Sinonīmu kopa" aria-label="Sinonīmu kopa" disabled>
+      <button type="button" className="btn btn-sm btn-light border p-1 mr-1" title="Sinonīmu kopa" aria-label="Sinonīmu kopa" disabled>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
           <path d="M2 3h7v6H2zM15 3h7v6h-7zM15 15h7v6h-7zM9 5h6v2H9zM7 9h2v3h8v3h-2v-1H7z" />
         </svg>

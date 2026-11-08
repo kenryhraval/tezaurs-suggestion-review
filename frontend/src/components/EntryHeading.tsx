@@ -16,9 +16,9 @@ export function EntryHeading({ heading, humanKey }: Props) {
   const showHomonymNumber = Number.isInteger(homonymNumber) && homonymNumber > 1
 
   return (
-    <strong>
+    <span className="sv_VR">
       {heading}
-      {showHomonymNumber && <sup>{homonymNumber}</sup>}
-    </strong>
+      {showHomonymNumber && <sup className="sv_IN">{homonymNumber}</sup>}
+    </span>
   )
 }

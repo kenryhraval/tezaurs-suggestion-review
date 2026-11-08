@@ -7,8 +7,9 @@ import { EntryActions, LexemeActions, SenseActions } from './TezaursActions'
 type Props = {
   entryId: number
   defaultOpen: boolean
+  canCollapse: boolean
+  complete: boolean
   children?: ReactNode
-  footer?: ReactNode
   onAddSense?: () => void
 }
 
@@ -299,11 +300,12 @@ function ExtraData({
   )
 }
 
-export function SenseDetails({ number, sense, actions, isNew = false }: {
+export function SenseDetails({ number, sense, actions, isNew = false, children }: {
   number: string
   sense: TezaursSenseDetails
   actions?: ReactNode
   isNew?: boolean
+  children?: ReactNode
 }) {
   const grammarData = readGrammarData(sense.data)
   const grammar = [formatFlags(grammarData?.Flags), formatRestrictions(grammarData?.StructuralRestrictions)]
@@ -316,26 +318,28 @@ export function SenseDetails({ number, sense, actions, isNew = false }: {
   }
 
   return (
-    <article className="existing-sense">
-      <p>
-        {number && <><strong>{number}.</strong>{' '}</>}
+    <article className="dict_Sense existing-sense">
+      <div className="dict_Gloss">
+        {number && <span className="dict_SenseNumber">{number}.</span>}
         {actions ?? <SenseActions subsense={number.includes('.')} />}
-        {grammar && <><span className="sense-metadata">{grammar}</span>{' '}</>}
+        {grammar && <><span className="dict_Verbalization">{grammar}</span>{' '}</>}
         {displayedGloss}
         {isNew && <small className="draft-label">Jauna</small>}
         {sense.hidden && ' · paslēpta'}
-      </p>
+      </div>
       {sense.examples.length > 0 && (
         <ul>
-          {sense.examples.map((example) => <li key={example.id}>{example.content}</li>)}
+          {sense.examples.map((example) => <li className="dict_Example sv_PI" key={example.id}>{example.content}</li>)}
         </ul>
       )}
       <ExtraData data={sense.data} grammarAlreadyShown />
+      {children}
     </article>
   )
 }
 
-export function ExistingEntryDetails({ entryId, children, footer, onAddSense, defaultOpen }: Props) {
+export function ExistingEntryDetails({ entryId, children, onAddSense, defaultOpen, canCollapse, complete }: Props) {
+  const [expanded, setExpanded] = useState(defaultOpen)
   const [entry, setEntry] = useState<TezaursEntryDetails | null>(null)
   const [error, setError] = useState('')
 
@@ -360,19 +364,27 @@ export function ExistingEntryDetails({ entryId, children, footer, onAddSense, de
     }
   }, [entryId])
 
+  function renderSection(content: ReactNode) {
+    return (
+      <details open={expanded || !canCollapse} onToggle={(event) => setExpanded(event.currentTarget.open)}
+        className="existing-entry review-section">
+        <summary className={!expanded && complete ? 'section-title confirmed' : 'section-title'} aria-disabled={!canCollapse} onClick={(event) => {
+          if (!canCollapse) event.preventDefault()
+        }}>4. Labojumu melnraksts</summary>
+        {content}
+      </details>
+    )
+  }
+
   if (error) {
     return <p className="error">{error}</p>
   }
   if (!entry) {
-    return <p className="muted">Ielādē esošo šķirkli...</p>
+    return renderSection(<p className="muted">Ielādē esošo šķirkli...</p>)
   }
 
-  return (
-    <details open={defaultOpen} className="existing-entry">
-      <summary><strong>3. Esošais šķirklis</strong></summary>
-      <EntryDisplay entry={entry} onAddSense={onAddSense}>{children}</EntryDisplay>
-      {footer}
-    </details>
+  return renderSection(
+    <EntryDisplay entry={entry} onAddSense={onAddSense}>{children}</EntryDisplay>
   )
 }
 
@@ -396,13 +408,16 @@ export function EntryDisplay({ entry, children, onEditEntry, onEditLexeme, onAdd
   const entryGrammar = [formatFlags(grammarData?.Flags), formatRestrictions(grammarData?.StructuralRestrictions)]
     .filter((text) => text !== '').join('; ')
   return (
-    <div className="tezaurs-entry-display">
-      <div className="draft-heading">
-        <EntryActions onEdit={onEditEntry} onAddLexeme={onAddLexeme} onAddSense={onAddSense}
-          publicHumanKey={publicHumanKey ?? (entry.id > 0 ? entry.humanKey : undefined)} />
-        <EntryHeading heading={entry.heading} humanKey={entry.humanKey} />
-        {entryGrammar && <span className="lexeme-metadata">{entryGrammar}</span>}
-        {entry.hidden && ' · paslēpts'}
+    <div className="dict_Entry tezaurs-entry-display">
+      <div className="draft-heading dict_EntryHeader">
+        <span className="dict_EntryHead">
+          <EntryActions onEdit={onEditEntry} onAddLexeme={onAddLexeme} onAddSense={onAddSense}
+            publicHumanKey={publicHumanKey ?? (entry.id > 0 ? entry.humanKey : undefined)} />
+          {' '}
+          <EntryHeading heading={entry.heading} humanKey={entry.humanKey} />
+          {entryGrammar && <> <span className="dict_Verbalization">{entryGrammar}</span></>}
+          {entry.hidden && ' · paslēpts'}
+        </span>
       </div>
 
       {entry.notes && <p><strong>Piezīmes:</strong> {entry.notes}</p>}
@@ -416,13 +431,13 @@ export function EntryDisplay({ entry, children, onEditEntry, onEditLexeme, onAdd
           ? lexeme.data.Pronunciations.map(String)
           : []
         return (
-          <div className="existing-lexeme" key={lexeme.id}>
+          <div className="dict_Lexeme existing-lexeme" key={lexeme.id}>
             <div>
               <LexemeActions onEdit={onEditLexeme ? () => onEditLexeme(index) : undefined}
                 onDelete={onDeleteLexeme && canDeleteLexeme?.(index) ? () => onDeleteLexeme(index) : undefined} />
-              <strong className="lexeme-heading" title={lexeme.role ?? undefined}>{lexeme.lemma}</strong>{' '}
-              {pronunciations.length > 0 && <span>[{pronunciations.join('], [')}] </span>}
-              {grammar && <span className="lexeme-metadata">{grammar}</span>}
+              <span className="sv_VR" title={lexeme.role ?? undefined}>{lexeme.lemma}</span>{' '}
+              {pronunciations.length > 0 && <span className="dict_Pron">[{pronunciations.join('], [')}] </span>}
+              {grammar && <span className="dict_Verbalization">{grammar}</span>}
               {technicalInfo && (
                 <span aria-label="Paradigmas informācija" className="lexeme-symbol"
                   title={technicalInfo}>¶</span>
@@ -439,20 +454,15 @@ export function EntryDisplay({ entry, children, onEditEntry, onEditLexeme, onAdd
         const senseNumber = String(senseIndex + 1)
         const subSenses = entry.senses.filter((item) => item.parentSenseId === sense.id)
         return (
-          <div key={sense.id}>
-            <SenseDetails number={mainSenses.length > 1 || subSenses.length > 0 ? senseNumber : ''} sense={sense} />
-            {subSenses.length > 0 && (
-              <div className="existing-subsenses">
-                {subSenses.map((subSense, subSenseIndex) => (
-                  <SenseDetails
-                    key={subSense.id}
-                    number={`${senseNumber}.${subSenseIndex + 1}`}
-                    sense={subSense}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
+          <SenseDetails key={sense.id} number={mainSenses.length > 1 || subSenses.length > 0 ? senseNumber : ''} sense={sense}>
+            {subSenses.map((subSense, subSenseIndex) => (
+              <SenseDetails
+                key={subSense.id}
+                number={`${senseNumber}.${subSenseIndex + 1}`}
+                sense={subSense}
+              />
+            ))}
+          </SenseDetails>
         )
       })}
       </>}
@@ -460,7 +470,7 @@ export function EntryDisplay({ entry, children, onEditEntry, onEditLexeme, onAdd
       {entry.examples.length > 0 && (
         <>
           <h4>Šķirkļa piemēri</h4>
-          <ul>{entry.examples.map((example) => <li key={example.id}>{example.content}</li>)}</ul>
+          <ul>{entry.examples.map((example) => <li className="dict_Example sv_PI" key={example.id}>{example.content}</li>)}</ul>
         </>
       )}
 

@@ -1,6 +1,8 @@
 # Frontend
 
 This is a small React and TypeScript interface for the suggestion review backend.
+It uses Bootstrap 4.6.2 CSS, matching the Tēzaurs editor; `src/App.css` contains
+the review layout and dictionary display rules. Interactions are handled by React.
 
 ## Run locally
 

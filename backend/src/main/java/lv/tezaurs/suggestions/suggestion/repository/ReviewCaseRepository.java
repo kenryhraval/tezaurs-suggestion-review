@@ -15,6 +15,8 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.repository.query.Param;
 
 public interface ReviewCaseRepository extends JpaRepository<ReviewCase, UUID> {
+    long countByStatusNot(ReviewStatus status);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<ReviewCase> findLockedById(UUID id);
 

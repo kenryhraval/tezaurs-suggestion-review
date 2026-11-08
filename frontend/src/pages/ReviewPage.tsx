@@ -8,6 +8,7 @@ import {
 } from '../api/client'
 import { SuggestionDetails } from '../components/SuggestionDetails'
 import { SuggestionList } from '../components/SuggestionList'
+import { AppHeader } from '../components/AppHeader'
 import type { QueueItem, Review, SuggestionSort, ReviewStatus } from '../api/types'
 
 const PAGE_SIZE = 20
@@ -219,11 +220,20 @@ export function ReviewPage() {
     setLoadedReview(null)
   }
 
+  function submitSearch() {
+    const nextQuery = search.trim()
+    if (nextQuery === query) return
+    setLoading(true)
+    setSelected(null)
+    setLoadedReview(null)
+    setPage(0)
+    setQuery(nextQuery)
+  }
+
   return (
-    <main>
-      <header>
-        <h1>Tēzaura ieteikumu pārskatīšana</h1>
-      </header>
+    <main className="app-shell">
+      <AppHeader reloadCount={reloadCount} search={search}
+        onSearchChange={setSearch} onSearchSubmit={submitSearch} />
 
       {error && <p className="error">{error}</p>}
 
@@ -232,7 +242,6 @@ export function ReviewPage() {
           items={items}
           status={status}
           sort={sort}
-          search={search}
           selectedKey={selected ? itemKey(selected) : null}
           loading={loading}
           page={page}
@@ -241,7 +250,6 @@ export function ReviewPage() {
           onSelect={selectItem}
           onFilterStatusChange={changeFilterStatus}
           onSortChange={changeSort}
-          onSearchChange={setSearch}
           onPageChange={changePage}
         />
 

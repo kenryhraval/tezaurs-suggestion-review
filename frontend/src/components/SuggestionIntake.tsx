@@ -17,7 +17,7 @@ type Props = {
 }
 
 export function SuggestionIntake({ status, onStatusChange, review, onDuplicate,
-  expanded, onExpandedChange, readOnly }: Props) {
+  expanded: expandedByUser, onExpandedChange, readOnly }: Props) {
   const [confirmingTrash, setConfirmingTrash] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -27,7 +27,9 @@ export function SuggestionIntake({ status, onStatusChange, review, onDuplicate,
   } else if (status !== 'NEW') {
     selectedStatus = 'READY_FOR_REVIEW'
   }
-  const caseSelected = review !== null && status !== 'GARBAGE' && status !== 'READY_FOR_REVIEW'
+  const caseSelected = review !== null && status !== 'NEW' && status !== 'GARBAGE' && status !== 'READY_FOR_REVIEW'
+  const canCollapse = readOnly || caseSelected || status === 'GARBAGE'
+  const expanded = expandedByUser || !canCollapse
 
   function choose(nextStatus: ReviewStatus) {
     if (nextStatus === selectedStatus) {
@@ -61,16 +63,19 @@ export function SuggestionIntake({ status, onStatusChange, review, onDuplicate,
   }
 
   return (
-    <section className="initial-review">
+    <section className={`initial-review review-section${expanded ? ' is-open' : ''}`}>
       <details open={expanded} onToggle={(event) => onExpandedChange(event.currentTarget.open)}>
-        <summary className={(caseSelected || status === 'GARBAGE') && !expanded ? 'confirmed' : undefined}>
-          <strong>1. Ieteikuma pirmapstrāde</strong>
+        <summary className={(caseSelected || status === 'GARBAGE') && !expanded ? 'section-title confirmed' : 'section-title'}
+          aria-disabled={!canCollapse} onClick={(event) => {
+            if (!canCollapse) event.preventDefault()
+          }}>
+          1. Ieteikuma pirmapstrāde
         </summary>
         <p className="muted">Vai ieteikums ir skatāms vai atkritums?</p>
         <fieldset className="review-controls" disabled={readOnly}>
           <div className="tezaurs-answer-actions">
             {intakeChoices.map((value) => (
-              <button key={value} type="button" aria-pressed={selectedStatus === value}
+              <button className="btn btn-sm btn-outline-secondary" key={value} type="button" aria-pressed={selectedStatus === value}
                 disabled={saving || (value !== selectedStatus && !reviewStatusTransitions[status].includes(value))}
                 onClick={() => choose(value)}>
                 {reviewStatusLabels[value]}
@@ -79,10 +84,8 @@ export function SuggestionIntake({ status, onStatusChange, review, onDuplicate,
           </div>
           {selectedStatus === 'READY_FOR_REVIEW' && review && (
             <div className="meaning-existence-check">
-              <p><strong>Vai ieteikums attiecas uz esošu izskatīšanu, vai jāsāk jauna?</strong></p>
+              <p><strong>Vai ieteikums attiecas uz esošu perēkli, vai jāsāk jauns?</strong></p>
               <DuplicateReviewCombobox
-                excludedCaseId={review.id}
-                initialQuery={review.reviewedTerm}
                 currentCase={review}
                 onSelect={(targetId) => onDuplicate(review.sources[0].id, targetId)}
               />
@@ -90,15 +93,10 @@ export function SuggestionIntake({ status, onStatusChange, review, onDuplicate,
           )}
         </fieldset>
       </details>
-      {!expanded && selectedStatus && (
-        <p className="muted">
-          {reviewStatusLabels[selectedStatus]}
-        </p>
-      )}
       {error && !confirmingTrash && <p className="error" role="alert">{error}</p>}
       {confirmingTrash && (
         <ConfirmationDialog
-          message="Ieteikums tiks atzīmēts kā “Atkritums”."
+          message="Ieteikums tiks atzīmēts kā “Atkritums”"
           busy={saving} error={error}
           onConfirm={() => saveStatus('GARBAGE')}
           onCancel={() => setConfirmingTrash(false)}
