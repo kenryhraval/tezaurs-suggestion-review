@@ -5,8 +5,8 @@ Feature: Backend API
     Then the response status is 200
     And the service reports that it is healthy
 
-  Scenario Outline: Unstarted suggestions are paginated
-    When I request "/api/suggestions?page=0&size=2&sort=<sort>"
+  Scenario Outline: New cases are paginated
+    When I request "/api/reviews?status=NEW&page=0&size=2&sort=<sort>"
     Then the response status is 200
     And the response is page 0 with a page size of 2
 
@@ -41,7 +41,7 @@ Feature: Backend API
 
     Examples:
       | path                                                   |
-      | /api/suggestions?page=-1                                |
-      | /api/suggestions?size=0                                 |
+      | /api/reviews?status=NEW&page=-1                                |
+      | /api/reviews?status=NEW&size=0                                 |
       | /api/reviews?status=IN_PROGRESS&page=-1                   |
       | /api/reviews?status=IN_PROGRESS&size=0                    |

@@ -1,64 +1,23 @@
 package lv.tezaurs.suggestions.suggestion.service;
 
+import java.util.List;
 import lombok.RequiredArgsConstructor;
-import lv.tezaurs.suggestions.common.error.NotFoundException;
-import lv.tezaurs.suggestions.suggestion.dto.ReviewResponse;
 import lv.tezaurs.suggestions.suggestion.dto.SuggestionCountsResponse;
-import lv.tezaurs.suggestions.suggestion.dto.SuggestionPageResponse;
-import lv.tezaurs.suggestions.suggestion.dto.SuggestionResponse;
-import lv.tezaurs.suggestions.suggestion.dto.SuggestionSort;
-import lv.tezaurs.suggestions.suggestion.dto.UpdateStatusRequest;
-import lv.tezaurs.suggestions.suggestion.dto.LinkDuplicateRequest;
-import lv.tezaurs.suggestions.suggestion.entity.IncubatorSuggestion;
-import lv.tezaurs.suggestions.suggestion.entity.ReviewCase;
 import lv.tezaurs.suggestions.suggestion.entity.ReviewStatus;
 import lv.tezaurs.suggestions.suggestion.repository.IncubatorSuggestionRepository;
 import lv.tezaurs.suggestions.suggestion.repository.ReviewCaseRepository;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
 public class SuggestionService {
-    private final ReviewCompletionService completionService;
     private final IncubatorSuggestionRepository sourceSuggestionRepository;
-    private final ReviewService reviewService;
     private final ReviewCaseRepository caseRepository;
 
     @Transactional(readOnly = true)
     public SuggestionCountsResponse counts() {
         return new SuggestionCountsResponse(sourceSuggestionRepository.count(),
-                caseRepository.countByStatusNot(ReviewStatus.GARBAGE));
-    }
-
-    @Transactional(readOnly = true)
-    public SuggestionPageResponse list(String query, int page, int size, SuggestionSort sort) {
-        String searchQuery = query == null ? "" : query.trim();
-        Sort.Direction direction = sort == SuggestionSort.OLDEST
-                ? Sort.Direction.ASC : Sort.Direction.DESC;
-        PageRequest pageable = PageRequest.of(page, size,
-                Sort.by(direction, "createdAt").and(Sort.by(direction, "id")));
-        return SuggestionPageResponse.from(sourceSuggestionRepository
-                .findUnstartedForReviewQueue(searchQuery, pageable)
-                .map(SuggestionResponse::fromNewSuggestion));
-    }
-
-    @Transactional
-    public ReviewResponse changeStatus(Integer sourceSuggestionId, UpdateStatusRequest request, String authorization) {
-        IncubatorSuggestion source = requireSourceSuggestion(sourceSuggestionId);
-        ReviewCase review = reviewService.startReview(source, request.status(), authorization);
-        return completionService.response(review);
-    }
-
-    @Transactional
-    public ReviewResponse linkDuplicate(Integer sourceSuggestionId, LinkDuplicateRequest request) {
-        return reviewService.linkDuplicate(requireSourceSuggestion(sourceSuggestionId), request.reviewId());
-    }
-
-    private IncubatorSuggestion requireSourceSuggestion(Integer id) {
-        return sourceSuggestionRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Suggestion " + id + " was not found"));
+                caseRepository.countByStatusNotIn(List.of(ReviewStatus.NEW, ReviewStatus.GARBAGE)));
     }
 }

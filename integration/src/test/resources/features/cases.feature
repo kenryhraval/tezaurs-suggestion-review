@@ -5,7 +5,7 @@ Feature: Combining and separating suggestions
     Then I save "/id" as "destinationCase"
     Given a case combines suggestions "1"
     Then I save "/id" as "oldCase"
-    When I POST "/api/suggestions/1/duplicate" with:
+    When I POST "/api/reviews/{oldCase}/duplicate" with:
       """
       {"reviewId":"{destinationCase}"}
       """
@@ -18,8 +18,12 @@ Feature: Combining and separating suggestions
     Then the response status is 200
     And the response field "/status" equals "COMPLETED"
     And the response field "/sources" contains 1 items
-    When I request "/api/suggestions?sort=OLDEST&size=1"
+    When I request "/api/reviews?status=NEW&sort=NEWEST&size=1"
     Then the response status is 200
-    And the response field "/items/0/id" is 1
+    And I save "/items/0/id" as "detachedCase"
+    When I request "/api/reviews/{detachedCase}"
+    Then the response status is 200
+    And the response field "/status" equals "NEW"
+    And the response field "/sources/0/id" is 1
     When I DELETE "/api/reviews/{destinationCase}/suggestions/3"
     Then the response status is 409

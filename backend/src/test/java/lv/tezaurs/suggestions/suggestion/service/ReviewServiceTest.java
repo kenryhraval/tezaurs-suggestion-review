@@ -20,7 +20,7 @@ import lv.tezaurs.suggestions.common.error.NotFoundException;
 import lv.tezaurs.suggestions.entry.repository.ReviewEntryRepository;
 import lv.tezaurs.suggestions.entry.repository.ReviewLexemeRepository;
 import lv.tezaurs.suggestions.sense.repository.ReviewSenseRepository;
-import lv.tezaurs.suggestions.suggestion.dto.RecordTezaursCheckRequest;
+import lv.tezaurs.suggestions.suggestion.dto.UpdateCaseTypeRequest;
 import lv.tezaurs.suggestions.suggestion.dto.ReviewResponse;
 import lv.tezaurs.suggestions.suggestion.dto.ReviewSort;
 import lv.tezaurs.suggestions.suggestion.dto.ReviewCaseListItem;
@@ -30,7 +30,7 @@ import lv.tezaurs.suggestions.suggestion.entity.IncubatorSuggestion;
 import lv.tezaurs.suggestions.suggestion.entity.ReviewCase;
 import lv.tezaurs.suggestions.suggestion.entity.CaseSuggestion;
 import lv.tezaurs.suggestions.suggestion.entity.ReviewStatus;
-import lv.tezaurs.suggestions.suggestion.entity.TezaursStatus;
+import lv.tezaurs.suggestions.suggestion.entity.CaseType;
 import lv.tezaurs.suggestions.suggestion.entity.CompletionBlockReason;
 import lv.tezaurs.suggestions.usage.entity.UsageDecision;
 import lv.tezaurs.suggestions.suggestion.repository.ReviewCaseRepository;
@@ -43,7 +43,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.mockito.ArgumentCaptor;
 import org.mockito.MockMakers;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -87,60 +86,34 @@ class ReviewServiceTest {
     }
 
     @Test
-    void theFirstStatusChangeCreatesTheLinkedReview() {
-        IncubatorSuggestion source = source();
-
-        ReviewCase review = service.startReview(source, ReviewStatus.READY_FOR_REVIEW, authorization("mikus"));
-
-        assertThat(review.getStatus()).isEqualTo(ReviewStatus.READY_FOR_REVIEW);
-        assertThat(review.getLastStatusChangedBy()).isEqualTo("mikus");
-        ArgumentCaptor<CaseSuggestion> link = ArgumentCaptor.forClass(CaseSuggestion.class);
-        verify(reviewSourceRepository).save(link.capture());
-        assertThat(link.getValue().getSourceSuggestion()).isSameAs(source);
-        assertThat(link.getValue().getReviewCase()).isSameAs(review);
-        assertThat(ReviewResponse.from(review, null).sources()).singleElement()
-                .satisfies(item -> {
-                    assertThat(item.id()).isEqualTo(source.getId());
-                    assertThat(item.submittedDefinition()).isEqualTo(source.getGloss());
-                });
-    }
-
-    @Test
-    void anExistingReviewCannotBeChangedThroughItsSourceSuggestionId() {
-        IncubatorSuggestion source = source();
-        when(reviewSourceRepository.existsById(source.getId())).thenReturn(true);
-
-        assertThatThrownBy(() -> service.startReview(source, ReviewStatus.GARBAGE, authorization("mikus")))
-                .isInstanceOf(ConflictException.class);
-    }
-
-    @Test
     void findsExistingReviewsAndLinksDuplicateSources() {
         IncubatorSuggestion source = source();
+        ReviewCase sourceCase = ReviewCase.fromSuggestion(source.getLemma(), ReviewStatus.NEW);
+        CaseSuggestion sourceLink = new CaseSuggestion(source, sourceCase);
+        when(reviewRepository.findById(sourceCase.getId())).thenReturn(Optional.of(sourceCase));
+        when(reviewRepository.findLockedById(sourceCase.getId())).thenReturn(Optional.of(sourceCase));
         ReviewCase target = new ReviewCase("term", "reviewer");
         target.changeStatus(ReviewStatus.READY_FOR_REVIEW, "reviewer");
         new CaseSuggestion(new IncubatorSuggestion(43, "term", "other meaning"), target);
         when(reviewRepository.findDuplicateCandidates(
                 org.mockito.ArgumentMatchers.isNull(),
-                org.mockito.ArgumentMatchers.eq(ReviewStatus.GARBAGE),
+                org.mockito.ArgumentMatchers.eq(List.of(ReviewStatus.NEW, ReviewStatus.GARBAGE)),
                 org.mockito.ArgumentMatchers.eq("term"), any(Pageable.class)))
                 .thenReturn(List.of(target));
         when(reviewSourceRepository.countByReviewCaseId(target.getId())).thenReturn(2L);
         when(reviewRepository.findById(target.getId())).thenReturn(Optional.of(target));
+        when(reviewRepository.findLockedById(target.getId())).thenReturn(Optional.of(target));
 
         var candidates = service.findDuplicateCandidates("  term  ", null);
-        ReviewResponse linked = service.linkDuplicate(source, target.getId());
+        ReviewResponse linked = service.linkDuplicate(sourceCase.getId(), target.getId());
 
         assertThat(candidates).hasSize(1);
         assertThat(candidates.getFirst().sourceCount()).isEqualTo(2);
         assertThat(linked.id()).isEqualTo(target.getId());
         assertThat(linked.sources()).extracting(ReviewSourceResponse::id).containsExactly(42, 43);
         assertThat(target.getStatus()).isEqualTo(ReviewStatus.READY_FOR_REVIEW);
-        ArgumentCaptor<CaseSuggestion> link = ArgumentCaptor.forClass(CaseSuggestion.class);
-        verify(reviewSourceRepository).save(link.capture());
-        assertThat(link.getValue().getSourceSuggestion()).isSameAs(source);
-        assertThat(link.getValue().getReviewCase()).isSameAs(target);
-        verify(reviewRepository, never()).delete(any());
+        assertThat(sourceLink.getReviewCase()).isSameAs(target);
+        verify(reviewRepository).delete(sourceCase);
         verify(reviewRepository, never()).save(any());
     }
 
@@ -149,9 +122,10 @@ class ReviewServiceTest {
         IncubatorSuggestion source = source();
         ReviewCase ongoing = inProgressReview();
         CaseSuggestion link = new CaseSuggestion(source, ongoing);
-        when(reviewSourceRepository.findById(source.getId())).thenReturn(Optional.of(link));
+        when(reviewRepository.findById(link.getReviewCase().getId())).thenReturn(Optional.of(link.getReviewCase()));
         when(reviewRepository.findById(ongoing.getId())).thenReturn(Optional.of(ongoing));
-        assertThatThrownBy(() -> service.linkDuplicate(source, ongoing.getId()))
+        when(reviewRepository.findLockedById(ongoing.getId())).thenReturn(Optional.of(ongoing));
+        assertThatThrownBy(() -> service.linkDuplicate(ongoing.getId(), ongoing.getId()))
                 .isInstanceOf(ConflictException.class);
         verify(reviewRepository, never()).delete(any());
         verify(reviewSourceRepository, never()).save(any());
@@ -164,16 +138,17 @@ class ReviewServiceTest {
         ReviewCase sourceCase = inProgressReview();
         CaseSuggestion link = new CaseSuggestion(source, sourceCase);
         ReviewCase target = inProgressReview();
-        target.recordTezaursCheck(TezaursStatus.MEANING_NOT_FOUND, 42, "reviewer");
+        target.changeType(CaseType.SENSE, 42, false, "reviewer");
         ReflectionTestUtils.setField(target, "status", status);
-        when(reviewSourceRepository.findById(source.getId())).thenReturn(Optional.of(link));
+        when(reviewRepository.findById(link.getReviewCase().getId())).thenReturn(Optional.of(link.getReviewCase()));
         when(reviewRepository.findById(target.getId())).thenReturn(Optional.of(target));
+        when(reviewRepository.findLockedById(target.getId())).thenReturn(Optional.of(target));
 
-        var result = service.linkDuplicate(source, target.getId());
+        var result = service.linkDuplicate(link.getReviewCase().getId(), target.getId());
 
         assertThat(result.status()).isEqualTo(status);
         assertThat(target.getMatchedEntryId()).isEqualTo(42);
-        assertThat(target.getTezaursStatus()).isEqualTo(TezaursStatus.MEANING_NOT_FOUND);
+        assertThat(target.getType()).isEqualTo(CaseType.SENSE);
         verify(reviewRepository).delete(sourceCase);
     }
 
@@ -185,10 +160,11 @@ class ReviewServiceTest {
         CaseSuggestion link = new CaseSuggestion(source, preliminary);
         ReviewCase target = inProgressReview();
         new CaseSuggestion(new IncubatorSuggestion(43, "term", "definition"), target);
-        when(reviewSourceRepository.findById(source.getId())).thenReturn(Optional.of(link));
+        when(reviewRepository.findById(link.getReviewCase().getId())).thenReturn(Optional.of(link.getReviewCase()));
         when(reviewRepository.findById(target.getId())).thenReturn(Optional.of(target));
+        when(reviewRepository.findLockedById(target.getId())).thenReturn(Optional.of(target));
 
-        var result = service.linkDuplicate(source, target.getId());
+        var result = service.linkDuplicate(link.getReviewCase().getId(), target.getId());
 
         assertThat(result.id()).isEqualTo(target.getId());
         assertThat(result.status()).isEqualTo(ReviewStatus.IN_PROGRESS);
@@ -209,19 +185,20 @@ class ReviewServiceTest {
         ReviewCase target = inProgressReview();
         new CaseSuggestion(new IncubatorSuggestion(44, "target", "definition"), target);
         preliminary.changeStatus(ReviewStatus.IN_PROGRESS, "reviewer");
-        preliminary.recordTezaursCheck(TezaursStatus.NOT_FOUND, null, "reviewer");
+        preliminary.changeType(CaseType.ENTRY, null, false, "reviewer");
         preliminary.recordUsageDecision(UsageDecision.USED, null, "reviewer");
-        when(reviewSourceRepository.findById(source.getId())).thenReturn(Optional.of(link));
+        when(reviewRepository.findById(link.getReviewCase().getId())).thenReturn(Optional.of(link.getReviewCase()));
         when(reviewRepository.findById(target.getId())).thenReturn(Optional.of(target));
+        when(reviewRepository.findLockedById(target.getId())).thenReturn(Optional.of(target));
 
-        var result = service.linkDuplicate(source, target.getId());
+        var result = service.linkDuplicate(link.getReviewCase().getId(), target.getId());
 
         assertThat(result.sources()).extracting(ReviewSourceResponse::id).containsExactly(42, 43, 44);
         assertThat(link.getReviewCase()).isSameAs(target);
         assertThat(other.getReviewCase()).isSameAs(target);
         assertThat(preliminary.getSources()).isEmpty();
         assertThat(target.getStatus()).isEqualTo(ReviewStatus.IN_PROGRESS);
-        assertThat(target.getTezaursStatus()).isEqualTo(TezaursStatus.NOT_CHECKED);
+        assertThat(target.getType()).isEqualTo(CaseType.UNKNOWN);
         var order = org.mockito.Mockito.inOrder(reviewSourceRepository, reviewRepository);
         order.verify(reviewSourceRepository).flush();
         order.verify(reviewRepository).delete(preliminary);
@@ -241,6 +218,7 @@ class ReviewServiceTest {
                 org.mockito.ArgumentMatchers.eq("term"), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(item)));
         when(reviewRepository.findById(review.getId())).thenReturn(Optional.of(review));
+        when(reviewRepository.findLockedById(review.getId())).thenReturn(Optional.of(review));
 
         var page = service.list(ReviewStatus.READY_FOR_REVIEW,
                 " term ", 0, 20, ReviewSort.MOST_SUGGESTIONS);
@@ -259,7 +237,7 @@ class ReviewServiceTest {
         ReviewCase review = inProgressReview();
         CaseSuggestion detached = new CaseSuggestion(source(), review);
         CaseSuggestion retained = new CaseSuggestion(new IncubatorSuggestion(43, "other", "definition"), review);
-        review.recordTezaursCheck(TezaursStatus.MEANING_NOT_FOUND, 42, "reviewer");
+        review.changeType(CaseType.SENSE, 42, false, "reviewer");
         when(reviewRepository.findLockedById(review.getId())).thenReturn(Optional.of(review));
 
         var response = service.detachSuggestion(review.getId(), 42);
@@ -268,9 +246,14 @@ class ReviewServiceTest {
         assertThat(review.getSources()).containsExactly(retained);
         assertThat(review.getStatus()).isEqualTo(ReviewStatus.IN_PROGRESS);
         assertThat(review.getMatchedEntryId()).isEqualTo(42);
-        verify(reviewSourceRepository).delete(detached);
+        ReviewCase newCase = detached.getReviewCase();
+        assertThat(newCase).isNotSameAs(review);
+        assertThat(newCase.getStatus()).isEqualTo(ReviewStatus.NEW);
+        assertThat(newCase.getLastStatusChangedBy()).isNull();
+        assertThat(newCase.getSources()).containsExactly(detached);
+        verify(reviewRepository).save(newCase);
+        verify(reviewSourceRepository, never()).delete(any());
         verify(reviewRepository, never()).delete(any());
-        verify(reviewRepository, never()).save(any());
     }
 
     @Test
@@ -291,8 +274,9 @@ class ReviewServiceTest {
     void validatesTezaursEntriesAndSearchesByTheReviewTerm() {
         ReviewCase review = inProgressReview();
         review.correctTerm("corrected");
-        review.recordTezaursCheck(TezaursStatus.FOUND, 42, "reviewer");
+        review.changeType(CaseType.SENSE, 42, false, "reviewer");
         when(reviewRepository.findById(review.getId())).thenReturn(Optional.of(review));
+        when(reviewRepository.findLockedById(review.getId())).thenReturn(Optional.of(review));
 
         service.findTezaursCandidates(review.getId(), null);
         verify(tezaursEntrySearchService).findMatches("corrected");
@@ -300,8 +284,8 @@ class ReviewServiceTest {
         service.findTezaursCandidates(review.getId(), "  another term  ");
         verify(tezaursEntrySearchService).findMatches("another term");
         when(tezaursEntryRepository.existsById(99)).thenReturn(false);
-        assertThatThrownBy(() -> service.recordTezaursCheck(review.getId(),
-                new RecordTezaursCheckRequest(TezaursStatus.FOUND, 99), authorization("mikus")))
+        assertThatThrownBy(() -> service.changeType(review.getId(),
+                new UpdateCaseTypeRequest(CaseType.SENSE, 99, false), authorization("mikus")))
                 .isInstanceOf(ConflictException.class);
     }
 
@@ -309,28 +293,30 @@ class ReviewServiceTest {
     void createsTheEntryDraftWhenTheReviewerConfirmsAnAbsentEntry() {
         ReviewCase review = inProgressReview();
         when(reviewRepository.findById(review.getId())).thenReturn(Optional.of(review));
+        when(reviewRepository.findLockedById(review.getId())).thenReturn(Optional.of(review));
 
-        service.recordTezaursCheck(review.getId(),
-                new RecordTezaursCheckRequest(TezaursStatus.NOT_FOUND, null), authorization("mikus"));
+        service.changeType(review.getId(),
+                new UpdateCaseTypeRequest(CaseType.ENTRY, null, false), authorization("mikus"));
 
-        assertThat(review.getTezaursStatus()).isEqualTo(TezaursStatus.NOT_FOUND);
+        assertThat(review.getType()).isEqualTo(CaseType.ENTRY);
     }
 
     @Test
     void confirmingAnExistingMeaningAlsoClosesTheCase() {
         ReviewCase review = inProgressReview();
         when(reviewRepository.findById(review.getId())).thenReturn(Optional.of(review));
+        when(reviewRepository.findLockedById(review.getId())).thenReturn(Optional.of(review));
         when(tezaursEntryRepository.existsById(42)).thenReturn(true);
 
-        var result = service.recordTezaursCheck(review.getId(),
-                new RecordTezaursCheckRequest(TezaursStatus.MEANING_ALREADY_EXISTS, 42), authorization("mikus"));
+        var result = service.changeType(review.getId(),
+                new UpdateCaseTypeRequest(CaseType.SENSE, 42, true), authorization("mikus"));
 
-        assertThat(result.tezaursStatus()).isEqualTo(TezaursStatus.MEANING_ALREADY_EXISTS);
+        assertThat(result.type()).isEqualTo(CaseType.SENSE);
         assertThat(result.status()).isEqualTo(ReviewStatus.ALREADY_EXISTS);
         assertThat(result.lastStatusChangedBy()).isEqualTo("mikus");
 
-        var repeated = service.recordTezaursCheck(review.getId(),
-                new RecordTezaursCheckRequest(TezaursStatus.MEANING_ALREADY_EXISTS, 42), authorization("mikus"));
+        var repeated = service.changeType(review.getId(),
+                new UpdateCaseTypeRequest(CaseType.SENSE, 42, true), authorization("mikus"));
         assertThat(repeated.status()).isEqualTo(ReviewStatus.ALREADY_EXISTS);
         assertThat(repeated.lastStatusChangedBy()).isEqualTo("mikus");
     }
@@ -338,15 +324,16 @@ class ReviewServiceTest {
     @Test
     void correctingAnAlreadyExistingMeaningReopensTheCase() {
         ReviewCase review = inProgressReview();
-        review.recordTezaursCheck(TezaursStatus.MEANING_ALREADY_EXISTS, 42, "reviewer");
+        review.changeType(CaseType.SENSE, 42, true, "reviewer");
         when(reviewRepository.findById(review.getId())).thenReturn(Optional.of(review));
+        when(reviewRepository.findLockedById(review.getId())).thenReturn(Optional.of(review));
         when(tezaursEntryRepository.existsById(42)).thenReturn(true);
 
-        var result = service.recordTezaursCheck(review.getId(),
-                new RecordTezaursCheckRequest(TezaursStatus.MEANING_NOT_FOUND, 42), authorization("mikus"));
+        var result = service.changeType(review.getId(),
+                new UpdateCaseTypeRequest(CaseType.SENSE, 42, false), authorization("mikus"));
 
         assertThat(result.status()).isEqualTo(ReviewStatus.IN_PROGRESS);
-        assertThat(result.tezaursStatus()).isEqualTo(TezaursStatus.MEANING_NOT_FOUND);
+        assertThat(result.type()).isEqualTo(CaseType.SENSE);
         assertThat(result.lastStatusChangedBy()).isEqualTo("mikus");
         assertThat(result.matchedEntryId()).isEqualTo(42);
     }
@@ -354,22 +341,24 @@ class ReviewServiceTest {
     @Test
     void correctingAClosedCaseToAnAbsentEntryReopensItAndCreatesADraft() {
         ReviewCase review = inProgressReview();
-        review.recordTezaursCheck(TezaursStatus.MEANING_ALREADY_EXISTS, 42, "reviewer");
+        review.changeType(CaseType.SENSE, 42, true, "reviewer");
         when(reviewRepository.findById(review.getId())).thenReturn(Optional.of(review));
+        when(reviewRepository.findLockedById(review.getId())).thenReturn(Optional.of(review));
 
-        var result = service.recordTezaursCheck(review.getId(),
-                new RecordTezaursCheckRequest(TezaursStatus.NOT_FOUND, null), authorization("mikus"));
+        var result = service.changeType(review.getId(),
+                new UpdateCaseTypeRequest(CaseType.ENTRY, null, false), authorization("mikus"));
 
         assertThat(result.status()).isEqualTo(ReviewStatus.IN_PROGRESS);
-        assertThat(result.tezaursStatus()).isEqualTo(TezaursStatus.NOT_FOUND);
+        assertThat(result.type()).isEqualTo(CaseType.ENTRY);
         assertThat(result.matchedEntryId()).isNull();
     }
 
     @Test
     void directCompletionRequestsUseTheSameDraftChecksAsTheResponse() {
         ReviewCase review = inProgressReview();
-        review.recordTezaursCheck(TezaursStatus.MEANING_NOT_FOUND, 42, "reviewer");
+        review.changeType(CaseType.SENSE, 42, false, "reviewer");
         when(reviewRepository.findById(review.getId())).thenReturn(Optional.of(review));
+        when(reviewRepository.findLockedById(review.getId())).thenReturn(Optional.of(review));
         when(reviewRepository.findLockedById(review.getId())).thenReturn(Optional.of(review));
         assertThat(service.find(review.getId()).canComplete()).isFalse();
         assertThatThrownBy(() -> service.changeStatus(review.getId(),
@@ -396,9 +385,6 @@ class ReviewServiceTest {
                 new UpdateStatusRequest(status), null))
                 .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("jāpiesakās");
-        assertThatThrownBy(() -> service.startReview(source(), status, null))
-                .isInstanceOf(ConflictException.class)
-                .hasMessageContaining("jāpiesakās");
 
         assertThat(review.getStatus()).isEqualTo(ReviewStatus.IN_PROGRESS);
         verify(reviewRepository, never()).findLockedById(any());
@@ -409,13 +395,13 @@ class ReviewServiceTest {
     void aDictionaryDecisionRequiresAUsernameBeforeItCanCloseTheCase() {
         ReviewCase review = inProgressReview();
 
-        assertThatThrownBy(() -> service.recordTezaursCheck(review.getId(),
-                new RecordTezaursCheckRequest(TezaursStatus.MEANING_ALREADY_EXISTS, 42), null))
+        assertThatThrownBy(() -> service.changeType(review.getId(),
+                new UpdateCaseTypeRequest(CaseType.SENSE, 42, true), null))
                 .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("jāpiesakās");
 
         assertThat(review.getStatus()).isEqualTo(ReviewStatus.IN_PROGRESS);
-        assertThat(review.getTezaursStatus()).isEqualTo(TezaursStatus.NOT_CHECKED);
+        assertThat(review.getType()).isEqualTo(CaseType.UNKNOWN);
         verify(tezaursEntryRepository, never()).existsById(any());
     }
 
@@ -466,7 +452,7 @@ class ReviewServiceTest {
     @Test
     void resumingAnExpertCaseReturnsItsConfirmedUsageForTheDraftView() {
         ReviewCase review = inProgressReview();
-        review.recordTezaursCheck(TezaursStatus.NOT_FOUND, null, "reviewer");
+        review.changeType(CaseType.ENTRY, null, false, "reviewer");
         review.recordUsageDecision(UsageDecision.USED, null, "reviewer");
         review.changeStatus(ReviewStatus.NEEDS_EXPERT, "reviewer");
         when(reviewRepository.findLockedById(review.getId())).thenReturn(Optional.of(review));
@@ -485,7 +471,7 @@ class ReviewServiceTest {
     void anotherReviewerReceivesTheSavedUsageCheckAfterTheCaseIsReleased() {
         ReviewCase review = inProgressReview();
         review.takeForReview("mikus");
-        review.recordTezaursCheck(TezaursStatus.NOT_FOUND, null, "mikus");
+        review.changeType(CaseType.ENTRY, null, false, "mikus");
         review.recordUsageDecision(UsageDecision.USED, "Confirmed usage", "mikus");
         var decisionTime = review.getUsageDecidedAt();
         when(reviewRepository.findLockedById(review.getId())).thenReturn(Optional.of(review));
@@ -508,7 +494,7 @@ class ReviewServiceTest {
         ReviewCase review = new ReviewCase("term", "reviewer");
         review.changeStatus(ReviewStatus.READY_FOR_REVIEW, "reviewer");
         review.takeForReview("mikus");
-        review.recordTezaursCheck(TezaursStatus.MEANING_NOT_FOUND, 42, "reviewer");
+        review.changeType(CaseType.SENSE, 42, false, "reviewer");
         when(reviewRepository.findLockedById(review.getId())).thenReturn(Optional.of(review));
 
         var released = service.changeStatus(review.getId(),
@@ -516,20 +502,12 @@ class ReviewServiceTest {
 
         assertThat(released.status()).isEqualTo(ReviewStatus.READY_FOR_REVIEW);
         assertThat(released.lastStatusChangedBy()).isEqualTo("mikus");
-        assertThat(released.tezaursStatus()).isEqualTo(TezaursStatus.MEANING_NOT_FOUND);
+        assertThat(released.type()).isEqualTo(CaseType.SENSE);
         assertThat(released.matchedEntryId()).isEqualTo(42);
 
         var reassigned = service.changeStatus(review.getId(),
                 new UpdateStatusRequest(ReviewStatus.IN_PROGRESS), authorization("laura"));
         assertThat(reassigned.lastStatusChangedBy()).isEqualTo("laura");
-    }
-
-    @Test
-    void startingThroughASourceIdAlsoRecordsTheReviewer() {
-        var review = service.startReview(source(), ReviewStatus.IN_PROGRESS, authorization("mikus"));
-
-        assertThat(review.getStatus()).isEqualTo(ReviewStatus.IN_PROGRESS);
-        assertThat(review.getLastStatusChangedBy()).isEqualTo("mikus");
     }
 
     private static String authorization(String username) {
@@ -538,14 +516,15 @@ class ReviewServiceTest {
     }
 
     @Test
-    void keepsTheCaseOpenWhenAnExistingMeaningNeedsEditing() {
+    void keepsTheCaseOpenWhenAMeaningIsMissing() {
         ReviewCase review = inProgressReview();
         when(reviewRepository.findById(review.getId())).thenReturn(Optional.of(review));
+        when(reviewRepository.findLockedById(review.getId())).thenReturn(Optional.of(review));
         when(tezaursEntryRepository.existsById(42)).thenReturn(true);
-        var response = service.recordTezaursCheck(review.getId(),
-                new RecordTezaursCheckRequest(TezaursStatus.MEANING_NEEDS_EDITING, 42), authorization("mikus"));
+        var response = service.changeType(review.getId(),
+                new UpdateCaseTypeRequest(CaseType.SENSE, 42, false), authorization("mikus"));
         assertThat(response.status()).isEqualTo(ReviewStatus.IN_PROGRESS);
-        assertThat(response.tezaursStatus()).isEqualTo(TezaursStatus.MEANING_NEEDS_EDITING);
+        assertThat(response.type()).isEqualTo(CaseType.SENSE);
     }
 
     private static ReviewCase inProgressReview() {

@@ -6,25 +6,25 @@ Tēzaurs.
 ## Data model
 
 - `incubator.suggestions` is the immutable source of submitted suggestions.
-- An untouched suggestion is shown as `NEW` and is addressed by its integer
-  incubator ID.
-- First decide whether the suggestion is trash. For a non-trash suggestion,
-  choose an existing case or keep a new case in `Skatāms`.
-- The first decision creates a preliminary case in `Skatāms` or `Atkritums`,
-  so it survives reloads. “Paņemt apstrādē?” starts work separately and records
-  the proxy-authenticated username. “Atteikties no apstrādes” returns the case to
-  `Skatāms` and preserves saved work. `last_status_changed_by` identifies who
-  took an active case; there is no separate ownership lock. Claiming a case
-  preserves its Tēzaurs check, usage decision, examples and drafts.
-  Choosing an existing case moves all its sources to the destination case.
+- The backend imports unlinked suggestions when it starts, then checks again
+  10 seconds after each import finishes. Each suggestion receives a case and UUID.
+  Its original status initializes the case (`0`–`8`); missing status defaults to
+  `NEW`. Later source status changes do not overwrite case decisions.
+- Automatic imports have no status-change author. Human status changes record
+  the proxy-authenticated username. “Paņemt apstrādē?” starts work;
+  “Atteikties no apstrādes” returns to `Skatāms` and preserves saved work.
+  `last_status_changed_by` identifies who took an active case; there is no
+  separate ownership lock.
 - Merging keeps the destination's data and status. After confirmation, the source
   case and its drafts are deleted; draft differences are not merged.
-- Cases link immutable sources through `review.case_suggestions`.
+- Cases link immutable sources through `review.case_suggestions`. Their `type` is
+  `UNKNOWN`, `ENTRY` or `SENSE`; `/api/reviews/{id}/type` saves the selected path
+  and matching entry, closing the case as `Jau ir` when its meaning already exists.
 - A case with multiple suggestions allows detaching a suggestion back to `Jauns`.
-  Its link is removed; the remaining case keeps its status and drafts.
+  It moves to a fresh `NEW` case; the remaining case keeps its status and drafts.
 - A review has a UUID and may contain several equal source suggestions when
   duplicates are combined.
-- All later status changes and draft data belong to the review UUID.
+- All status changes and draft data belong to the review UUID.
 - Drafts reference that case through `case_id`; linked source suggestions remain
   immutable.
 - `dict` and `incubator` are read-only; Flyway changes only the `review` schema.
@@ -33,9 +33,10 @@ The application currently supports the review queue, duplicate linking,
 Tēzaurs entry checks, and entry, lexeme, and sense drafts. It does
 not write drafts back to the real Tēzaurs tables.
 
-For a new entry, first confirm usage in “Lietojuma pārbaude”. “Jā, atzīstu” creates
-its draft and first primary lexeme. “Nē, neatzīstu” offers postponement or an explicit
-reviewer decision to mark the word as “Izdoma”. Automatic search checks the 42 corpora
+For a new entry, choose a usage decision in “Lietojuma pārbaude”. “Lietojums atzīts”
+immediately creates its draft and first primary lexeme. “Trūkst datu” and “Izdomāts vārds” require confirmation and pause
+work; saved evidence stays readable. Resume in `Apstrādē` to change evidence or the
+saved decision. Automatic search checks the 42 corpora
 listed by [korpuss.lv](https://korpuss.lv/search), using word forms and lemmas where
 available. Results appear progressively; unavailable corpora are marked separately.
 Press Enter to search a changed word; click a corpus count to open its examples.
@@ -43,10 +44,9 @@ The corpus with the most matches opens by default after the search finishes.
 Marked examples stay in the results and in a paginated selection across all search phrases.
 The corpus list and server URLs are maintained in `Corpus.java`.
 Findings and external citations are saved separately from dictionary examples.
-Entry, lexeme and sense edits open separate dialogs in a shared Tēzaurs-style view.
-Existing entries and lexemes remain read-only. Before closing as “Jau ir”,
-the reviewer may choose to edit the existing sense instead. Only saved sense
-edits are copied into `review`; new senses and edits are kept per selected entry.
+Entry, lexeme and sense drafts are edited in popup forms. Existing entries are
+shown as a name and link; TIP only prepares new content. New sense drafts retain
+which existing entry they belong to, without copying that entry into `review`.
 Completion is checked against the active drafts; readiness flags are not stored.
 The schema is defined by the single V1 migration.
 

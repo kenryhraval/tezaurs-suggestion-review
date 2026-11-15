@@ -15,7 +15,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.repository.query.Param;
 
 public interface ReviewCaseRepository extends JpaRepository<ReviewCase, UUID> {
-    long countByStatusNot(ReviewStatus status);
+    long countByStatusNotIn(List<ReviewStatus> statuses);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<ReviewCase> findLockedById(UUID id);
@@ -23,12 +23,12 @@ public interface ReviewCaseRepository extends JpaRepository<ReviewCase, UUID> {
     @Query("""
             SELECT review FROM ReviewCase review
             WHERE (:excludedCaseId IS NULL OR review.id <> :excludedCaseId)
-              AND review.status <> :excludedStatus
+              AND review.status NOT IN :excludedStatuses
               AND LOWER(review.reviewedTerm) LIKE CONCAT('%', LOWER(:query), '%')
             """)
     List<ReviewCase> findDuplicateCandidates(
             @Param("excludedCaseId") UUID excludedCaseId,
-            @Param("excludedStatus") ReviewStatus excludedStatus,
+            @Param("excludedStatuses") List<ReviewStatus> excludedStatuses,
             @Param("query") String query, Pageable pageable);
 
     @Query("""

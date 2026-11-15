@@ -56,10 +56,10 @@ class ReviewCaseTest {
     void recordsReviewData() {
         ReviewCase review = inProgressReview();
         review.correctTerm("corrected");
-        review.recordTezaursCheck(TezaursStatus.MEANING_NOT_FOUND, 42, "reviewer");
+        review.changeType(CaseType.SENSE, 42, false, "reviewer");
 
         assertThat(review.getReviewedTerm()).isEqualTo("corrected");
-        assertThat(review.getTezaursStatus()).isEqualTo(TezaursStatus.MEANING_NOT_FOUND);
+        assertThat(review.getType()).isEqualTo(CaseType.SENSE);
     }
 
     @Test
@@ -70,62 +70,96 @@ class ReviewCaseTest {
         ReviewCase inProgress = inProgressReview();
         assertThatThrownBy(() -> inProgress.changeStatus(ReviewStatus.ALREADY_EXISTS, "reviewer"))
                 .isInstanceOf(ConflictException.class);
-        inProgress.recordTezaursCheck(TezaursStatus.MEANING_ALREADY_EXISTS, 42, "reviewer");
+        inProgress.changeType(CaseType.SENSE, 42, true, "reviewer");
         assertThat(inProgress.getStatus()).isEqualTo(ReviewStatus.ALREADY_EXISTS);
     }
 
-    @ParameterizedTest
-    @EnumSource(value = TezaursStatus.class, names = {"FOUND", "MEANING_NOT_FOUND", "MEANING_NEEDS_EDITING"})
-    void closingAsAlreadyExistingAlsoRecordsTheMeaningDecision(TezaursStatus previousDecision) {
+    @Test
+    void closingASenseCaseAsAlreadyExistingKeepsItsTargetEntry() {
         ReviewCase review = inProgressReview();
-        review.recordTezaursCheck(previousDecision, 42, "reviewer");
+        review.changeType(CaseType.SENSE, 42, false, "reviewer");
 
         review.changeStatus(ReviewStatus.ALREADY_EXISTS, "reviewer");
 
         assertThat(review.getStatus()).isEqualTo(ReviewStatus.ALREADY_EXISTS);
-        assertThat(review.getTezaursStatus()).isEqualTo(TezaursStatus.MEANING_ALREADY_EXISTS);
+        assertThat(review.getType()).isEqualTo(CaseType.SENSE);
         assertThat(review.getMatchedEntryId()).isEqualTo(42);
     }
 
     @Test
     void closingAsAlreadyExistingStillRequiresAMatchingEntry() {
         ReviewCase review = inProgressReview();
-        review.recordTezaursCheck(TezaursStatus.NOT_FOUND, null, "reviewer");
+        review.changeType(CaseType.ENTRY, null, false, "reviewer");
         review.recordUsageDecision(lv.tezaurs.suggestions.usage.entity.UsageDecision.USED, null, "reviewer");
 
         assertThatThrownBy(() -> review.changeStatus(ReviewStatus.ALREADY_EXISTS, "reviewer"))
                 .isInstanceOf(ConflictException.class)
                 .hasMessage("Select the matching Tēzaurs entry");
         assertThat(review.getStatus()).isEqualTo(ReviewStatus.IN_PROGRESS);
-        assertThat(review.getTezaursStatus()).isEqualTo(TezaursStatus.NOT_FOUND);
+        assertThat(review.getType()).isEqualTo(CaseType.ENTRY);
     }
 
     @Test
     void rejectsReviewDataThatDoesNotMatchTheTezaursCheck() {
         ReviewCase review = inProgressReview();
 
-        assertThatThrownBy(() -> review.recordTezaursCheck(TezaursStatus.NOT_FOUND, 42, "reviewer"))
+        assertThatThrownBy(() -> review.changeType(CaseType.ENTRY, 42, false, "reviewer"))
                 .isInstanceOf(ConflictException.class);
-        assertThatThrownBy(() -> review.recordTezaursCheck(TezaursStatus.FOUND, null, "reviewer"))
+        assertThatThrownBy(() -> review.changeType(CaseType.SENSE, null, false, "reviewer"))
                 .isInstanceOf(ConflictException.class);
 
+    }
+
+    @Test
+    void rejectsContradictoryTypeChoicesWithoutChangingTheCase() {
+        ReviewCase review = inProgressReview();
+
+        assertThatThrownBy(() -> review.changeType(CaseType.ENTRY, null, true, "reviewer"))
+                .isInstanceOf(ConflictException.class);
+        assertThatThrownBy(() -> review.changeType(CaseType.UNKNOWN, 42, false, "reviewer"))
+                .isInstanceOf(ConflictException.class);
+        assertThatThrownBy(() -> review.changeType(null, null, false, "reviewer"))
+                .isInstanceOf(ConflictException.class);
+
+        assertThat(review.getType()).isEqualTo(CaseType.UNKNOWN);
+        assertThat(review.getMatchedEntryId()).isNull();
+        assertThat(review.getStatus()).isEqualTo(ReviewStatus.IN_PROGRESS);
+    }
+
+    @Test
+    void selectingAnExistingMeaningClosesTheCaseAndSelectingANewMeaningReopensIt() {
+        ReviewCase review = inProgressReview();
+
+        review.changeType(CaseType.SENSE, 42, true, "closer");
+
+        assertThat(review.getType()).isEqualTo(CaseType.SENSE);
+        assertThat(review.getMatchedEntryId()).isEqualTo(42);
+        assertThat(review.getStatus()).isEqualTo(ReviewStatus.ALREADY_EXISTS);
+        assertThat(review.getLastStatusChangedBy()).isEqualTo("closer");
+
+        review.changeType(CaseType.SENSE, 99, false, "editor");
+
+        assertThat(review.getType()).isEqualTo(CaseType.SENSE);
+        assertThat(review.getMatchedEntryId()).isEqualTo(99);
+        assertThat(review.getStatus()).isEqualTo(ReviewStatus.IN_PROGRESS);
+        assertThat(review.getLastStatusChangedBy()).isEqualTo("editor");
     }
 
     @ParameterizedTest
     @EnumSource(value = ReviewStatus.class, names = {"IN_PROGRESS", "ALREADY_EXISTS"}, mode = EnumSource.Mode.EXCLUDE)
     void requiresResumingBeforeChangingTheTezaursCheck(ReviewStatus status) {
         ReviewCase review = inProgressReview();
-        review.recordTezaursCheck(TezaursStatus.NOT_FOUND, null, "reviewer");
+        review.changeType(CaseType.ENTRY, null, false, "reviewer");
         if (status == ReviewStatus.NEW) review = new ReviewCase("submitted", "reviewer");
         else review.changeStatus(status, "reviewer");
         ReviewCase paused = review;
-        TezaursStatus previousCheck = paused.getTezaursStatus();
+        CaseType previousCheck = paused.getType();
 
-        assertThatThrownBy(() -> paused.recordTezaursCheck(TezaursStatus.MEANING_NOT_FOUND, 42, "reviewer"))
+        assertThatThrownBy(() -> paused.changeType(CaseType.SENSE, 42, false, "reviewer"))
                 .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("Resume the case in Apstrādē");
         assertThat(paused.getStatus()).isEqualTo(status);
-        assertThat(paused.getTezaursStatus()).isEqualTo(previousCheck);
+        assertThat(paused.getType()).isEqualTo(previousCheck);
         assertThat(paused.getMatchedEntryId()).isNull();
     }
 
@@ -133,7 +167,7 @@ class ReviewCaseTest {
     @EnumSource(value = ReviewStatus.class, names = "IN_PROGRESS", mode = EnumSource.Mode.EXCLUDE)
     void requiresResumingBeforeChangingTheTitle(ReviewStatus status) {
         ReviewCase review = inProgressReview();
-        review.recordTezaursCheck(TezaursStatus.MEANING_NOT_FOUND, 42, "reviewer");
+        review.changeType(CaseType.SENSE, 42, false, "reviewer");
         if (status == ReviewStatus.NEW) review = new ReviewCase("submitted", "reviewer");
         else review.changeStatus(status, "reviewer");
         ReviewCase paused = review;
@@ -152,10 +186,10 @@ class ReviewCaseTest {
     }
 
     @Test
-    void choosingSenseEditingReopensAnAlreadyExistingCase() {
+    void choosingAMissingMeaningReopensAnAlreadyExistingCase() {
         ReviewCase review = inProgressReview();
-        review.recordTezaursCheck(TezaursStatus.MEANING_ALREADY_EXISTS, 42, "reviewer");
-        review.recordTezaursCheck(TezaursStatus.MEANING_NEEDS_EDITING, 42, "reviewer");
+        review.changeType(CaseType.SENSE, 42, true, "reviewer");
+        review.changeType(CaseType.SENSE, 42, false, "reviewer");
         assertThat(review.getStatus()).isEqualTo(ReviewStatus.IN_PROGRESS);
     }
 
@@ -165,7 +199,7 @@ class ReviewCaseTest {
             "ALREADY_EXISTS", "INSUFFICIENT_DATA", "NEEDS_EXPERT"})
     void recordsWhoActuallyChangedTheStatus(ReviewStatus nextStatus) {
         ReviewCase review = inProgressReview();
-        review.recordTezaursCheck(TezaursStatus.FOUND, 42, "researcher");
+        review.changeType(CaseType.SENSE, 42, false, "researcher");
 
         review.changeStatus(nextStatus, "editor");
 
@@ -187,15 +221,15 @@ class ReviewCaseTest {
     @Test
     void recordsAuthorsWhenDictionaryChecksCloseOrReopenTheCase() {
         ReviewCase review = inProgressReview();
-        review.recordTezaursCheck(TezaursStatus.FOUND, 42, "researcher");
+        review.changeType(CaseType.SENSE, 42, false, "researcher");
         assertThat(review.getLastStatusChangedBy()).isEqualTo("reviewer");
 
-        review.recordTezaursCheck(TezaursStatus.MEANING_ALREADY_EXISTS, 42, "closer");
+        review.changeType(CaseType.SENSE, 42, true, "closer");
         assertThat(review.getLastStatusChangedBy()).isEqualTo("closer");
-        review.recordTezaursCheck(TezaursStatus.MEANING_ALREADY_EXISTS, 42, "visitor");
+        review.changeType(CaseType.SENSE, 42, true, "visitor");
         assertThat(review.getLastStatusChangedBy()).isEqualTo("closer");
 
-        review.recordTezaursCheck(TezaursStatus.MEANING_NEEDS_EDITING, 42, "editor");
+        review.changeType(CaseType.SENSE, 42, false, "editor");
         assertThat(review.getStatus()).isEqualTo(ReviewStatus.IN_PROGRESS);
         assertThat(review.getLastStatusChangedBy()).isEqualTo("editor");
     }
@@ -203,7 +237,7 @@ class ReviewCaseTest {
     @Test
     void recordsUsageStatusChangesButNotRepeatedDecisionsOrTitleEdits() {
         ReviewCase review = inProgressReview();
-        review.recordTezaursCheck(TezaursStatus.NOT_FOUND, null, "researcher");
+        review.changeType(CaseType.ENTRY, null, false, "researcher");
         review.recordUsageDecision(UsageDecision.USED, null, "visitor");
         assertThat(review.getLastStatusChangedBy()).isEqualTo("reviewer");
         review.correctTerm("corrected");
@@ -211,8 +245,10 @@ class ReviewCaseTest {
 
         review.recordUsageDecision(UsageDecision.NOT_CONFIRMED, null, "researcher");
         assertThat(review.getLastStatusChangedBy()).isEqualTo("researcher");
+        review.takeForReview("linguist");
         review.recordUsageDecision(UsageDecision.INVENTED, null, "linguist");
         assertThat(review.getLastStatusChangedBy()).isEqualTo("linguist");
+        review.takeForReview("expert");
         review.recordUsageDecision(UsageDecision.USED, null, "expert");
         assertThat(review.getLastStatusChangedBy()).isEqualTo("expert");
     }
@@ -238,7 +274,7 @@ class ReviewCaseTest {
             "INSUFFICIENT_DATA", "INVENTED"})
     void takingAPausedCasePreservesTheUsageAnswer(ReviewStatus pausedStatus) {
         ReviewCase review = inProgressReview();
-        review.recordTezaursCheck(TezaursStatus.NOT_FOUND, null, "reviewer");
+        review.changeType(CaseType.ENTRY, null, false, "reviewer");
         UsageDecision decision = UsageDecision.USED;
         if (pausedStatus == ReviewStatus.INSUFFICIENT_DATA) decision = UsageDecision.NOT_CONFIRMED;
         if (pausedStatus == ReviewStatus.INVENTED) decision = UsageDecision.INVENTED;
@@ -252,7 +288,7 @@ class ReviewCaseTest {
         assertThat(review.getUsageNote()).isEqualTo("Previous assessment");
         assertThat(review.getUsageDecidedBy()).isEqualTo("reviewer");
         assertThat(review.getUsageDecidedAt()).isNotNull();
-        assertThat(review.getTezaursStatus()).isEqualTo(TezaursStatus.NOT_FOUND);
+        assertThat(review.getType()).isEqualTo(CaseType.ENTRY);
         assertThat(review.getLastStatusChangedBy()).isEqualTo("editor");
     }
 
@@ -260,7 +296,7 @@ class ReviewCaseTest {
     void releasingAndTakingACasePreservesTheUsageAssessment() {
         ReviewCase review = inProgressReview();
         review.takeForReview("reviewer");
-        review.recordTezaursCheck(TezaursStatus.NOT_FOUND, null, "reviewer");
+        review.changeType(CaseType.ENTRY, null, false, "reviewer");
         review.recordUsageDecision(UsageDecision.USED, "Confirmed usage", "reviewer");
         var decisionTime = review.getUsageDecidedAt();
 
@@ -272,14 +308,14 @@ class ReviewCaseTest {
         assertThat(review.getUsageNote()).isEqualTo("Confirmed usage");
         assertThat(review.getUsageDecidedBy()).isEqualTo("reviewer");
         assertThat(review.getUsageDecidedAt()).isEqualTo(decisionTime);
-        assertThat(review.getTezaursStatus()).isEqualTo(TezaursStatus.NOT_FOUND);
+        assertThat(review.getType()).isEqualTo(CaseType.ENTRY);
         assertThat(review.canEditEntryDraft()).isTrue();
     }
 
     @Test
     void returningFromAnExpertPreservesTheUsageAssessment() {
         ReviewCase review = inProgressReview();
-        review.recordTezaursCheck(TezaursStatus.NOT_FOUND, null, "reviewer");
+        review.changeType(CaseType.ENTRY, null, false, "reviewer");
         review.recordUsageDecision(UsageDecision.USED, "Confirmed usage", "reviewer");
         var decisionTime = review.getUsageDecidedAt();
         review.changeStatus(ReviewStatus.NEEDS_EXPERT, "reviewer");
@@ -291,7 +327,7 @@ class ReviewCaseTest {
         assertThat(review.getUsageNote()).isEqualTo("Confirmed usage");
         assertThat(review.getUsageDecidedBy()).isEqualTo("reviewer");
         assertThat(review.getUsageDecidedAt()).isEqualTo(decisionTime);
-        assertThat(review.getTezaursStatus()).isEqualTo(TezaursStatus.NOT_FOUND);
+        assertThat(review.getType()).isEqualTo(CaseType.ENTRY);
         assertThat(review.getLastStatusChangedBy()).isEqualTo("editor");
         assertThat(review.canEditEntryDraft()).isTrue();
     }
@@ -299,11 +335,11 @@ class ReviewCaseTest {
     @Test
     void reopeningAnAlreadyExistingCaseResetsTheUsageAnswer() {
         ReviewCase review = inProgressReview();
-        review.recordTezaursCheck(TezaursStatus.NOT_FOUND, null, "reviewer");
+        review.changeType(CaseType.ENTRY, null, false, "reviewer");
         review.recordUsageDecision(UsageDecision.USED, null, "reviewer");
-        review.recordTezaursCheck(TezaursStatus.MEANING_ALREADY_EXISTS, 42, "reviewer");
+        review.changeType(CaseType.SENSE, 42, true, "reviewer");
 
-        review.recordTezaursCheck(TezaursStatus.NOT_FOUND, null, "editor");
+        review.changeType(CaseType.ENTRY, null, false, "editor");
 
         assertThat(review.getStatus()).isEqualTo(ReviewStatus.IN_PROGRESS);
         assertThat(review.getUsageDecision()).isEqualTo(UsageDecision.NOT_CHECKED);
@@ -314,7 +350,7 @@ class ReviewCaseTest {
     @Test
     void takingAnAlreadyActiveCaseKeepsTheUsageAnswer() {
         ReviewCase review = inProgressReview();
-        review.recordTezaursCheck(TezaursStatus.NOT_FOUND, null, "reviewer");
+        review.changeType(CaseType.ENTRY, null, false, "reviewer");
         review.recordUsageDecision(UsageDecision.USED, null, "reviewer");
 
         review.takeForReview("reviewer");
@@ -327,11 +363,16 @@ class ReviewCaseTest {
 
     @ParameterizedTest
     @EnumSource(value = UsageDecision.class, names = {"NOT_CONFIRMED", "INVENTED"})
-    void confirmingUsageOnAPausedCaseKeepsTheNewAnswer(UsageDecision previousDecision) {
+    void usageDecisionCanChangeOnlyAfterResumingAPausedCase(UsageDecision previousDecision) {
         ReviewCase review = inProgressReview();
-        review.recordTezaursCheck(TezaursStatus.NOT_FOUND, null, "reviewer");
+        review.changeType(CaseType.ENTRY, null, false, "reviewer");
         review.recordUsageDecision(previousDecision, null, "reviewer");
 
+        assertThatThrownBy(() -> review.recordUsageDecision(UsageDecision.USED, null, "editor"))
+                .isInstanceOf(ConflictException.class);
+        assertThat(review.getUsageDecision()).isEqualTo(previousDecision);
+        review.takeForReview("editor");
+        assertThat(review.getUsageDecision()).isEqualTo(previousDecision);
         review.recordUsageDecision(UsageDecision.USED, null, "editor");
 
         assertThat(review.getStatus()).isEqualTo(ReviewStatus.IN_PROGRESS);

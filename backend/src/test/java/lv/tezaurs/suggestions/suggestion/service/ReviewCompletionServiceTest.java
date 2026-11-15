@@ -17,7 +17,7 @@ import lv.tezaurs.suggestions.sense.repository.ReviewSenseRepository;
 import lv.tezaurs.suggestions.suggestion.entity.CompletionBlockReason;
 import lv.tezaurs.suggestions.suggestion.entity.ReviewCase;
 import lv.tezaurs.suggestions.suggestion.entity.ReviewStatus;
-import lv.tezaurs.suggestions.suggestion.entity.TezaursStatus;
+import lv.tezaurs.suggestions.suggestion.entity.CaseType;
 import org.junit.jupiter.api.Test;
 
 class ReviewCompletionServiceTest {
@@ -27,17 +27,15 @@ class ReviewCompletionServiceTest {
     private final ReviewCompletionService service = new ReviewCompletionService(entries, lexemes, senses);
 
     @Test
-    void requiresTheTezaursAndMeaningDecisions() {
+    void requiresCaseTypeSelection() {
         ReviewCase review = review();
         assertBlocked(review, CompletionBlockReason.TEZAURS_CHECK_REQUIRED);
-        review.recordTezaursCheck(TezaursStatus.FOUND, 42, "reviewer");
-        assertBlocked(review, CompletionBlockReason.MEANING_CHECK_REQUIRED);
     }
 
     @Test
     void readsNewEntryAndPrimaryLexemesFromActualDrafts() {
         ReviewCase review = review();
-        review.recordTezaursCheck(TezaursStatus.NOT_FOUND, null, "reviewer");
+        review.changeType(CaseType.ENTRY, null, false, "reviewer");
         review.recordUsageDecision(lv.tezaurs.suggestions.usage.entity.UsageDecision.USED, null, "reviewer");
         assertBlocked(review, CompletionBlockReason.ENTRY_DRAFT_REQUIRED);
         ReviewEntry entry = new ReviewEntry(review.getId());
@@ -57,19 +55,15 @@ class ReviewCompletionServiceTest {
     @Test
     void requiresANewSenseForAMissingMeaningAndUsesOnlyTheSelectedEntry() {
         ReviewCase review = review();
-        review.recordTezaursCheck(TezaursStatus.MEANING_NOT_FOUND, 42, "reviewer");
-        ReviewSense edited = new ReviewSense(review.getId(), 42);
-        edited.recordSource(7);
-        when(senses.findAllByCaseIdAndTargetEntryIdOrderByOrderNoAscIdAsc(review.getId(), 42))
-                .thenReturn(List.of(edited));
+        review.changeType(CaseType.SENSE, 42, false, "reviewer");
         assertBlocked(review, CompletionBlockReason.SENSE_DRAFT_REQUIRED);
         ReviewSense added = new ReviewSense(review.getId(), 42);
         when(senses.findAllByCaseIdAndTargetEntryIdOrderByOrderNoAscIdAsc(review.getId(), 42))
-                .thenReturn(List.of(edited, added));
+                .thenReturn(List.of(added));
         assertReady(review);
-        review.recordTezaursCheck(TezaursStatus.MEANING_NOT_FOUND, 99, "reviewer");
+        review.changeType(CaseType.SENSE, 99, false, "reviewer");
         assertBlocked(review, CompletionBlockReason.SENSE_DRAFT_REQUIRED);
-        review.recordTezaursCheck(TezaursStatus.MEANING_NOT_FOUND, 42, "reviewer");
+        review.changeType(CaseType.SENSE, 42, false, "reviewer");
         assertReady(review);
         when(senses.findAllByCaseIdAndTargetEntryIdOrderByOrderNoAscIdAsc(review.getId(), 42))
                 .thenReturn(List.of());
@@ -77,16 +71,9 @@ class ReviewCompletionServiceTest {
     }
 
     @Test
-    void requiresSavedWorkOnlyWhenTheExistingMeaningNeedsEditing() {
+    void anAlreadyExistingMeaningNeedsNoDraft() {
         ReviewCase review = review();
-        review.recordTezaursCheck(TezaursStatus.MEANING_ALREADY_EXISTS, 42, "reviewer");
-        assertReady(review);
-        review.recordTezaursCheck(TezaursStatus.MEANING_NEEDS_EDITING, 42, "reviewer");
-        assertBlocked(review, CompletionBlockReason.SENSE_DRAFT_REQUIRED);
-        ReviewSense edit = new ReviewSense(review.getId(), 42);
-        edit.recordSource(7);
-        when(senses.findAllByCaseIdAndTargetEntryIdOrderByOrderNoAscIdAsc(review.getId(), 42))
-                .thenReturn(List.of(edit));
+        review.changeType(CaseType.SENSE, 42, true, "reviewer");
         assertReady(review);
     }
 

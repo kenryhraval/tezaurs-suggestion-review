@@ -10,7 +10,14 @@ type Props = {
   review: Review
   defaultOpen: boolean
   readOnly: boolean
-  onSaveDecision: (decision: UsageDecision) => Promise<boolean>
+  onSaveDecision: (decision: UsageDecision) => Promise<void>
+}
+
+const decisionLabels: Record<UsageDecision, string> = {
+  NOT_CHECKED: 'Nav izvēlēts',
+  USED: 'Lietojums atzīts',
+  NOT_CONFIRMED: 'Trūkst datu',
+  INVENTED: 'Izdomāts vārds',
 }
 
 export function UsageCheck({ review, onSaveDecision, defaultOpen, readOnly }: Props) {
@@ -21,6 +28,7 @@ export function UsageCheck({ review, onSaveDecision, defaultOpen, readOnly }: Pr
   const [error, setError] = useState('')
   const [addingSource, setAddingSource] = useState(false)
   const [searchStarted, setSearchStarted] = useState(defaultOpen)
+  const [decisionDropdownOpen, setDecisionDropdownOpen] = useState(false)
   const [pendingDecision, setPendingDecision] = useState<UsageDecision | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const editable = !readOnly
@@ -93,20 +101,29 @@ export function UsageCheck({ review, onSaveDecision, defaultOpen, readOnly }: Pr
   }
 
   async function saveDecision(decision: UsageDecision) {
-    if (saving) {
+    if (readOnly || saving || loading || decision === 'NOT_CHECKED') {
       return
     }
     setSaving(true)
     setError('')
     try {
-      if (await onSaveDecision(decision)) {
-        setPendingDecision(null)
-        setExpanded(false)
-      }
+      await onSaveDecision(decision)
+      setPendingDecision(null)
+      setExpanded(false)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Neizdevās saglabāt izvēli.')
     } finally {
       setSaving(false)
+    }
+  }
+
+  function chooseDecision(decision: UsageDecision) {
+    setDecisionDropdownOpen(false)
+    setError('')
+    if (decision === 'USED') {
+      saveDecision(decision)
+    } else {
+      setPendingDecision(decision)
     }
   }
 
@@ -150,17 +167,6 @@ export function UsageCheck({ review, onSaveDecision, defaultOpen, readOnly }: Pr
     setError('')
   }
 
-  function chooseUsed() {
-    setError('')
-    saveDecision('USED')
-  }
-
-  function chooseNotUsed() {
-    setError('')
-    const previousDecisionWasInvented = review.usageDecision === 'INVENTED'
-    setPendingDecision(previousDecisionWasInvented ? 'INVENTED' : 'NOT_CONFIRMED')
-  }
-
   async function saveCorpusEvidence(request: SaveUsageEvidence) {
     await addEvidence(request)
   }
@@ -174,13 +180,13 @@ export function UsageCheck({ review, onSaveDecision, defaultOpen, readOnly }: Pr
           }}>
           3. Lietojuma pārbaude
         </summary>
-        {editable && <>
-          {searchStarted && <CorpusSearch reviewId={review.id} term={review.reviewedTerm}
+        {editable && searchStarted && <CorpusSearch reviewId={review.id} term={review.reviewedTerm}
             evidence={evidence} saving={saving || loading} onSave={saveCorpusEvidence}
             onRemove={requestEvidenceRemoval}
             onAddSource={openSourceForm} />}
-        </>}
-        {error && <p className="error" role="alert">{error}</p>}
+        {error && !addingSource && !deletingId && !pendingDecision && (
+          <p className="error" role="alert">{error}</p>
+        )}
         {loading && <p className="muted">Ielādē saglabātos atradumus...</p>}
         {readOnly && !loading && !error && evidence.length === 0 && (
           <p className="muted">Nav atzīmētu piemēru.</p>
@@ -189,36 +195,52 @@ export function UsageCheck({ review, onSaveDecision, defaultOpen, readOnly }: Pr
           onRemove={editable ? requestEvidenceRemoval : undefined} />
         {readOnly && review.usageNote && <p>{review.usageNote}</p>}
         <p><strong>Vai atzīstat, ka vārdu lieto?</strong></p>
-        <div>
-          <button className="btn btn-sm btn-outline-secondary" type="button" aria-pressed={review.usageDecision === 'USED'} disabled={readOnly || saving || loading}
-            onClick={chooseUsed}>Jā, atzīstu</button>{' '}
-          <button className="btn btn-sm btn-outline-secondary" type="button" aria-pressed={review.usageDecision === 'NOT_CONFIRMED' || review.usageDecision === 'INVENTED'} disabled={readOnly || saving || loading}
-            onClick={chooseNotUsed}>Nē, neatzīstu</button>
+        <div className="tezaurs-dropdown" onBlur={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget)) {
+            setDecisionDropdownOpen(false)
+          }
+        }} onKeyDown={(event) => {
+          if (event.key === 'Escape') setDecisionDropdownOpen(false)
+        }}>
+          <div className="tezaurs-dropdown-control">
+            <button className="tezaurs-dropdown-toggle" type="button" aria-expanded={decisionDropdownOpen}
+              aria-label="Lietojuma izvērtējums" disabled={readOnly || saving || loading}
+              onClick={() => setDecisionDropdownOpen(!decisionDropdownOpen)}>
+              <span className="tezaurs-option-label">{decisionLabels[review.usageDecision]}</span>
+              <span aria-hidden="true">▾</span>
+            </button>
+          </div>
+          {decisionDropdownOpen && <div className="tezaurs-dropdown-menu">
+            <div className="tezaurs-dropdown-options">
+              <button type="button" disabled>{decisionLabels.NOT_CHECKED}</button>
+              <button type="button" onClick={() => chooseDecision('USED')}>{decisionLabels.USED}</button>
+              <button type="button" onClick={() => chooseDecision('NOT_CONFIRMED')}>{decisionLabels.NOT_CONFIRMED}</button>
+              <button type="button" onClick={() => chooseDecision('INVENTED')}>{decisionLabels.INVENTED}</button>
+            </div>
+          </div>}
         </div>
       </details>
+      {pendingDecision && <ConfirmationDialog busy={saving} error={error}
+        message={pendingDecision === 'NOT_CONFIRMED'
+          ? 'Perēklis tiks atlikts stāvoklī “Trūkst datu”. Lai turpinātu darbu, tas būs jāpaņem apstrādē.'
+          : 'Vārds tiks atzīmēts kā izdomāts, un perēklis pāries stāvoklī “Izdoma”. Lai turpinātu darbu, tas būs jāpaņem apstrādē.'}
+        onConfirm={() => saveDecision(pendingDecision)}
+        onCancel={() => {
+          setPendingDecision(null)
+          setError('')
+        }} />}
       {addingSource && <EditDialog title="Pievienot citu avotu" busy={saving} error={error} wide={false}
         onSubmit={(event) => addExternalEvidence(event)}
         onCancel={closeSourceForm}>
         <label>Avota saite<input className="form-control form-control-sm" autoFocus name="url" type="url" required maxLength={4000} disabled={saving} /></label>
         <label>Citāts<textarea className="form-control form-control-sm" name="citation" required maxLength={10000} rows={3} disabled={saving} /></label>
       </EditDialog>}
-      {pendingDecision && <ConfirmationDialog busy={saving} error={error}
-        message="Kā rīkoties ar ieteikumu?"
-        onConfirm={() => saveDecision(pendingDecision)} onCancel={() => setPendingDecision(null)}>
-        <>
-          <label className="checkbox-label"><input type="radio" name="usage-outcome" disabled={saving}
-            checked={pendingDecision === 'NOT_CONFIRMED'} onChange={() => setPendingDecision('NOT_CONFIRMED')} />
-            Atlikt: trūkst datu, izpēti var turpināt vēlāk.
-          </label>
-          <label className="checkbox-label"><input type="radio" name="usage-outcome" disabled={saving}
-            checked={pendingDecision === 'INVENTED'} onChange={() => setPendingDecision('INVENTED')} />
-            Izdomāts vārds.
-          </label>
-        </>
-      </ConfirmationDialog>}
       {deletingId && <ConfirmationDialog busy={saving} error={error}
         message="Noņemt šo atradumu no izskatīšanas?" onConfirm={() => removeEvidence()}
-        onCancel={() => setDeletingId(null)} />}
+        onCancel={() => {
+          setDeletingId(null)
+          setError('')
+        }} />}
     </section>
   )
 }

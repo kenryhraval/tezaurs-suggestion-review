@@ -110,7 +110,10 @@ aside h3, .details h4 { font-size: 1rem; }
 .tezaurs-option, .tezaurs-check .tezaurs-dropdown-control { display: flex; align-items: center; }
 .tezaurs-option button, .tezaurs-check .tezaurs-dropdown-toggle { flex: 1; min-width: 0; }
 .tezaurs-option-label { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.tezaurs-sense-preview { list-style: none; margin: 0 6px 8px; padding: 0; font-size: .875rem; }
+.tezaurs-sense-preview .tezaurs-sense-preview { margin: 0; padding-left: 16px; }
 .tezaurs-entry-link { flex-shrink: 0; padding: 6px 10px; text-decoration: none; }
+.tezaurs-entry-link:hover, .tezaurs-entry-link:focus { text-decoration: none; }
 
 .tezaurs-dropdown-options button {
   border: 0;
@@ -136,7 +139,7 @@ summary { cursor: pointer; }
 .confirmation-dialog::backdrop { background: rgb(0 0 0 / 35%); }
 .edit-dialog { max-width: 720px; }
 .draft-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 12px 0 6px; }
-.tezaurs-answer-actions button[aria-pressed="true"], .usage-check button[aria-pressed="true"] { background: var(--theme-color-lite); color: var(--theme-color-dark); border-color: var(--theme-color-dark); }
+.tezaurs-answer-actions button[aria-pressed="true"] { background: var(--theme-color-lite); color: var(--theme-color-dark); border-color: var(--theme-color-dark); }
 
 .tezaurs-check, .initial-review,
 .meaning-existence-check,
@@ -160,41 +163,26 @@ summary { cursor: pointer; }
 }
 
 .entry-draft-form textarea { resize: vertical; }
+.entry-draft-form .read-only-fields { border: 0; margin: 0; padding: 0; }
+.draft-lexeme, .draft-sense { margin: 10px 0; }
+.draft-sense .draft-sense { margin-left: 24px; }
+.existing-record { padding: 6px 8px; border-radius: 3px; background: #f3f3f3; color: #616161; }
 .checkbox-label { display: flex; align-items: center; }
 .checkbox-label input { width: auto; }
 .flag-editor { display: grid; gap: 8px; }
 .flag-row { display: grid; grid-template-columns: 1fr 2fr auto; align-items: center; gap: 8px; }
 .selected-flag-values { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
 .restriction-editor { display: grid; gap: 8px; margin-top: 8px; border-left: 3px solid #ccc; padding-left: 10px; }
-.existing-entry dl { display: grid; grid-template-columns: 180px 1fr; gap: 4px 12px; }
-.existing-entry dt { font-weight: bold; }
-.existing-entry dd { margin: 0; }
-.existing-entry details:not(.review-section) { margin: 8px 0; padding: 8px; border: 1px solid #ddd; }
-.existing-sense .icon-button, .existing-lexeme .icon-button { margin-right: 6px; vertical-align: middle; }
-.tezaurs-entry-display > .draft-heading { margin: 18px 0 10px; }
-.draft-label { margin-left: 6px; }
 .edit-button { padding: 3px; }
-.entity-actions > .action-toggle { border-left: 1px solid rgb(0 0 0 / 20%); padding: 2px 5px; font-size: 12px; }
-.existing-sense .entity-actions, .existing-lexeme .entity-actions { margin-right: 6px; }
+/* Match the Tēzaurs editor's small edit controls. */
+.entity-actions { margin: 0 5px; }
+.entity-actions > .btn { padding: .2rem; font-size: .8rem; line-height: .8; border-radius: .2rem; }
+.entity-actions .edit-button svg { width: 1em; height: 1em; vertical-align: -.125em; }
 .entity-action-menu { width: 320px; max-width: calc(100vw - 80px); max-height: 60vh; overflow: auto; }
 .entity-action-menu .dropdown-item { white-space: normal; }
-.existing-entry details dl div { display: contents; }
-.existing-data { margin: 8px 0; }
-.existing-data ul { margin: 4px 0; }
-.lexeme-symbol { margin-left: 6px; color: #777; cursor: help; }
-.usage-frequency { color: #777; font-size: 0.9em; }
-.usage-frequency span { margin-left: 2px; color: #ddd; }
-.usage-frequency span.active { color: #777; }
 
 .sv_VR { font-size: 1.3em; font-weight: 600; color: #212121; }
 .sv_IN { font-size: 0.7em; }
-.sv_PI { font-style: italic; }
-.dict_EntryHead { font-size: 1.2rem; }
-.dict_Verbalization, .dict_Pron { font-size: 0.85em; color: #616161; }
-.dict_Lexeme .dict_Verbalization { margin-right: 0.5rem; }
-.dict_Sense { margin-top: 1em; color: #212121; }
-.dict_Sense .dict_Sense { margin: 0.5em 0 0 2em; font-weight: 300; font-size: 0.95em; }
-.dict_SenseNumber { font-weight: 600; margin: 0 0.3em 0 0.5em; }
 
 @media (max-width: 768px) {
   .app-shell { border: 0; box-shadow: none; }

@@ -6,7 +6,7 @@ import lombok.RequiredArgsConstructor;
 import lv.tezaurs.suggestions.entry.entity.ReviewEntry;
 import lv.tezaurs.suggestions.entry.entity.ReviewLexeme;
 import lv.tezaurs.suggestions.sense.entity.ReviewSense;
-import lv.tezaurs.suggestions.suggestion.entity.TezaursStatus;
+import lv.tezaurs.suggestions.suggestion.entity.CaseType;
 import lv.tezaurs.suggestions.usage.entity.UsageDecision;
 import lv.tezaurs.suggestions.common.error.ConflictException;
 import lv.tezaurs.suggestions.entry.repository.ReviewEntryRepository;
@@ -15,6 +15,7 @@ import lv.tezaurs.suggestions.sense.repository.ReviewSenseRepository;
 import lv.tezaurs.suggestions.suggestion.dto.ReviewResponse;
 import lv.tezaurs.suggestions.suggestion.entity.CompletionBlockReason;
 import lv.tezaurs.suggestions.suggestion.entity.ReviewCase;
+import lv.tezaurs.suggestions.suggestion.entity.ReviewStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,17 +38,14 @@ public class ReviewCompletionService {
     }
 
     public CompletionBlockReason completionBlockReason(ReviewCase review) {
-        TezaursStatus checkStatus = review.getTezaursStatus();
-        if (checkStatus == TezaursStatus.NOT_CHECKED) {
+        CaseType type = review.getType();
+        if (type == CaseType.UNKNOWN) {
             return CompletionBlockReason.TEZAURS_CHECK_REQUIRED;
         }
-        if (checkStatus == TezaursStatus.FOUND) {
-            return CompletionBlockReason.MEANING_CHECK_REQUIRED;
-        }
-        if (checkStatus == TezaursStatus.MEANING_ALREADY_EXISTS) {
+        if (review.getStatus() == ReviewStatus.ALREADY_EXISTS) {
             return null;
         }
-        if (checkStatus == TezaursStatus.NOT_FOUND) {
+        if (type == CaseType.ENTRY) {
             if (review.getUsageDecision() != UsageDecision.USED) {
                 return CompletionBlockReason.USAGE_CHECK_REQUIRED;
             }
@@ -74,14 +72,6 @@ public class ReviewCompletionService {
     private boolean hasRequiredSenseDraft(ReviewCase review) {
         List<ReviewSense> senses = senseRepository.findAllByCaseIdAndTargetEntryIdOrderByOrderNoAscIdAsc(
                 review.getId(), review.getMatchedEntryId());
-        if (review.getTezaursStatus() == TezaursStatus.MEANING_NEEDS_EDITING) {
-            return !senses.isEmpty();
-        }
-        for (ReviewSense sense : senses) {
-            if (sense.getSourceSenseId() == null) {
-                return true;
-            }
-        }
-        return false;
+        return !senses.isEmpty();
     }
 }

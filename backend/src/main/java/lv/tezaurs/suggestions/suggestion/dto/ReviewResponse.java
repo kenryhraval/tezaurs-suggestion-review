@@ -7,7 +7,7 @@ import java.util.UUID;
 import lv.tezaurs.suggestions.suggestion.entity.CompletionBlockReason;
 import lv.tezaurs.suggestions.suggestion.entity.ReviewCase;
 import lv.tezaurs.suggestions.suggestion.entity.ReviewStatus;
-import lv.tezaurs.suggestions.suggestion.entity.TezaursStatus;
+import lv.tezaurs.suggestions.suggestion.entity.CaseType;
 import lv.tezaurs.suggestions.usage.entity.UsageDecision;
 
 public record ReviewResponse(
@@ -15,7 +15,7 @@ public record ReviewResponse(
         String reviewedTerm,
         ReviewStatus status,
         String lastStatusChangedBy,
-        TezaursStatus tezaursStatus,
+        CaseType type,
         Integer matchedEntryId,
         UsageDecision usageDecision,
         String usageNote,
@@ -29,7 +29,7 @@ public record ReviewResponse(
     public static ReviewResponse from(ReviewCase review, CompletionBlockReason blockReason) {
         return new ReviewResponse(review.getId(), review.getReviewedTerm(), review.getStatus(),
                 review.getLastStatusChangedBy(),
-                review.getTezaursStatus(), review.getMatchedEntryId(),
+                review.getType(), review.getMatchedEntryId(),
                 review.getUsageDecision(), review.getUsageNote(), review.getUsageDecidedBy(), review.getUsageDecidedAt(),
                 blockReason == null, blockReason, review.getCreatedAt(),
                 review.getSources().stream()

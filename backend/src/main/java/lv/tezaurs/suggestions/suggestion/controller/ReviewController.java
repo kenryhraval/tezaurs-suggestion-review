@@ -8,11 +8,12 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lv.tezaurs.suggestions.suggestion.dto.CorrectTermRequest;
 import lv.tezaurs.suggestions.suggestion.dto.DuplicateReviewCandidateResponse;
-import lv.tezaurs.suggestions.suggestion.dto.RecordTezaursCheckRequest;
+import lv.tezaurs.suggestions.suggestion.dto.UpdateCaseTypeRequest;
 import lv.tezaurs.suggestions.suggestion.dto.ReviewPageResponse;
 import lv.tezaurs.suggestions.suggestion.dto.ReviewResponse;
 import lv.tezaurs.suggestions.suggestion.dto.ReviewSort;
 import lv.tezaurs.suggestions.suggestion.dto.UpdateStatusRequest;
+import lv.tezaurs.suggestions.suggestion.dto.LinkDuplicateRequest;
 import lv.tezaurs.suggestions.suggestion.entity.ReviewStatus;
 import lv.tezaurs.suggestions.suggestion.service.ReviewService;
 import lv.tezaurs.suggestions.tezaurs.dto.TezaursEntryCandidateResponse;
@@ -61,6 +62,11 @@ public class ReviewController {
         return service.findDuplicateCandidates(query, excludedCaseId);
     }
 
+    @PostMapping("/{reviewId}/duplicate")
+    ReviewResponse linkDuplicate(@PathVariable UUID reviewId, @Valid @RequestBody LinkDuplicateRequest request) {
+        return service.linkDuplicate(reviewId, request.reviewId());
+    }
+
     @PostMapping("/{reviewId}/term-correction")
     ReviewResponse correctTerm(@PathVariable UUID reviewId,
                                @Valid @RequestBody CorrectTermRequest request) {
@@ -72,11 +78,11 @@ public class ReviewController {
         return service.detachSuggestion(reviewId, sourceId);
     }
 
-    @PostMapping("/{reviewId}/tezaurs-check")
-    ReviewResponse recordTezaursCheck(@PathVariable UUID reviewId,
-                                      @Valid @RequestBody RecordTezaursCheckRequest request,
-                                      @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization) {
-        return service.recordTezaursCheck(reviewId, request, authorization);
+    @PostMapping("/{reviewId}/type")
+    ReviewResponse changeType(@PathVariable UUID reviewId,
+                              @Valid @RequestBody UpdateCaseTypeRequest request,
+                              @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization) {
+        return service.changeType(reviewId, request, authorization);
     }
 
     @GetMapping("/{reviewId}/tezaurs-candidates")

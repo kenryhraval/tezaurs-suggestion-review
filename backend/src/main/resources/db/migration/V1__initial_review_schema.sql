@@ -1,9 +1,9 @@
 CREATE TABLE cases (
     id UUID PRIMARY KEY,
-    reviewed_term VARCHAR(255) NOT NULL,
+    reviewed_term TEXT NOT NULL,
     status VARCHAR(32) NOT NULL,
-    last_status_changed_by VARCHAR(255) NOT NULL CHECK (btrim(last_status_changed_by) <> ''),
-    tezaurs_status VARCHAR(32) NOT NULL,
+    last_status_changed_by VARCHAR(255) CHECK (btrim(last_status_changed_by) <> ''),
+    type VARCHAR(16) NOT NULL,
     matched_entry_id INTEGER,
     usage_decision VARCHAR(32) NOT NULL DEFAULT 'NOT_CHECKED'
         CHECK (usage_decision IN ('NOT_CHECKED', 'USED', 'NOT_CONFIRMED', 'INVENTED')),
@@ -19,15 +19,10 @@ CREATE TABLE cases (
             'INVENTED', 'ALREADY_EXISTS', 'INSUFFICIENT_DATA', 'NEEDS_EXPERT'
         )
     ),
-    CONSTRAINT ck_review_cases_tezaurs_status CHECK (
-        tezaurs_status IN (
-            'NOT_CHECKED', 'FOUND', 'MEANING_ALREADY_EXISTS', 'MEANING_NEEDS_EDITING', 'MEANING_NOT_FOUND', 'NOT_FOUND'
-        )
-    ),
-    CONSTRAINT ck_review_cases_tezaurs_match CHECK (
-        (tezaurs_status IN ('NOT_CHECKED', 'NOT_FOUND') AND matched_entry_id IS NULL)
-        OR (tezaurs_status IN ('FOUND', 'MEANING_ALREADY_EXISTS', 'MEANING_NEEDS_EDITING', 'MEANING_NOT_FOUND')
-            AND matched_entry_id IS NOT NULL)
+    CONSTRAINT ck_review_cases_type CHECK (type IN ('UNKNOWN', 'ENTRY', 'SENSE')),
+    CONSTRAINT ck_review_cases_type_match CHECK (
+        (type IN ('UNKNOWN', 'ENTRY') AND matched_entry_id IS NULL)
+        OR (type = 'SENSE' AND matched_entry_id IS NOT NULL)
     )
 );
 
@@ -85,7 +80,6 @@ CREATE TABLE senses (
     id UUID PRIMARY KEY,
     case_id UUID NOT NULL REFERENCES cases (id) ON DELETE CASCADE,
     target_entry_id INTEGER,
-    source_sense_id INTEGER,
     parent_draft_sense_id UUID REFERENCES senses (id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED,
     parent_tezaurs_sense_id INTEGER,
     gloss TEXT NOT NULL,
@@ -94,17 +88,14 @@ CREATE TABLE senses (
     structural_restrictions JSONB,
     created_at TIMESTAMPTZ NOT NULL,
     updated_at TIMESTAMPTZ NOT NULL,
-    CONSTRAINT ck_review_senses_gloss_not_blank CHECK (source_sense_id IS NOT NULL OR btrim(gloss) <> ''),
+    CONSTRAINT ck_review_senses_gloss_not_blank CHECK (btrim(gloss) <> ''),
     CONSTRAINT ck_review_senses_one_parent CHECK (
         parent_draft_sense_id IS NULL OR parent_tezaurs_sense_id IS NULL
     )
 );
 
 CREATE INDEX ix_review_senses_case
-    ON senses (case_id, order_no);
-
-CREATE UNIQUE INDEX ix_review_senses_source
-    ON senses (case_id, target_entry_id, source_sense_id);
+    ON senses (case_id, target_entry_id, order_no);
 
 CREATE TABLE usage_evidence (
     id UUID PRIMARY KEY,

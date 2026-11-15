@@ -5,23 +5,21 @@ export function getReviewWorkflow(review: Review | null, queueStatus: ReviewStat
   const isInProgress = status === 'IN_PROGRESS'
   const onlyIntakeIsVisible = status === 'NEW' || status === 'READY_FOR_REVIEW' || status === 'GARBAGE'
   const isClosed = status === 'COMPLETED' || status === 'ALREADY_EXISTS'
-  const entryIsMissing = review?.tezaursStatus === 'NOT_FOUND'
+  const entryIsMissing = review?.type === 'ENTRY'
   const usageIsConfirmed = review?.usageDecision === 'USED'
-  const needsSenseDraft = review?.tezaursStatus === 'MEANING_NOT_FOUND'
-    || review?.tezaursStatus === 'MEANING_NEEDS_EDITING'
+  const needsSenseDraft = review?.type === 'SENSE'
 
   const canEditTezaursCheck = isInProgress || status === 'ALREADY_EXISTS'
-  const canEditUsageCheck = isInProgress || status === 'INVENTED' || status === 'INSUFFICIENT_DATA'
   const hasReview = review !== null
   const showReviewSections = hasReview && !onlyIntakeIsVisible
-  const needsTezaursAnswer = review?.tezaursStatus === 'NOT_CHECKED' || review?.tezaursStatus === 'FOUND'
+  const needsTezaursAnswer = review?.type === 'UNKNOWN'
   const canShowNewEntryDraft = entryIsMissing && usageIsConfirmed
   const showDraft = showReviewSections && status !== 'ALREADY_EXISTS'
     && (needsSenseDraft || canShowNewEntryDraft)
 
   let sectionResetKey = `source:${status}`
   if (review) {
-    sectionResetKey = [review.id, status, review.tezaursStatus, review.matchedEntryId,
+    sectionResetKey = [review.id, status, review.type, review.matchedEntryId,
       review.usageDecision].join(':')
   }
 
@@ -40,7 +38,7 @@ export function getReviewWorkflow(review: Review | null, queueStatus: ReviewStat
     usage: {
       visible: showReviewSections && entryIsMissing,
       defaultOpen: isInProgress && entryIsMissing && !usageIsConfirmed,
-      readOnly: !canEditUsageCheck,
+      readOnly: !isInProgress,
     },
     draft: {
       visible: showDraft,
@@ -50,7 +48,7 @@ export function getReviewWorkflow(review: Review | null, queueStatus: ReviewStat
       complete: review?.canComplete === true || status === 'NEEDS_EXPERT' || status === 'COMPLETED',
     },
     completion: {
-      visible: status !== 'NEEDS_EXPERT' && (showDraft || status === 'ALREADY_EXISTS'),
+      visible: status !== 'NEEDS_EXPERT' && showDraft,
     },
   }
 }

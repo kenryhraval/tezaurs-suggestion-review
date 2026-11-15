@@ -9,41 +9,21 @@ export type ReviewStatus =
   | 'INSUFFICIENT_DATA'
   | 'NEEDS_EXPERT'
 
-export type SuggestionSort = 'NEWEST' | 'OLDEST' | 'MOST_SUGGESTIONS'
+export type ReviewSort = 'NEWEST' | 'OLDEST' | 'MOST_SUGGESTIONS'
 
-export type TezaursStatus =
-  | 'NOT_CHECKED'
-  | 'FOUND'
-  | 'MEANING_ALREADY_EXISTS'
-  | 'MEANING_NEEDS_EDITING'
-  | 'MEANING_NOT_FOUND'
-  | 'NOT_FOUND'
+export type CaseType = 'UNKNOWN' | 'ENTRY' | 'SENSE'
+
+export type SaveCaseType = {
+  type: CaseType
+  matchedEntryId: number | null
+  meaningAlreadyExists?: boolean
+}
 
 export type CompletionBlockReason =
   | 'TEZAURS_CHECK_REQUIRED'
-  | 'MEANING_CHECK_REQUIRED'
   | 'USAGE_CHECK_REQUIRED'
   | 'ENTRY_DRAFT_REQUIRED'
   | 'SENSE_DRAFT_REQUIRED'
-
-export type Suggestion = {
-  id: number
-  submittedTerm: string
-  submittedDefinition: string
-  usageExample: string | null
-  source: string | null
-  flagInfo: string | null
-  notes: string | null
-  contact: string | null
-  createdAt: string
-}
-
-export type SuggestionPage = {
-  items: Suggestion[]
-  page: number
-  totalPages: number
-  totalItems: number
-}
 
 export type ReviewListItem = {
   id: string
@@ -53,16 +33,8 @@ export type ReviewListItem = {
   sourceCount: number
 }
 
-export type QueueItem =
-  | (Suggestion & {
-      itemType: 'SUGGESTION'
-      status: 'NEW'
-      sourceCount: 1
-    })
-  | (ReviewListItem & { itemType: 'REVIEW' })
-
-export type QueuePage = {
-  items: QueueItem[]
+export type ReviewPageResponse = {
+  items: ReviewListItem[]
   page: number
   totalPages: number
   totalItems: number
@@ -72,8 +44,8 @@ export type Review = {
   id: string
   reviewedTerm: string
   status: ReviewStatus
-  lastStatusChangedBy: string
-  tezaursStatus: TezaursStatus
+  lastStatusChangedBy: string | null
+  type: CaseType
   matchedEntryId: number | null
   usageDecision: UsageDecision
   usageNote: string | null
@@ -175,7 +147,6 @@ export type SaveEntryDraft = {
 
 export type SenseDraft = {
   id: string
-  sourceSenseId: number | null
   gloss: string
   parentDraftSenseId: string | null
   parentTezaursSenseId: number | null
@@ -186,7 +157,6 @@ export type SenseDraft = {
 
 export type SaveSenseDraft = {
   id?: string
-  sourceSenseId?: number | null
   gloss: string
   parentDraftSenseId: string | null
   parentTezaursSenseId: number | null
@@ -232,28 +202,6 @@ export type TezaursFormOptions = {
   flags: TezaursFlagDefinition[]
   restrictionTypes: TezaursOption[]
   restrictionFrequencies: RestrictionFrequency[]
-}
-
-export type TezaursEntryDetails = {
-  id: number
-  heading: string
-  humanKey: string
-  typeId: number
-  type: string | null
-  hidden: boolean
-  notes: string | null
-  data: Record<string, unknown> | null
-  lexemes: TezaursLexemeDetails[]
-  senses: TezaursSenseDetails[]
-  examples: TezaursExample[]
-  sources: TezaursSource[]
-}
-
-export type TezaursExample = {
-  id: number
-  content: string
-  hidden: boolean
-  data: Record<string, unknown> | null
 }
 
 export type UsageDecision = 'NOT_CHECKED' | 'USED' | 'NOT_CONFIRMED' | 'INVENTED'
@@ -303,42 +251,4 @@ export type CorpusSearchResult = {
 export type CorpusOption = {
   id: string
   label: string
-}
-
-export type TezaursLexemeDetails = {
-  id: number
-  lemma: string
-  roleId: number
-  role: string | null
-  paradigmId: number | null
-  paradigmLegacyNo: number | null
-  paradigmCode: string | null
-  paradigm: string | null
-  paradigmData: Record<string, unknown> | null
-  stem1: string | null
-  stem2: string | null
-  stem3: string | null
-  hidden: boolean
-  data: Record<string, unknown> | null
-  extras: Record<string, unknown> | null
-}
-
-export type TezaursSenseDetails = {
-  id: number
-  parentSenseId: number | null
-  orderNo: number | null
-  senseTag: string | null
-  gloss: string | null
-  hidden: boolean
-  data: Record<string, unknown> | null
-  examples: TezaursExample[]
-}
-
-export type TezaursSource = {
-  id: number
-  senseId: number | null
-  lexemeId: number | null
-  abbreviation: string | null
-  title: string | null
-  url: string | null
 }

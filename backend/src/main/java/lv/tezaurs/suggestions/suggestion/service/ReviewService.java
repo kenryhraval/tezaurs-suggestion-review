@@ -1,7 +1,6 @@
 package lv.tezaurs.suggestions.suggestion.service;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lv.tezaurs.suggestions.auth.service.CurrentUserService;
@@ -9,17 +8,16 @@ import lv.tezaurs.suggestions.common.error.ConflictException;
 import lv.tezaurs.suggestions.common.error.NotFoundException;
 import lv.tezaurs.suggestions.suggestion.dto.CorrectTermRequest;
 import lv.tezaurs.suggestions.suggestion.dto.DuplicateReviewCandidateResponse;
-import lv.tezaurs.suggestions.suggestion.dto.RecordTezaursCheckRequest;
+import lv.tezaurs.suggestions.suggestion.dto.UpdateCaseTypeRequest;
 import lv.tezaurs.suggestions.suggestion.dto.ReviewListItemResponse;
 import lv.tezaurs.suggestions.suggestion.dto.ReviewPageResponse;
 import lv.tezaurs.suggestions.suggestion.dto.ReviewResponse;
 import lv.tezaurs.suggestions.suggestion.dto.ReviewSort;
 import lv.tezaurs.suggestions.suggestion.dto.UpdateStatusRequest;
-import lv.tezaurs.suggestions.suggestion.entity.IncubatorSuggestion;
 import lv.tezaurs.suggestions.suggestion.entity.ReviewCase;
 import lv.tezaurs.suggestions.suggestion.entity.CaseSuggestion;
 import lv.tezaurs.suggestions.suggestion.entity.ReviewStatus;
-import lv.tezaurs.suggestions.suggestion.entity.TezaursStatus;
+import lv.tezaurs.suggestions.suggestion.entity.CaseType;
 import lv.tezaurs.suggestions.suggestion.repository.ReviewCaseRepository;
 import lv.tezaurs.suggestions.suggestion.repository.CaseSuggestionRepository;
 import lv.tezaurs.suggestions.tezaurs.dto.TezaursEntryCandidateResponse;
@@ -62,21 +60,6 @@ public class ReviewService {
     }
 
     @Transactional
-    public ReviewCase startReview(IncubatorSuggestion source, ReviewStatus status, String authorization) {
-        String username = currentUserService.requireUsername(authorization);
-        if (reviewSourceRepository.existsById(source.getId())) {
-            throw new ConflictException("The source suggestion already belongs to a review");
-        }
-        ReviewCase review = create(source, username);
-        if (status == ReviewStatus.IN_PROGRESS) {
-            review.takeForReview(username);
-        } else {
-            review.changeStatus(status, username);
-        }
-        return review;
-    }
-
-    @Transactional
     public ReviewResponse changeStatus(UUID reviewId, UpdateStatusRequest request, String authorization) {
         String username = currentUserService.requireUsername(authorization);
         ReviewCase review = reviewRepository.findLockedById(reviewId)
@@ -98,7 +81,7 @@ public class ReviewService {
             return List.of();
         }
         return reviewRepository.findDuplicateCandidates(
-                        excludedCaseId, ReviewStatus.GARBAGE, query.trim(),
+                        excludedCaseId, List.of(ReviewStatus.NEW, ReviewStatus.GARBAGE), query.trim(),
                         PageRequest.of(0, 5, Sort.by("reviewedTerm")))
                 .stream()
                 .map(review -> DuplicateReviewCandidateResponse.from(
@@ -107,23 +90,18 @@ public class ReviewService {
     }
 
     @Transactional
-    public ReviewResponse linkDuplicate(IncubatorSuggestion source, UUID targetCaseId) {
-        ReviewCase target = requireReview(targetCaseId);
-        Optional<CaseSuggestion> existingLink = reviewSourceRepository.findById(source.getId());
-        if (existingLink.isPresent()) {
-            ReviewCase sourceCase = existingLink.get().getReviewCase();
-            if (sourceCase.getId().equals(targetCaseId)) {
-                throw new ConflictException("A case cannot be merged into itself");
-            }
-            for (CaseSuggestion link : List.copyOf(sourceCase.getSources())) {
-                link.reassignTo(target);
-            }
-            // Persist the moved links before deleting the case with ON DELETE CASCADE.
-            reviewSourceRepository.flush();
-            reviewRepository.delete(sourceCase);
-        } else {
-            reviewSourceRepository.save(new CaseSuggestion(source, target));
+    public ReviewResponse linkDuplicate(UUID sourceCaseId, UUID targetCaseId) {
+        if (sourceCaseId.equals(targetCaseId)) {
+            throw new ConflictException("A case cannot be merged into itself");
         }
+        ReviewCase sourceCase = requireReview(sourceCaseId);
+        ReviewCase target = requireReview(targetCaseId);
+        for (CaseSuggestion link : List.copyOf(sourceCase.getSources())) {
+            link.reassignTo(target);
+        }
+        // Persist the moved links before deleting the case with ON DELETE CASCADE.
+        reviewSourceRepository.flush();
+        reviewRepository.delete(sourceCase);
         return completionService.response(target);
     }
 
@@ -138,8 +116,9 @@ public class ReviewService {
         if (review.getSources().size() <= 1) {
             throw new ConflictException("The last suggestion cannot be detached from a case");
         }
-        review.getSources().remove(link);
-        reviewSourceRepository.delete(link);
+        ReviewCase newCase = reviewRepository.save(
+                ReviewCase.fromSuggestion(link.getSourceSuggestion().getLemma(), ReviewStatus.NEW));
+        link.reassignTo(newCase);
         return completionService.response(review);
     }
 
@@ -151,15 +130,17 @@ public class ReviewService {
     }
 
     @Transactional
-    public ReviewResponse recordTezaursCheck(UUID reviewId, RecordTezaursCheckRequest request, String authorization) {
+    public ReviewResponse changeType(UUID reviewId, UpdateCaseTypeRequest request, String authorization) {
         String username = currentUserService.requireUsername(authorization);
-        ReviewCase review = requireReview(reviewId);
-        if (request.status().entryExists()
+        ReviewCase review = reviewRepository.findLockedById(reviewId)
+                .orElseThrow(() -> new NotFoundException("Review " + reviewId + " was not found"));
+        if (request.type() == CaseType.SENSE
                 && (request.matchedEntryId() == null
                 || !tezaursEntryRepository.existsById(request.matchedEntryId()))) {
             throw new ConflictException("The selected Tēzaurs entry does not exist");
         }
-        review.recordTezaursCheck(request.status(), request.matchedEntryId(), username);
+        review.changeType(request.type(), request.matchedEntryId(),
+                Boolean.TRUE.equals(request.meaningAlreadyExists()), username);
         return completionService.response(review);
     }
 
@@ -176,11 +157,4 @@ public class ReviewService {
                 .orElseThrow(() -> new NotFoundException("Review " + id + " was not found"));
     }
 
-    private ReviewCase create(IncubatorSuggestion source, String username) {
-        ReviewCase review = reviewRepository.save(
-                new ReviewCase(source.getLemma(), username));
-        reviewSourceRepository.save(
-                new CaseSuggestion(source, review));
-        return review;
-    }
 }

@@ -29,19 +29,19 @@ public class ReviewCase {
     @Id
     private UUID id;
 
-    @Column(name = "reviewed_term", nullable = false)
+    @Column(name = "reviewed_term", nullable = false, columnDefinition = "text")
     private String reviewedTerm;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 32)
     private ReviewStatus status;
 
-    @Column(name = "last_status_changed_by", nullable = false)
+    @Column(name = "last_status_changed_by")
     private String lastStatusChangedBy;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "tezaurs_status", nullable = false, length = 32)
-    private TezaursStatus tezaursStatus;
+    @Column(nullable = false, length = 16)
+    private CaseType type;
 
     @Column(name = "matched_entry_id")
     private Integer matchedEntryId;
@@ -75,11 +75,19 @@ public class ReviewCase {
     private List<CaseSuggestion> sources = new ArrayList<>();
 
     public ReviewCase(String submittedTerm, String username) {
+        this(submittedTerm, ReviewStatus.NEW);
         this.lastStatusChangedBy = requireStatusAuthor(username);
+    }
+
+    private ReviewCase(String submittedTerm, ReviewStatus initialStatus) {
         this.id = UUID.randomUUID();
         this.reviewedTerm = submittedTerm;
-        this.status = ReviewStatus.NEW;
-        this.tezaursStatus = TezaursStatus.NOT_CHECKED;
+        this.status = initialStatus;
+        this.type = CaseType.UNKNOWN;
+    }
+
+    public static ReviewCase fromSuggestion(String submittedTerm, ReviewStatus initialStatus) {
+        return new ReviewCase(submittedTerm, initialStatus);
     }
 
     void addSource(CaseSuggestion source) {
@@ -89,10 +97,9 @@ public class ReviewCase {
     public void changeStatus(ReviewStatus newStatus, String username) {
         status.requireTransitionTo(newStatus);
         if (newStatus == ReviewStatus.ALREADY_EXISTS) {
-            if (matchedEntryId == null) {
+            if (type != CaseType.SENSE || matchedEntryId == null) {
                 throw new ConflictException("Select the matching Tēzaurs entry");
             }
-            tezaursStatus = TezaursStatus.MEANING_ALREADY_EXISTS;
         }
         updateStatus(newStatus, username);
     }
@@ -100,6 +107,8 @@ public class ReviewCase {
     public void takeForReview(String username) {
         if (status != ReviewStatus.IN_PROGRESS) {
             changeStatus(ReviewStatus.IN_PROGRESS, username);
+        } else if (lastStatusChangedBy == null) {
+            lastStatusChangedBy = requireStatusAuthor(username);
         }
     }
 
@@ -111,10 +120,8 @@ public class ReviewCase {
     }
 
     public void recordUsageDecision(UsageDecision decision, String note, String username) {
-        if (tezaursStatus != TezaursStatus.NOT_FOUND
-                || (status != ReviewStatus.IN_PROGRESS && status != ReviewStatus.INSUFFICIENT_DATA
-                    && status != ReviewStatus.INVENTED)) {
-            throw new ConflictException("Usage decisions require a new-entry case in progress or awaiting evidence");
+        if (type != CaseType.ENTRY || status != ReviewStatus.IN_PROGRESS) {
+            throw new ConflictException("Usage decisions require a new-entry case in progress");
         }
         if (decision == UsageDecision.NOT_CHECKED) {
             throw new ConflictException("Choose whether usage has been confirmed");
@@ -123,36 +130,41 @@ public class ReviewCase {
         usageNote = note == null || note.isBlank() ? null : note.trim();
         usageDecidedBy = username;
         usageDecidedAt = Instant.now();
-        if (decision == UsageDecision.USED) {
-            updateStatus(ReviewStatus.IN_PROGRESS, username);
-        } else if (decision == UsageDecision.NOT_CONFIRMED) {
+        if (decision == UsageDecision.NOT_CONFIRMED) {
             updateStatus(ReviewStatus.INSUFFICIENT_DATA, username);
-        } else {
+        } else if (decision == UsageDecision.INVENTED) {
             updateStatus(ReviewStatus.INVENTED, username);
         }
     }
 
-    public void recordTezaursCheck(TezaursStatus newTezaursStatus, Integer selectedEntryId, String username) {
+    public void changeType(CaseType selectedType, Integer selectedEntryId,
+            boolean meaningAlreadyExists, String username) {
+        requireStatusAuthor(username);
         if (status != ReviewStatus.IN_PROGRESS && status != ReviewStatus.ALREADY_EXISTS) {
-            throw new ConflictException("Resume the case in Apstrādē before changing the Tēzaurs check");
+            throw new ConflictException("Resume the case in Apstrādē before changing its type");
         }
-        if (newTezaursStatus.entryExists() && selectedEntryId == null) {
+        if (selectedType == null) {
+            throw new ConflictException("Choose the case type");
+        }
+        if (selectedType == CaseType.SENSE && selectedEntryId == null) {
             throw new ConflictException("Select the matching Tēzaurs entry");
         }
-        if (!newTezaursStatus.entryExists() && selectedEntryId != null) {
-            throw new ConflictException("An entry ID is only allowed when a Tēzaurs entry was found");
+        if (selectedType != CaseType.SENSE && selectedEntryId != null) {
+            throw new ConflictException("Only a sense case can reference an existing Tēzaurs entry");
         }
-        boolean shouldReopenCase = this.status == ReviewStatus.ALREADY_EXISTS
-                && newTezaursStatus != TezaursStatus.MEANING_ALREADY_EXISTS;
-        if (shouldReopenCase) {
+        if (meaningAlreadyExists && selectedType != CaseType.SENSE) {
+            throw new ConflictException("An existing meaning requires a matching Tēzaurs entry");
+        }
+
+        type = selectedType;
+        matchedEntryId = selectedEntryId;
+        if (meaningAlreadyExists) {
+            if (status != ReviewStatus.ALREADY_EXISTS) {
+                changeStatus(ReviewStatus.ALREADY_EXISTS, username);
+            }
+        } else if (status == ReviewStatus.ALREADY_EXISTS) {
             updateStatus(ReviewStatus.IN_PROGRESS, username);
             resetUsageDecision();
-        }
-        this.tezaursStatus = newTezaursStatus;
-        this.matchedEntryId = selectedEntryId;
-        if (newTezaursStatus == TezaursStatus.MEANING_ALREADY_EXISTS
-                && status != ReviewStatus.ALREADY_EXISTS) {
-            changeStatus(ReviewStatus.ALREADY_EXISTS, username);
         }
     }
 
@@ -179,7 +191,7 @@ public class ReviewCase {
     }
 
     public boolean canEditEntryDraft() {
-        return status == ReviewStatus.IN_PROGRESS && tezaursStatus == TezaursStatus.NOT_FOUND
+        return status == ReviewStatus.IN_PROGRESS && type == CaseType.ENTRY
                 && usageDecision == UsageDecision.USED;
     }
 }

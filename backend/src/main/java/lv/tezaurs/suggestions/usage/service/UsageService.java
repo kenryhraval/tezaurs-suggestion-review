@@ -11,7 +11,7 @@ import lv.tezaurs.suggestions.entry.service.EntryDraftService;
 import lv.tezaurs.suggestions.suggestion.dto.ReviewResponse;
 import lv.tezaurs.suggestions.suggestion.entity.ReviewCase;
 import lv.tezaurs.suggestions.suggestion.entity.ReviewStatus;
-import lv.tezaurs.suggestions.suggestion.entity.TezaursStatus;
+import lv.tezaurs.suggestions.suggestion.entity.CaseType;
 import lv.tezaurs.suggestions.suggestion.repository.ReviewCaseRepository;
 import lv.tezaurs.suggestions.suggestion.service.ReviewCompletionService;
 import lv.tezaurs.suggestions.usage.dto.Corpus;
@@ -51,7 +51,7 @@ public class UsageService {
     @Transactional
     public ReviewResponse decide(UUID caseId, UsageDecisionRequest request, String authorization) {
         String username = currentUserService.requireUsername(authorization);
-        ReviewCase review = requireUsageCase(caseId);
+        ReviewCase review = requireEditableEntryCase(caseId);
         review.recordUsageDecision(request.decision(), request.note(), username);
         if (request.decision() == UsageDecision.USED) {
             entryDraftService.create(caseId);
@@ -61,7 +61,7 @@ public class UsageService {
 
     @Transactional
     public EvidenceResponse addEvidence(UUID caseId, SaveEvidenceRequest request, String authorization) {
-        requireEditableCase(caseId);
+        requireEditableEntryCase(caseId);
         if (request.source() == EvidenceSource.CORPUS && (request.corpus() == null || request.tokenNumber() == null)) {
             throw new ConflictException("Corpus evidence requires a corpus and token number");
         }
@@ -83,31 +83,30 @@ public class UsageService {
 
     @Transactional
     public void deleteEvidence(UUID caseId, UUID evidenceId) {
-        requireEditableCase(caseId);
+        requireEditableEntryCase(caseId);
         UsageEvidence evidence = evidenceRepository.findByIdAndCaseId(evidenceId, caseId)
                 .orElseThrow(() -> new NotFoundException("Evidence was not found in this case"));
         evidenceRepository.delete(evidence);
     }
 
-    private ReviewCase requireUsageCase(UUID caseId) {
+    private void requireUsageCase(UUID caseId) {
         ReviewCase review = caseRepository.findById(caseId)
                 .orElseThrow(() -> new NotFoundException("Review " + caseId + " was not found"));
-        if (review.getTezaursStatus() != TezaursStatus.NOT_FOUND) {
+        if (review.getType() != CaseType.ENTRY) {
             throw new ConflictException("Usage research is currently available only for new entries");
         }
-        return review;
     }
 
-    private void requireEditableCase(UUID caseId) {
+    private ReviewCase requireEditableEntryCase(UUID caseId) {
         ReviewCase review = caseRepository.findLockedById(caseId)
                 .orElseThrow(() -> new NotFoundException("Review " + caseId + " was not found"));
-        if (review.getTezaursStatus() != TezaursStatus.NOT_FOUND) {
+        if (review.getType() != CaseType.ENTRY) {
             throw new ConflictException("Usage research is currently available only for new entries");
         }
-        if (review.getStatus() != ReviewStatus.IN_PROGRESS && review.getStatus() != ReviewStatus.INSUFFICIENT_DATA
-                && review.getStatus() != ReviewStatus.INVENTED) {
-            throw new ConflictException("Usage evidence can only be changed in progress or while awaiting evidence");
+        if (review.getStatus() != ReviewStatus.IN_PROGRESS) {
+            throw new ConflictException("Atsāciet izskatīšanu statusā “Apstrādē”, lai mainītu lietojuma pārbaudi.");
         }
+        return review;
     }
 
     private static void validateUrl(String url) {

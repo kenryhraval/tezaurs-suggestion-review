@@ -11,9 +11,9 @@ type Props = {
   expanded: boolean
   onExpandedChange: (expanded: boolean) => void
   readOnly: boolean
-  onStatusChange: (status: ReviewStatus) => Promise<Review | null>
+  onStatusChange: (status: ReviewStatus) => Promise<Review>
   review: Review | null
-  onDuplicate: (sourceId: number, caseId: string) => Promise<void>
+  onDuplicate: (sourceCaseId: string, targetCaseId: string) => Promise<void>
 }
 
 export function ReviewIntake({ status, onStatusChange, review, onDuplicate,
@@ -49,11 +49,7 @@ export function ReviewIntake({ status, onStatusChange, review, onDuplicate,
     }
     setSaving(true)
     try {
-      const updatedReview = await onStatusChange(nextStatus)
-      if (!updatedReview) {
-        setError('Neizdevās mainīt statusu. Mēģiniet vēlreiz.')
-        return
-      }
+      await onStatusChange(nextStatus)
       setConfirmingTrash(false)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Neizdevās mainīt statusu.')
@@ -87,7 +83,7 @@ export function ReviewIntake({ status, onStatusChange, review, onDuplicate,
               <p><strong>Vai ieteikums attiecas uz esošu perēkli, vai jāsāk jauns?</strong></p>
               <DuplicateCaseCombobox
                 currentCase={review}
-                onSelect={(targetId) => onDuplicate(review.sources[0].id, targetId)}
+                onSelect={(targetId) => onDuplicate(review.id, targetId)}
               />
             </div>
           )}

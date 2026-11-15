@@ -20,8 +20,8 @@ import type {
 import { FlagEditor } from './FlagEditor'
 import { RestrictionEditor } from './RestrictionEditor'
 import { EditDialog } from '../shared/EditDialog'
-import { EntryDisplay } from '../tezaurs/EntryDisplay'
-import { buildDraftEntryView } from '../../draft/entryView'
+import { EntryHeading } from '../tezaurs/EntryHeading'
+import { EntryActions, LexemeActions } from '../tezaurs/TezaursActions'
 import { ConfirmationDialog } from '../shared/ConfirmationDialog'
 
 type Props = {
@@ -136,6 +136,7 @@ export function EntryDraftForm({ reviewId, onReviewUpdated, children, editable, 
   }
 
   async function saveLexeme(index: number) {
+    if (!editable) return
     const lexeme = lexemes[index]
     setSavingLexemeIndex(index)
     setError('')
@@ -167,6 +168,7 @@ export function EntryDraftForm({ reviewId, onReviewUpdated, children, editable, 
   }
 
   async function selectPrimary(lexemeId: string) {
+    if (!editable) return
     const index = lexemes.findIndex((lexeme) => lexeme.id === lexemeId)
     if (index < 0 || lexemes[index].primary) {
       return
@@ -207,6 +209,7 @@ export function EntryDraftForm({ reviewId, onReviewUpdated, children, editable, 
   }
 
   async function removeLexeme(index: number) {
+    if (!editable) return false
     const lexeme = lexemes[index]
     if (!lexeme.id) {
       return false
@@ -257,6 +260,7 @@ export function EntryDraftForm({ reviewId, onReviewUpdated, children, editable, 
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (!editable) return
     const formData = new FormData(event.currentTarget)
     function optionalFormValue(name: string) {
       const formValue = String(formData.get(name) ?? '').trim()
@@ -298,6 +302,7 @@ export function EntryDraftForm({ reviewId, onReviewUpdated, children, editable, 
   }
 
   function addLexeme() {
+    if (!editable) return
     if (!options) {
       return
     }
@@ -353,26 +358,35 @@ export function EntryDraftForm({ reviewId, onReviewUpdated, children, editable, 
 
   return renderSection(
     <>
-      <EntryDisplay entry={buildDraftEntryView(draft, options)}
-        onEditEntry={editable ? openEntryEditor : undefined}
-        onEditLexeme={editable ? openLexemeEditor : undefined}
-        onAddLexeme={editable ? addLexeme : undefined}
-        onAddSense={onAddSense}
-        onDeleteLexeme={editable ? requestLexemeDeletion : undefined}
-        canDeleteLexeme={(index) => draft.lexemes.length > 1 && !draft.lexemes[index].primary}
-        lexemeControls={editable && savedLexemes.length > 1 && (
-          <label>Galvenā leksēma
-            <select className="custom-select custom-select-sm" value={primaryLexemeId} disabled={savingLexemeIndex !== null}
-              onChange={(event) => selectPrimary(event.target.value)}>
-              {savedLexemes.map((lexeme) => <option key={lexeme.id} value={lexeme.id ?? ''}>{lexeme.lemma}</option>)}
-            </select>
-          </label>
-        )}>
-        {children}
-      </EntryDisplay>
+      <div className="draft-heading">
+        <EntryActions onEdit={openEntryEditor}
+          onAddLexeme={editable ? addLexeme : undefined} readOnly={!editable} onAddSense={onAddSense} />
+        <EntryHeading heading={draft.heading} humanKey={draft.humanKey} />
+      </div>
+      {savedLexemes.length > 1 && (
+        <label>Galvenā leksēma
+          <select className="custom-select custom-select-sm" value={primaryLexemeId}
+            disabled={!editable || savingLexemeIndex !== null}
+            onChange={(event) => selectPrimary(event.target.value)}>
+            {savedLexemes.map((lexeme) => <option key={lexeme.id} value={lexeme.id ?? ''}>{lexeme.lemma}</option>)}
+          </select>
+        </label>
+      )}
+      {savedLexemes.map((lexeme) => {
+        const index = lexemes.indexOf(lexeme)
+        return (
+          <div className="draft-lexeme" key={lexeme.id}>
+            <LexemeActions onEdit={() => openLexemeEditor(index)}
+              readOnly={!editable} onDelete={editable && savedLexemes.length > 1 && !lexeme.primary
+                ? () => requestLexemeDeletion(index) : undefined} />
+            <strong>{lexeme.lemma}</strong>
+          </div>
+        )
+      })}
+      {children}
 
       {editingEntry && (
-        <EditDialog title="Labot šķirkli" busy={saving} error={error}
+        <EditDialog title={editable ? "Labot šķirkli" : "Šķirkļa dati"} busy={saving} error={error} readOnly={!editable}
           onSubmit={submit} onCancel={cancelEntryEdit}>
           <fieldset>
             <legend>Šķirklis</legend>
@@ -399,7 +413,6 @@ export function EntryDraftForm({ reviewId, onReviewUpdated, children, editable, 
             <label>Avots<input className="form-control form-control-sm" defaultValue={draft?.source ?? ''} name="source" /></label>
             <label>Iekšējās piezīmes<textarea className="form-control form-control-sm" defaultValue={draft?.notes ?? ''} name="notes" rows={3} /></label>
           </fieldset>
-
         </EditDialog>
       )}
       {lexemes.map((lexeme, index) => {
@@ -409,7 +422,7 @@ export function EntryDraftForm({ reviewId, onReviewUpdated, children, editable, 
         return (
           <Fragment key={lexeme.id ?? index}>
             {editingLexemeIndex === index && (
-              <EditDialog title={lexeme.id ? 'Labot leksēmu' : 'Pievienot leksēmu'}
+              <EditDialog title={editable ? (lexeme.id ? 'Labot leksēmu' : 'Pievienot leksēmu') : 'Leksēmas dati'} readOnly={!editable}
                 busy={savingLexemeIndex !== null} error={error}
                 onCancel={() => cancelLexemeEdit(index)} onSubmit={() => {
                   saveLexeme(index)

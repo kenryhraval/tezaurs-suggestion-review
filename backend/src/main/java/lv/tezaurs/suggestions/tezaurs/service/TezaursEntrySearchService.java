@@ -4,12 +4,10 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lv.tezaurs.suggestions.tezaurs.dto.TezaursEntryCandidateResponse;
 import lv.tezaurs.suggestions.tezaurs.dto.TezaursSenseResponse;
-import lv.tezaurs.suggestions.tezaurs.entity.TezaursSense;
+import lv.tezaurs.suggestions.tezaurs.entity.TezaursEntry;
 import lv.tezaurs.suggestions.tezaurs.repository.TezaursEntryRepository;
 import lv.tezaurs.suggestions.tezaurs.repository.TezaursSenseRepository;
 import org.springframework.data.domain.PageRequest;
@@ -48,18 +46,14 @@ public class TezaursEntrySearchService {
         }
         if (entries.isEmpty()) return List.of();
 
-        Map<Integer, List<TezaursSense>> sensesByEntry = senseRepository
-                .findOrderedByEntryIdIn(entries.stream().map(entry -> entry.getId()).toList()).stream()
-                .collect(Collectors.groupingBy(TezaursSense::getEntryId));
-
+        var senses = senseRepository.findOrderedByEntryIdIn(
+                entries.stream().map(TezaursEntry::getId).toList());
         return entries.stream().map(entry -> new TezaursEntryCandidateResponse(
                 entry.getId(), entry.getHeading(), entry.getHumanKey(),
-                sensesByEntry.getOrDefault(entry.getId(), List.of()).stream()
-                        .map(sense -> new TezaursSenseResponse(
-                                sense.getId(), sense.getParentSenseId(),
-                                sense.getGloss(), sense.getOrderNo()))
-                        .toList()))
-                .toList();
+                senses.stream()
+                        .filter(sense -> entry.getId().equals(sense.getEntryId()))
+                        .map(TezaursSenseResponse::from)
+                        .toList())).toList();
     }
 
     private static String normalize(String value) {

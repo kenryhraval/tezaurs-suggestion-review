@@ -2,10 +2,13 @@
 
 This is a small React and TypeScript interface for the suggestion review backend.
 It uses Bootstrap 4.6.2 CSS, matching the Tēzaurs editor; `src/App.css` contains
-the review layout and dictionary display rules. Interactions are handled by React.
+the review layout and draft form styles. Interactions are handled by React.
 
 Components are grouped under `src/components`: `review`, `tezaurs`, `draft`,
 `usage`, `layout`, and `shared` (dialogs and common controls).
+Draft fields are edited in popup forms; the overview shows only headings, lexemes
+and definitions. Existing Tēzaurs entries are shown as a name and link; only newly added senses
+are displayed and edited here when working with an existing entry.
 
 ## Run locally
 
@@ -28,9 +31,9 @@ handled by the reverse proxy, as described in the root README.
 
 ## Source structure
 
-- `src/types.ts` describes data received from the backend.
-- `src/api.ts` contains `fetch` calls to backend endpoints.
-- `src/labels.ts` maps backend enum values to Latvian labels.
+- `src/api/types.ts` describes data received from the backend.
+- `src/api/client.ts` contains `fetch` calls to backend endpoints.
+- `src/review/statuses.ts` maps backend enum values to Latvian labels.
 - `src/pages/` contains complete pages.
 - `src/components/` contains smaller parts used by a page.
 - `src/App.tsx` selects the page for the current URL.
@@ -39,7 +42,7 @@ handled by the reverse proxy, as described in the root README.
 The usual data flow is:
 
 1. A page or component handles a user event.
-2. It calls a function from `api.ts`.
+2. It calls a function from `api/client.ts`.
 3. The backend returns updated data.
 4. React state is updated and React redraws the affected UI.
 

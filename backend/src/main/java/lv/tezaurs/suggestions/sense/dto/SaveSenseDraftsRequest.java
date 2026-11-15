@@ -11,7 +11,6 @@ import java.util.UUID;
 public record SaveSenseDraftsRequest(@NotEmpty List<@Valid SenseDraftRequest> senses) {
     public record SenseDraftRequest(
             UUID id,
-            Integer sourceSenseId,
             @NotNull @Size(max = 10000) String gloss,
             UUID parentDraftSenseId,
             Integer parentTezaursSenseId,

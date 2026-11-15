@@ -30,9 +30,6 @@ public class ReviewSense {
     @Column(name = "target_entry_id", updatable = false)
     private Integer targetEntryId;
 
-    @Column(name = "source_sense_id", updatable = false)
-    private Integer sourceSenseId;
-
     @Column(name = "parent_draft_sense_id")
     private UUID parentDraftSenseId;
 
@@ -81,9 +78,5 @@ public class ReviewSense {
         this.flags = new HashMap<>(flags);
         this.structuralRestrictions = structuralRestrictions == null
                 ? null : new HashMap<>(structuralRestrictions);
-    }
-
-    public void recordSource(Integer senseId) {
-        sourceSenseId = senseId;
     }
 }

@@ -2,11 +2,28 @@ Feature: Editing drafts
 
   Scenario: Create and edit a new entry, lexeme and sense before completing the case
     Given a case combines suggestions "1"
-    When I POST "/api/reviews/{caseId}/tezaurs-check" with:
+    When I POST "/api/reviews/{caseId}/type" with:
       """
-      {"status":"NOT_FOUND"}
+      {"type":"ENTRY"}
       """
     Then the response status is 200
+    When I POST "/api/reviews/{caseId}/usage/decision" with:
+      """
+      {"decision":"NOT_CONFIRMED"}
+      """
+    Then the response status is 200
+    And the response field "/status" equals "INSUFFICIENT_DATA"
+    When I POST "/api/reviews/{caseId}/usage/decision" with:
+      """
+      {"decision":"USED"}
+      """
+    Then the response status is 409
+    When I POST "/api/reviews/{caseId}/status" with:
+      """
+      {"status":"IN_PROGRESS"}
+      """
+    Then the response status is 200
+    And the response field "/usageDecision" equals "NOT_CONFIRMED"
     When I POST "/api/reviews/{caseId}/usage/decision" with:
       """
       {"decision":"USED","note":"Valodniekam zināms vārds."}
@@ -34,7 +51,6 @@ Feature: Editing drafts
       {"senses":[{"gloss":"Jauna definīcija.","flags":{}}]}
       """
     Then the response status is 200
-    And the response field "/senses/0/sourceSenseId" is null
     When I POST "/api/reviews/{caseId}/status" with:
       """
       {"status":"COMPLETED"}
@@ -44,9 +60,15 @@ Feature: Editing drafts
 
   Scenario: An existing entry needs a new sense before the case can be completed
     Given a case combines suggestions "3"
-    When I POST "/api/reviews/{caseId}/tezaurs-check" with:
+    When I request "/api/reviews/{caseId}/tezaurs-candidates?query=lemt"
+    Then the response status is 200
+    And the response field "/0/id" is 100
+    And the response field "/0/senses" contains 2 items
+    And the response field "/0/senses/0/id" is 300
+    And the response field "/0/senses/1/parentSenseId" is 300
+    When I POST "/api/reviews/{caseId}/type" with:
       """
-      {"status":"MEANING_NOT_FOUND","matchedEntryId":100}
+      {"type":"SENSE","matchedEntryId":100}
       """
     Then the response status is 200
     When I POST "/api/reviews/{caseId}/status" with:
@@ -64,7 +86,6 @@ Feature: Editing drafts
       {"senses":[{"gloss":"Pievienotā nozīme.","flags":{}}]}
       """
     Then the response status is 200
-    And the response field "/senses/0/sourceSenseId" is null
     And the response field "/senses/0/parentTezaursSenseId" is null
     And the response field "/senses/0/parentDraftSenseId" is null
     When I POST "/api/reviews/{caseId}/status" with:
@@ -72,55 +93,16 @@ Feature: Editing drafts
       {"status":"COMPLETED"}
       """
     Then the response status is 200
-    When I request "/api/tezaurs/entries/100"
+    When I request "/api/tezaurs/entries/100/senses"
     Then the response status is 200
-    And the response field "/senses" contains 2 items
-    And the response field "/senses/1/parentSenseId" is 300
-
-  Scenario: Reopen an already-existing meaning and edit only its sense draft
-    Given a review case with status "ALREADY_EXISTS"
-    When I POST "/api/reviews/{caseId}/tezaurs-check" with:
-      """
-      {"status":"MEANING_NEEDS_EDITING","matchedEntryId":100}
-      """
-    Then the response status is 200
-    And the response field "/status" equals "IN_PROGRESS"
-    When I request "/api/reviews/{caseId}/sense-drafts"
-    Then the response status is 200
-    And the response field "" contains 0 items
-    When I POST "/api/reviews/{caseId}/status" with:
-      """
-      {"status":"COMPLETED"}
-      """
-    Then the response status is 409
-    When I PUT "/api/reviews/{caseId}/sense-drafts" with:
-      """
-      {"senses":[{"sourceSenseId":300,"gloss":"Precizēta definīcija.","flags":{"Piezīmes":"Precizēta pazīme"}}]}
-      """
-    Then the response status is 200
-    And the response field "/senses/0/sourceSenseId" is 300
-    And I save "/senses/0/id" as "senseId"
-    When I PUT "/api/reviews/{caseId}/sense-drafts" with:
-      """
-      {"senses":[{"id":"{senseId}","sourceSenseId":300,"gloss":"Atkārtoti precizēta definīcija.","flags":{}}]}
-      """
-    Then the response status is 200
-    And the response field "/senses" contains 1 items
-    And the response field "/senses/0/id" equals "{senseId}"
-    When I POST "/api/reviews/{caseId}/status" with:
-      """
-      {"status":"COMPLETED"}
-      """
-    Then the response status is 200
-    When I request "/api/tezaurs/entries/100"
-    Then the response status is 200
-    And the response field "/senses/0/gloss" equals "Pieņemt lēmumu."
+    And the response field "" contains 2 items
+    And the response field "/1/parentSenseId" is 300
 
   Scenario: Switching the selected entry preserves each branch's saved sense drafts
     Given a case combines suggestions "1"
-    When I POST "/api/reviews/{caseId}/tezaurs-check" with:
+    When I POST "/api/reviews/{caseId}/type" with:
       """
-      {"status":"NOT_FOUND"}
+      {"type":"ENTRY"}
       """
     Then the response status is 200
     When I POST "/api/reviews/{caseId}/usage/decision" with:
@@ -133,9 +115,9 @@ Feature: Editing drafts
       {"senses":[{"gloss":"Jaunā šķirkļa nozīme.","flags":{}}]}
       """
     Then the response status is 200
-    When I POST "/api/reviews/{caseId}/tezaurs-check" with:
+    When I POST "/api/reviews/{caseId}/type" with:
       """
-      {"status":"MEANING_NOT_FOUND","matchedEntryId":100}
+      {"type":"SENSE","matchedEntryId":100}
       """
     Then the response status is 200
     When I PUT "/api/reviews/{caseId}/sense-drafts" with:
@@ -143,9 +125,9 @@ Feature: Editing drafts
       {"senses":[{"gloss":"Esošā šķirkļa jaunā nozīme.","flags":{}}]}
       """
     Then the response status is 200
-    When I POST "/api/reviews/{caseId}/tezaurs-check" with:
+    When I POST "/api/reviews/{caseId}/type" with:
       """
-      {"status":"NOT_FOUND"}
+      {"type":"ENTRY"}
       """
     Then the response status is 200
     When I POST "/api/reviews/{caseId}/usage/decision" with:

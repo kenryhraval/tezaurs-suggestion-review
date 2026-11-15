@@ -1,28 +1,27 @@
-import { Fragment, useEffect, useId, useRef, useState } from 'react'
-import { tezaursEntryUrl } from '../../config/tezaurs'
+import { useEffect, useId, useRef, useState } from 'react'
 import { EditButton } from '../shared/EditButton'
 
 type Action = {
   label: string
   onClick?: () => void
-  href?: string
-  separator?: boolean
 }
 
 type ActionsProps = {
   kind: 'entry' | 'lexeme' | 'sense'
   label: string
   onEdit?: () => void
+  readOnly?: boolean
   items: Action[]
 }
 
-function EntityActions({ kind, label, onEdit, items }: ActionsProps) {
+function EntityActions({ kind, label, onEdit, items, readOnly = false }: ActionsProps) {
   const buttonVariants = { entry: 'primary', lexeme: 'warning', sense: 'success' }
-  const buttonClassName = `btn btn-sm btn-${buttonVariants[kind]}`
+  const buttonClassName = readOnly ? 'btn btn-sm btn-secondary' : `btn btn-sm btn-${buttonVariants[kind]}`
   const [open, setOpen] = useState(false)
   const container = useRef<HTMLSpanElement>(null)
   const toggle = useRef<HTMLButtonElement>(null)
   const menuId = useId()
+  const hasMenuItems = items.length > 0
 
   useEffect(() => {
     if (!open) {
@@ -38,7 +37,7 @@ function EntityActions({ kind, label, onEdit, items }: ActionsProps) {
   }, [open])
 
   return (
-    <span className="btn-group entity-actions" ref={container}
+    <span className="btn-group btn-group-sm entity-actions" ref={container}
       onBlur={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget)) {
           setOpen(false)
@@ -50,27 +49,20 @@ function EntityActions({ kind, label, onEdit, items }: ActionsProps) {
           toggle.current?.focus()
         }
       }}>
-      <EditButton className={buttonClassName} label={`Rediģēt ${label}`} disabled={!onEdit} onClick={() => onEdit?.()} />
-      <button className={`${buttonClassName} action-toggle`} type="button" ref={toggle}
+      <EditButton className={buttonClassName} icon={readOnly ? 'info' : 'edit'}
+        label={`${readOnly ? 'Skatīt' : 'Rediģēt'} ${label}`} disabled={!onEdit} onClick={() => onEdit?.()} />
+      {hasMenuItems && <button className={`${buttonClassName} dropdown-toggle`} type="button" ref={toggle}
         title="Papildu darbības" aria-label={`Papildu darbības: ${label}`}
-        aria-expanded={open} aria-controls={menuId} onClick={() => setOpen(!open)}>
-        <span aria-hidden="true">▾</span>
-      </button>
-      {open && (
+        aria-expanded={open} aria-controls={menuId} onClick={() => setOpen(!open)} />}
+      {open && hasMenuItems && (
         <span className="dropdown-menu show entity-action-menu" id={menuId}>
           {items.map((item) => (
-            <Fragment key={item.label}>
-              {item.separator && <span className="dropdown-divider" aria-hidden="true" />}
-              {item.href ? (
-                <a className="dropdown-item" href={item.href} target="_blank" rel="noreferrer" onClick={() => setOpen(false)}>{item.label}</a>
-              ) : (
-                <button className="dropdown-item" type="button" disabled={!item.onClick} onClick={() => {
-                  setOpen(false)
-                  toggle.current?.focus()
-                  item.onClick?.()
-                }}>{item.label}</button>
-              )}
-            </Fragment>
+            <button key={item.label} className="dropdown-item" type="button" disabled={!item.onClick}
+              onClick={() => {
+                setOpen(false)
+                toggle.current?.focus()
+                item.onClick?.()
+              }}>{item.label}</button>
           ))}
         </span>
       )}
@@ -80,39 +72,26 @@ function EntityActions({ kind, label, onEdit, items }: ActionsProps) {
 
 type EntryProps = {
   onEdit?: () => void
+  readOnly?: boolean
   onAddLexeme?: () => void
   onAddSense?: () => void
-  publicHumanKey?: string
 }
 
-export function EntryActions({ onEdit, onAddLexeme, onAddSense, publicHumanKey }: EntryProps) {
-  return <EntityActions kind="entry" label="šķirkli" onEdit={onEdit} items={[
+export function EntryActions({ onEdit, onAddLexeme, onAddSense, readOnly }: EntryProps) {
+  return <EntityActions kind="entry" label="šķirkli" onEdit={onEdit} readOnly={readOnly} items={[
     { label: 'Pievienot leksēmu', onClick: onAddLexeme },
     { label: 'Pievienot nozīmi', onClick: onAddSense },
-    { label: 'Pievienot saiti uz stabilu vārdu savienojumu' },
-    { label: 'Pievienot saiti uz saistītu šķirkli' },
-    { label: 'Semantiskās saites' },
-    { label: 'Pievienot šo šķirkli citam šķirklim' },
-    { label: 'Pievienot šķirkļa avotu' },
-    { label: 'Dzēst šķirkli' },
-    { label: 'Labošanas vēsture', separator: true },
-    { label: 'Publiskā versija', separator: true,
-      href: publicHumanKey ? tezaursEntryUrl(publicHumanKey) : undefined },
   ]} />
 }
 
 type LexemeProps = {
   onEdit?: () => void
+  readOnly?: boolean
   onDelete?: () => void
 }
 
-export function LexemeActions({ onEdit, onDelete }: LexemeProps) {
-  return <EntityActions kind="lexeme" label="leksēmu" onEdit={onEdit} items={[
-    { label: 'Pārvietot leksēmu' },
-    { label: 'Pievienot saiti no leksēmas uz tās morfoloģisko atvasinājumu' },
-    { label: 'Pievienot leksēmas avotu' },
-    { label: 'Pavairot leksēmu' },
-    { label: 'Pievienot izņēmumformu' },
+export function LexemeActions({ onEdit, onDelete, readOnly }: LexemeProps) {
+  return <EntityActions kind="lexeme" label="leksēmu" onEdit={onEdit} readOnly={readOnly} items={[
     { label: 'Dzēst leksēmu', onClick: onDelete },
   ]} />
 }
@@ -120,38 +99,22 @@ export function LexemeActions({ onEdit, onDelete }: LexemeProps) {
 type SenseProps = {
   subsense: boolean
   onEdit?: () => void
+  readOnly?: boolean
   onAddSubsense?: () => void
   onMove?: () => void
   onPromote?: () => void
   onDelete?: () => void
 }
 
-export function SenseActions({ subsense, onEdit, onAddSubsense, onMove, onPromote, onDelete }: SenseProps) {
+export function SenseActions({ subsense, onEdit, onAddSubsense, onMove, onPromote, onDelete, readOnly }: SenseProps) {
   const items: Action[] = subsense ? [
-    { label: 'Pievienot piemēru' },
-    { label: 'Pievienot saiti uz stabilu vārdu savienojumu' },
-    { label: 'Pārvietot apakšnozīmi' },
     { label: 'Pārvietot apakšnozīmi zem citas nozīmes', onClick: onMove },
     { label: 'Pārvietot apakšnozīmi par patstāvīgu nozīmi', onClick: onPromote },
-    { label: 'Pievienot apakšnozīmes avotu' },
     { label: 'Dzēst apakšnozīmi', onClick: onDelete },
   ] : [
     { label: 'Pievienot apakšnozīmi', onClick: onAddSubsense },
-    { label: 'Pievienot piemēru' },
-    { label: 'Pievienot saiti uz stabilu vārdu savienojumu' },
-    { label: 'Pārvietot nozīmi' },
     { label: 'Pārvietot nozīmi zem citas nozīmes', onClick: onMove },
-    { label: 'Pievienot nozīmes avotu' },
     { label: 'Dzēst nozīmi', onClick: onDelete },
   ]
-  return (
-    <>
-      <EntityActions kind="sense" label={subsense ? 'apakšnozīmi' : 'nozīmi'} onEdit={onEdit} items={items} />
-      <button type="button" className="btn btn-sm btn-light border p-1 mr-1" title="Sinonīmu kopa" aria-label="Sinonīmu kopa" disabled>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-          <path d="M2 3h7v6H2zM15 3h7v6h-7zM15 15h7v6h-7zM9 5h6v2H9zM7 9h2v3h8v3h-2v-1H7z" />
-        </svg>
-      </button>
-    </>
-  )
+  return <EntityActions kind="sense" label={subsense ? 'apakšnozīmi' : 'nozīmi'} onEdit={onEdit} readOnly={readOnly} items={items} />
 }

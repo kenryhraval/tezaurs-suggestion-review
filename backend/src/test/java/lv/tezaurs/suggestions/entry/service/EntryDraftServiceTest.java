@@ -24,7 +24,7 @@ import lv.tezaurs.suggestions.entry.repository.ReviewEntryRepository;
 import lv.tezaurs.suggestions.entry.repository.ReviewLexemeRepository;
 import lv.tezaurs.suggestions.suggestion.entity.ReviewCase;
 import lv.tezaurs.suggestions.suggestion.entity.ReviewStatus;
-import lv.tezaurs.suggestions.suggestion.entity.TezaursStatus;
+import lv.tezaurs.suggestions.suggestion.entity.CaseType;
 import lv.tezaurs.suggestions.suggestion.repository.ReviewCaseRepository;
 import lv.tezaurs.suggestions.tezaurs.entity.TezaursEntry;
 import lv.tezaurs.suggestions.tezaurs.repository.TezaursEntryRepository;
@@ -67,7 +67,7 @@ class EntryDraftServiceTest {
     @Test
     void createsAnEntryWithItsFirstPrimaryLexeme() {
         ReviewCase review = inProgressReview();
-        review.recordTezaursCheck(TezaursStatus.NOT_FOUND, null, "reviewer");
+        review.changeType(CaseType.ENTRY, null, false, "reviewer");
         review.recordUsageDecision(lv.tezaurs.suggestions.usage.entity.UsageDecision.USED, null, "reviewer");
         when(caseRepository.findById(review.getId())).thenReturn(Optional.of(review));
         when(entryRepository.findByCaseId(review.getId())).thenReturn(Optional.empty());
@@ -104,7 +104,7 @@ class EntryDraftServiceTest {
     @Test
     void rejectsEntryDraftsForExistingEntries() {
         ReviewCase review = inProgressReview();
-        review.recordTezaursCheck(TezaursStatus.MEANING_NOT_FOUND, 42, "reviewer");
+        review.changeType(CaseType.SENSE, 42, false, "reviewer");
         when(caseRepository.findById(review.getId())).thenReturn(Optional.of(review));
 
         assertThatThrownBy(() -> service.create(review.getId()))
@@ -115,7 +115,7 @@ class EntryDraftServiceTest {
     @ValueSource(strings = {"jauns vārds", "labots vārds"})
     void editingPreservesTheAssignedHomonymNumber(String heading) {
         ReviewCase review = inProgressReview();
-        review.recordTezaursCheck(TezaursStatus.NOT_FOUND, null, "reviewer");
+        review.changeType(CaseType.ENTRY, null, false, "reviewer");
         review.recordUsageDecision(lv.tezaurs.suggestions.usage.entity.UsageDecision.USED, null, "reviewer");
         ReviewEntry entry = new ReviewEntry(review.getId());
         entry.update("jauns vārds", 2, 1, null, null, null, null, null, Map.of());
@@ -139,7 +139,7 @@ class EntryDraftServiceTest {
     @Test
     void reusesAnExistingDraftWithoutOverwritingItsEdits() {
         ReviewCase review = inProgressReview();
-        review.recordTezaursCheck(TezaursStatus.NOT_FOUND, null, "reviewer");
+        review.changeType(CaseType.ENTRY, null, false, "reviewer");
         review.recordUsageDecision(lv.tezaurs.suggestions.usage.entity.UsageDecision.USED, null, "reviewer");
         ReviewEntry entry = new ReviewEntry(review.getId());
         entry.update("edited heading", 2, 1, null, null, null, null, "saved note", Map.of());
@@ -173,7 +173,7 @@ class EntryDraftServiceTest {
     @Test
     void existingEntriesStayReadOnlyEvenWhenSenseEditingWasChosen() {
         ReviewCase review = inProgressReview();
-        review.recordTezaursCheck(TezaursStatus.MEANING_NEEDS_EDITING, 42, "reviewer");
+        review.changeType(CaseType.SENSE, 42, false, "reviewer");
         when(caseRepository.findById(review.getId())).thenReturn(Optional.of(review));
         assertThat(service.find(review.getId())).isEmpty();
         assertThatThrownBy(() -> service.create(review.getId())).isInstanceOf(ConflictException.class);

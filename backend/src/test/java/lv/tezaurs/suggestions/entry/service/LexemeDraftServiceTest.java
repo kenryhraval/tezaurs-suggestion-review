@@ -19,7 +19,7 @@ import lv.tezaurs.suggestions.entry.repository.ReviewEntryRepository;
 import lv.tezaurs.suggestions.entry.repository.ReviewLexemeRepository;
 import lv.tezaurs.suggestions.suggestion.entity.ReviewCase;
 import lv.tezaurs.suggestions.suggestion.entity.ReviewStatus;
-import lv.tezaurs.suggestions.suggestion.entity.TezaursStatus;
+import lv.tezaurs.suggestions.suggestion.entity.CaseType;
 import lv.tezaurs.suggestions.suggestion.repository.ReviewCaseRepository;
 import lv.tezaurs.suggestions.tezaurs.repository.TezaursLexemeRoleRepository;
 import lv.tezaurs.suggestions.tezaurs.repository.TezaursParadigmRepository;
@@ -121,7 +121,7 @@ class LexemeDraftServiceTest {
         ReviewCase review = new ReviewCase("jauns vārds", "reviewer");
         review.changeStatus(ReviewStatus.READY_FOR_REVIEW, "reviewer");
         review.changeStatus(ReviewStatus.IN_PROGRESS, "reviewer");
-        review.recordTezaursCheck(TezaursStatus.NOT_FOUND, null, "reviewer");
+        review.changeType(CaseType.ENTRY, null, false, "reviewer");
         review.recordUsageDecision(lv.tezaurs.suggestions.usage.entity.UsageDecision.USED, null, "reviewer");
         return review;
     }

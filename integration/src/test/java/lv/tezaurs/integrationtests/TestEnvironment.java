@@ -74,14 +74,26 @@ public class TestEnvironment {
     }
 
     public static void resetData() throws IOException, SQLException {
-        try (var resource = TestEnvironment.class.getResourceAsStream("/fixtures/scenario-data.sql")) {
-            if (resource == null) {
-                throw new IllegalStateException("Missing scenario-data.sql");
+        resetFixtures("scenario-data.sql", "review-cases.sql");
+    }
+
+    public static void resetImportData() throws IOException, SQLException {
+        resetFixtures("scenario-data.sql", "import-data.sql");
+    }
+
+    private static void resetFixtures(String... fixtureFiles) throws IOException, SQLException {
+        try (Connection connection = connection(); Statement statement = connection.createStatement()) {
+            connection.setAutoCommit(false);
+            statement.execute("SELECT pg_advisory_xact_lock(714, 1)");
+            for (String fixtureFile : fixtureFiles) {
+                try (var resource = TestEnvironment.class.getResourceAsStream("/fixtures/" + fixtureFile)) {
+                    if (resource == null) {
+                        throw new IllegalStateException("Missing fixture: " + fixtureFile);
+                    }
+                    statement.execute(new String(resource.readAllBytes(), StandardCharsets.UTF_8));
+                }
             }
-            String sql = new String(resource.readAllBytes(), StandardCharsets.UTF_8);
-            try (Connection connection = connection(); Statement statement = connection.createStatement()) {
-                statement.execute(sql);
-            }
+            connection.commit();
         }
     }
 
@@ -101,7 +113,7 @@ public class TestEnvironment {
         return snapshot.toString();
     }
 
-    private static Connection connection() throws SQLException {
+    static Connection connection() throws SQLException {
         return DriverManager.getConnection(database.getJdbcUrl(), database.getUsername(), database.getPassword());
     }
 

@@ -2,9 +2,7 @@ package lv.tezaurs.suggestions.suggestion.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
-import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import lombok.AccessLevel;
@@ -50,9 +48,6 @@ public class IncubatorSuggestion {
 
     @Column(name = "updated_by", updatable = false)
     private Integer updatedBy;
-
-    @OneToOne(mappedBy = "sourceSuggestion", fetch = FetchType.LAZY)
-    private CaseSuggestion reviewSource;
 
     public IncubatorSuggestion(Integer id, String lemma, String gloss) {
         this.id = id;

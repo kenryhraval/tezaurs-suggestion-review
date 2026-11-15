@@ -26,12 +26,19 @@ public class ApiSteps {
     private final HttpClient client = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(5)).build();
     private final JsonMapper json = JsonMapper.builder().build();
-    private final Map<String, String> savedValues = new HashMap<>();
+    private final Map<String, String> savedValues = new HashMap<>(Map.of(
+            "suggestion1Case", "00000000-0000-0000-0000-000000000001",
+            "suggestion2Case", "00000000-0000-0000-0000-000000000002",
+            "suggestion3Case", "00000000-0000-0000-0000-000000000003",
+            "suggestion4Case", "00000000-0000-0000-0000-000000000004",
+            "suggestion5Case", "00000000-0000-0000-0000-000000000005",
+            "suggestion6Case", "00000000-0000-0000-0000-000000000006",
+            "suggestion7Case", "00000000-0000-0000-0000-000000000007"));
     private HttpResponse<String> response;
     private JsonNode responseBody;
     private String originalLegacyData;
 
-    @Before
+    @Before("not @import")
     public void resetScenario() throws Exception {
         TestEnvironment.resetData();
         originalLegacyData = TestEnvironment.legacyDataSnapshot();
@@ -140,15 +147,15 @@ public class ApiSteps {
         if (status.equals("READY_FOR_REVIEW") || status.equals("GARBAGE")) {
             initialStatus = status;
         }
-        post("/api/suggestions/3/status", json.writeValueAsString(Map.of("status", initialStatus)));
+        post("/api/reviews/{suggestion3Case}/status", json.writeValueAsString(Map.of("status", initialStatus)));
         responseStatusIs(200);
         saveValue("/id", "caseId");
         if (status.equals("ALREADY_EXISTS")) {
-            post("/api/reviews/{caseId}/tezaurs-check",
-                    "{\"status\":\"MEANING_ALREADY_EXISTS\",\"matchedEntryId\":100}");
+            post("/api/reviews/{caseId}/type",
+                    "{\"type\":\"SENSE\",\"meaningAlreadyExists\":true,\"matchedEntryId\":100}");
         } else if (status.equals("COMPLETED")) {
-            post("/api/reviews/{caseId}/tezaurs-check",
-                    "{\"status\":\"MEANING_NOT_FOUND\",\"matchedEntryId\":100}");
+            post("/api/reviews/{caseId}/type",
+                    "{\"type\":\"SENSE\",\"matchedEntryId\":100}");
             responseStatusIs(200);
             put("/api/reviews/{caseId}/sense-drafts", "{\"senses\":[{\"gloss\":\"Jauna nozīme\",\"flags\":{}}]}");
             responseStatusIs(200);
@@ -162,11 +169,11 @@ public class ApiSteps {
     @Given("a case combines suggestions {string}")
     public void combinedSuggestions(String ids) throws InterruptedException {
         String[] suggestionIds = ids.split(",");
-        post("/api/suggestions/" + suggestionIds[0].trim() + "/status", "{\"status\":\"IN_PROGRESS\"}");
+        post("/api/reviews/{suggestion" + suggestionIds[0].trim() + "Case}/status", "{\"status\":\"IN_PROGRESS\"}");
         responseStatusIs(200);
         saveValue("/id", "caseId");
         for (int index = 1; index < suggestionIds.length; index++) {
-            post("/api/suggestions/" + suggestionIds[index].trim() + "/duplicate", "{\"reviewId\":\"{caseId}\"}");
+            post("/api/reviews/{suggestion" + suggestionIds[index].trim() + "Case}/duplicate", "{\"reviewId\":\"{caseId}\"}");
             responseStatusIs(200);
         }
     }

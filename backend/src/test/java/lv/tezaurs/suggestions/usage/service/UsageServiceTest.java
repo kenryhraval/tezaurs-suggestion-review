@@ -14,7 +14,7 @@ import lv.tezaurs.suggestions.common.error.NotFoundException;
 import lv.tezaurs.suggestions.entry.service.EntryDraftService;
 import lv.tezaurs.suggestions.suggestion.entity.ReviewCase;
 import lv.tezaurs.suggestions.suggestion.entity.ReviewStatus;
-import lv.tezaurs.suggestions.suggestion.entity.TezaursStatus;
+import lv.tezaurs.suggestions.suggestion.entity.CaseType;
 import lv.tezaurs.suggestions.suggestion.repository.ReviewCaseRepository;
 import lv.tezaurs.suggestions.suggestion.service.ReviewCompletionService;
 import lv.tezaurs.suggestions.usage.dto.*;
@@ -38,7 +38,7 @@ class UsageServiceTest {
     void prepareCase() {
         review = new ReviewCase("vārds", "reviewer");
         review.changeStatus(ReviewStatus.IN_PROGRESS, "reviewer");
-        review.recordTezaursCheck(TezaursStatus.NOT_FOUND, null, "reviewer");
+        review.changeType(CaseType.ENTRY, null, false, "reviewer");
         when(cases.findById(review.getId())).thenReturn(Optional.of(review));
         when(cases.findLockedById(review.getId())).thenReturn(Optional.of(review));
         when(evidence.save(any())).thenAnswer(call -> call.getArgument(0));
@@ -65,6 +65,7 @@ class UsageServiceTest {
         assertThat(review.getStatus()).isEqualTo(ReviewStatus.INSUFFICIENT_DATA);
         assertThat(review.getLastStatusChangedBy()).isEqualTo("user");
         verifyNoInteractions(drafts);
+        review.takeForReview("user");
         service.decide(review.getId(), new UsageDecisionRequest(UsageDecision.USED, " Pazīstu šo vārdu. "), "Basic dXNlcjpwYXNz");
         assertThat(review.getStatus()).isEqualTo(ReviewStatus.IN_PROGRESS);
         assertThat(review.getUsageNote()).isEqualTo("Pazīstu šo vārdu.");
@@ -79,7 +80,7 @@ class UsageServiceTest {
         assertThat(review.getUsageNote()).isEqualTo("Pazīstu šo vārdu.");
         assertThat(review.getUsageDecidedBy()).isEqualTo("user");
         assertThat(review.getUsageDecidedAt()).isEqualTo(decisionTime);
-        assertThat(review.getTezaursStatus()).isEqualTo(TezaursStatus.NOT_FOUND);
+        assertThat(review.getType()).isEqualTo(CaseType.ENTRY);
         assertThat(review.getStatus()).isEqualTo(ReviewStatus.IN_PROGRESS);
         assertThat(review.canEditEntryDraft()).isTrue();
     }
@@ -88,12 +89,16 @@ class UsageServiceTest {
     void distinguishesPostponementFromAnExplicitInventedDecision() {
         service.decide(review.getId(), new UsageDecisionRequest(UsageDecision.NOT_CONFIRMED, "Jāturpina izpēte"), "Basic dXNlcjpwYXNz");
         assertThat(review.getStatus()).isEqualTo(ReviewStatus.INSUFFICIENT_DATA);
+        review.takeForReview("user");
         service.decide(review.getId(), new UsageDecisionRequest(UsageDecision.INVENTED, "Valodnieka izvērtējums"), "Basic dXNlcjpwYXNz");
         assertThat(review.getStatus()).isEqualTo(ReviewStatus.INVENTED);
         assertThat(review.getUsageDecision()).isEqualTo(UsageDecision.INVENTED);
+        review.takeForReview("user");
         service.decide(review.getId(), new UsageDecisionRequest(UsageDecision.NOT_CONFIRMED, null), "Basic dXNlcjpwYXNz");
         assertThat(review.getStatus()).isEqualTo(ReviewStatus.INSUFFICIENT_DATA);
+        review.takeForReview("user");
         service.decide(review.getId(), new UsageDecisionRequest(UsageDecision.INVENTED, null), "Basic dXNlcjpwYXNz");
+        review.takeForReview("user");
         service.decide(review.getId(), new UsageDecisionRequest(UsageDecision.USED, null), "Basic dXNlcjpwYXNz");
         assertThat(review.getStatus()).isEqualTo(ReviewStatus.IN_PROGRESS);
         verify(drafts).create(review.getId());
@@ -146,10 +151,43 @@ class UsageServiceTest {
                 .isInstanceOf(ConflictException.class);
         ReviewCase other = new ReviewCase("lemt", "reviewer");
         other.changeStatus(ReviewStatus.IN_PROGRESS, "reviewer");
-        other.recordTezaursCheck(TezaursStatus.MEANING_NOT_FOUND, 100, "reviewer");
+        other.changeType(CaseType.SENSE, 100, false, "reviewer");
         when(cases.findById(other.getId())).thenReturn(Optional.of(other));
         assertThatThrownBy(() -> service.evidence(other.getId())).isInstanceOf(ConflictException.class);
         assertThatThrownBy(() -> service.evidence(UUID.randomUUID())).isInstanceOf(NotFoundException.class);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = ReviewStatus.class, names = {"INSUFFICIENT_DATA", "INVENTED"})
+    void pausedCasesKeepEvidenceReadableButRejectChangesUntilResumed(ReviewStatus pausedStatus) {
+        UsageDecision previousDecision = pausedStatus == ReviewStatus.INSUFFICIENT_DATA
+                ? UsageDecision.NOT_CONFIRMED : UsageDecision.INVENTED;
+        var request = external("https://example.com");
+        UsageEvidence saved = new UsageEvidence(review.getId(), request, "reviewer");
+        when(evidence.findByCaseIdOrderByCreatedAtAscIdAsc(review.getId())).thenReturn(List.of(saved));
+        service.decide(review.getId(), new UsageDecisionRequest(previousDecision, "Saglabāts vērtējums"),
+                "Basic dXNlcjpwYXNz");
+
+        assertThat(service.evidence(review.getId())).hasSize(1);
+        assertThatThrownBy(() -> service.addEvidence(review.getId(), request, null))
+                .isInstanceOf(ConflictException.class);
+        assertThatThrownBy(() -> service.deleteEvidence(review.getId(), saved.getId()))
+                .isInstanceOf(ConflictException.class);
+        assertThatThrownBy(() -> service.decide(review.getId(), new UsageDecisionRequest(UsageDecision.USED, null),
+                "Basic dXNlcjpwYXNz"))
+                .isInstanceOf(ConflictException.class);
+        assertThat(review.getUsageDecision()).isEqualTo(previousDecision);
+        assertThat(review.getUsageNote()).isEqualTo("Saglabāts vērtējums");
+        verifyNoInteractions(drafts);
+        verify(evidence, never()).save(any());
+        verify(evidence, never()).delete(any());
+
+        review.takeForReview("user");
+        assertThat(review.getUsageDecision()).isEqualTo(previousDecision);
+        service.addEvidence(review.getId(), request, null);
+        service.decide(review.getId(), new UsageDecisionRequest(UsageDecision.USED, null), "Basic dXNlcjpwYXNz");
+        assertThat(review.getStatus()).isEqualTo(ReviewStatus.IN_PROGRESS);
+        verify(drafts).create(review.getId());
     }
 
     @Test

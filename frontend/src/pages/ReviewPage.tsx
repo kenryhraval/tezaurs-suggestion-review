@@ -1,25 +1,19 @@
 import { useEffect, useState } from 'react'
 import {
   changeReviewStatus,
-  changeSuggestionStatus,
-  getQueueItems,
+  getReviews,
   getCurrentUser,
-  linkDuplicateSuggestion,
+  mergeReviewCases,
 } from '../api/client'
 import { ReviewDetails } from '../components/review/ReviewDetails'
 import { SuggestionList } from '../components/review/SuggestionList'
 import { AppHeader } from '../components/layout/AppHeader'
-import type { QueueItem, Review, SuggestionSort, ReviewStatus } from '../api/types'
+import type { ReviewListItem, Review, ReviewSort, ReviewStatus } from '../api/types'
 
 const PAGE_SIZE = 20
 
-function itemKey(item: QueueItem) {
-  return `${item.itemType}:${item.id}`
-}
-
-function itemFromReview(review: Review): QueueItem {
+function itemFromReview(review: Review): ReviewListItem {
   return {
-    itemType: 'REVIEW',
     id: review.id,
     reviewedTerm: review.reviewedTerm,
     status: review.status,
@@ -29,15 +23,15 @@ function itemFromReview(review: Review): QueueItem {
 }
 
 export function ReviewPage() {
-  const [items, setItems] = useState<QueueItem[]>([])
+  const [items, setItems] = useState<ReviewListItem[]>([])
   const [status, setStatus] = useState<ReviewStatus>('NEW')
-  const [sort, setSort] = useState<SuggestionSort>('NEWEST')
+  const [sort, setSort] = useState<ReviewSort>('NEWEST')
   const [search, setSearch] = useState('')
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(0)
   const [totalPages, setTotalPages] = useState(0)
   const [totalItems, setTotalItems] = useState(0)
-  const [selected, setSelected] = useState<QueueItem | null>(null)
+  const [selected, setSelected] = useState<ReviewListItem | null>(null)
   const [loadedReview, setLoadedReview] = useState<Review | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -82,7 +76,7 @@ export function ReviewPage() {
 
     async function loadQueue() {
       try {
-        const result = await getQueueItems(status, query, page, PAGE_SIZE, sort)
+        const result = await getReviews(status, query, page, PAGE_SIZE, sort)
         if (requestIsOutdated) {
           return
         }
@@ -99,7 +93,7 @@ export function ReviewPage() {
           if (selectedReviewMovedToAnotherStatus) {
             return current
           }
-          const previousSelection = result.items.find((item) => current && itemKey(item) === itemKey(current))
+          const previousSelection = result.items.find((item) => current && item.id === current.id)
           return previousSelection ?? result.items[0] ?? null
         })
         setError('')
@@ -132,7 +126,7 @@ export function ReviewPage() {
     }
   }
 
-  function changeSort(nextSort: SuggestionSort) {
+  function changeSort(nextSort: ReviewSort) {
     setLoading(true)
     setSelected(null)
     setLoadedReview(null)
@@ -147,58 +141,33 @@ export function ReviewPage() {
     setPage(nextPage)
   }
 
-  function removeItem(item: QueueItem, keepOpen?: QueueItem) {
-    const key = itemKey(item)
-    const index = items.findIndex((candidate) => itemKey(candidate) === key)
+  function removeItem(item: ReviewListItem, keepOpen?: ReviewListItem) {
+    const key = item.id
+    const index = items.findIndex((candidate) => candidate.id === key)
     const next = items[index + 1] ?? items[index - 1] ?? null
 
     if (index >= 0) {
-      setItems((currentItems) => currentItems.filter((candidate) => itemKey(candidate) !== key))
+      setItems((currentItems) => currentItems.filter((candidate) => candidate.id !== key))
       setTotalItems((count) => Math.max(0, count - 1))
     }
     setSelected(keepOpen ?? next)
     setReloadCount((value) => value + 1)
   }
 
-  async function changeStatus(
-    item: QueueItem,
-    nextStatus: ReviewStatus,
-    keepOpen = false,
-  ): Promise<Review | null> {
-    setError('')
-    try {
-      let review: Review
-      if (item.itemType === 'SUGGESTION') {
-        review = await changeSuggestionStatus(item.id, nextStatus)
-      } else {
-        review = await changeReviewStatus(item.id, nextStatus)
-      }
-      const updated = itemFromReview(review)
-      setLoadedReview(review)
-      removeItem(item, keepOpen ? updated : undefined)
-      return review
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Neizdevās mainīt statusu.')
-      throw cause
+  async function changeStatus(nextStatus: ReviewStatus): Promise<Review> {
+    if (!selected) {
+      throw new Error('Izvēlieties izskatīšanu.')
     }
+    const review = await changeReviewStatus(selected.id, nextStatus)
+    handleReviewUpdated(review)
+    return review
   }
 
-  async function linkDuplicate(id: number, reviewId: string) {
-    setError('')
-    try {
-      const target = await linkDuplicateSuggestion(id, reviewId)
-      setLoadedReview(target)
-      let source = items.find((item) => item.itemType === 'SUGGESTION' && item.id === id)
-      if (selected?.itemType === 'REVIEW') {
-        source = selected
-      }
-      if (source) {
-        removeItem(source, itemFromReview(target))
-      }
-    } catch (cause) {
-      const message = cause instanceof Error ? cause.message : 'Neizdevās piesaistīt dublikātu.'
-      setError(message)
-      throw cause
+  async function linkDuplicate(sourceCaseId: string, targetCaseId: string) {
+    const target = await mergeReviewCases(sourceCaseId, targetCaseId)
+    setLoadedReview(target)
+    if (selected?.id === sourceCaseId) {
+      removeItem(selected, itemFromReview(target))
     }
   }
 
@@ -208,14 +177,14 @@ export function ReviewPage() {
       removeItem(selected, itemFromReview(review))
     } else {
       const updated = itemFromReview(review)
-      setItems((current) => current.map((item) => itemKey(item) === itemKey(updated) ? updated : item))
+      setItems((current) => current.map((item) => item.id === updated.id ? updated : item))
       setSelected(updated)
       setReloadCount((value) => value + 1)
     }
   }
 
   function selectItem(key: string) {
-    const selectedItem = items.find((item) => itemKey(item) === key)
+    const selectedItem = items.find((item) => item.id === key)
     setSelected(selectedItem ?? null)
     setLoadedReview(null)
   }
@@ -242,7 +211,7 @@ export function ReviewPage() {
           items={items}
           status={status}
           sort={sort}
-          selectedKey={selected ? itemKey(selected) : null}
+          selectedKey={selected?.id ?? null}
           loading={loading}
           page={page}
           totalPages={totalPages}
@@ -261,11 +230,11 @@ export function ReviewPage() {
 
         {selected && (
           <ReviewDetails
-            key={itemKey(selected)}
+            key={selected.id}
             item={selected}
-            initialReview={selected.itemType === 'REVIEW' && loadedReview?.id === selected.id ? loadedReview : null}
+            initialReview={loadedReview?.id === selected.id ? loadedReview : null}
             username={username}
-            onStatusChange={(nextStatus) => changeStatus(selected, nextStatus, true)}
+            onStatusChange={changeStatus}
             onReviewUpdated={handleReviewUpdated}
             onDuplicate={linkDuplicate}
           />

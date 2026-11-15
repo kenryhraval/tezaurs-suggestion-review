@@ -2,21 +2,18 @@ import type {
   DuplicateReviewCandidate,
   EntryDraft,
   Review,
-  ReviewListItem,
-  QueuePage,
-  QueueItem,
+  ReviewPageResponse,
   SaveSenseDraft,
   SenseDraft,
-  SuggestionPage,
-  SuggestionSort,
+  ReviewSort,
   ReviewStatus,
   SaveEntryDraft,
   SaveLexemeDraft,
   LexemeDraft,
   TezaursEntryCandidate,
-  TezaursEntryDetails,
+  TezaursSense,
   TezaursFormOptions,
-  TezaursStatus,
+  SaveCaseType,
   UsageDecision,
   UsageEvidence,
   SaveUsageEvidence,
@@ -60,29 +57,13 @@ export async function getSuggestionCounts(): Promise<{ suggestions: number; case
   return response.json()
 }
 
-export async function getSuggestions(
-  query: string,
-  page: number,
-  size: number,
-  sort: SuggestionSort,
-): Promise<SuggestionPage> {
-  const parameters = new URLSearchParams({
-    query,
-    page: String(page),
-    size: String(size),
-    sort,
-  })
-  const response = await request(`/api/suggestions?${parameters}`)
-  return response.json()
-}
-
-async function getReviews(
+export async function getReviews(
   status: ReviewStatus,
   query: string,
   page: number,
   size: number,
-  sort: SuggestionSort,
-): Promise<{ items: ReviewListItem[]; page: number; totalPages: number; totalItems: number }> {
+  sort: ReviewSort,
+): Promise<ReviewPageResponse> {
   const parameters = new URLSearchParams({
     status,
     query,
@@ -94,47 +75,9 @@ async function getReviews(
   return response.json()
 }
 
-export async function getQueueItems(
-  status: ReviewStatus,
-  query: string,
-  page: number,
-  size: number,
-  sort: SuggestionSort,
-): Promise<QueuePage> {
-  if (status === 'NEW') {
-    const result = await getSuggestions(query, page, size, sort)
-    return {
-      ...result,
-      items: result.items.map((item): QueueItem => ({
-        ...item,
-        itemType: 'SUGGESTION',
-        status: 'NEW',
-        sourceCount: 1,
-      })),
-    }
-  }
-
-  const result = await getReviews(status, query, page, size, sort)
-  return {
-    ...result,
-    items: result.items.map((item): QueueItem => ({ ...item, itemType: 'REVIEW' })),
-  }
-}
-
 export async function detachSuggestion(reviewId: string, sourceId: number): Promise<Review> {
   const response = await request(`/api/reviews/${reviewId}/suggestions/${sourceId}`, {
     method: 'DELETE',
-  })
-  return response.json()
-}
-
-export async function changeSuggestionStatus(
-  id: number,
-  status: ReviewStatus,
-): Promise<Review> {
-  const response = await request(`/api/suggestions/${id}/status`, {
-    method: 'POST',
-    body: JSON.stringify({ status }),
   })
   return response.json()
 }
@@ -159,8 +102,8 @@ export async function getDuplicateReviewCandidates(
   return response.json()
 }
 
-export async function linkDuplicateSuggestion(id: number, reviewId: string): Promise<Review> {
-  const response = await request(`/api/suggestions/${id}/duplicate`, {
+export async function mergeReviewCases(sourceCaseId: string, reviewId: string): Promise<Review> {
+  const response = await request(`/api/reviews/${sourceCaseId}/duplicate`, {
     method: 'POST',
     body: JSON.stringify({ reviewId }),
   })
@@ -183,14 +126,10 @@ export async function correctReviewTerm(
   return response.json()
 }
 
-export async function saveTezaursCheck(
-  reviewId: string,
-  status: TezaursStatus,
-  matchedEntryId: number | null,
-): Promise<Review> {
-  const response = await request(`/api/reviews/${reviewId}/tezaurs-check`, {
+export async function saveCaseType(reviewId: string, selection: SaveCaseType): Promise<Review> {
+  const response = await request(`/api/reviews/${reviewId}/type`, {
     method: 'POST',
-    body: JSON.stringify({ status, matchedEntryId }),
+    body: JSON.stringify(selection),
   })
   return response.json()
 }
@@ -272,8 +211,13 @@ export async function getTezaursFormOptions(): Promise<TezaursFormOptions> {
   return response.json()
 }
 
-export async function getTezaursEntry(entryId: number): Promise<TezaursEntryDetails> {
+export async function getTezaursEntry(entryId: number): Promise<TezaursEntryCandidate> {
   const response = await request(`/api/tezaurs/entries/${entryId}`)
+  return response.json()
+}
+
+export async function getTezaursSenses(entryId: number): Promise<TezaursSense[]> {
+  const response = await request(`/api/tezaurs/entries/${entryId}/senses`)
   return response.json()
 }
 
@@ -288,7 +232,6 @@ export async function saveSenseDrafts(
 ): Promise<{ senses: SenseDraft[]; review: Review }> {
   const requestSenses = senses.map((sense) => ({
     id: sense.id,
-    sourceSenseId: sense.sourceSenseId,
     gloss: sense.gloss,
     parentDraftSenseId: sense.parentDraftSenseId,
     parentTezaursSenseId: sense.parentTezaursSenseId,

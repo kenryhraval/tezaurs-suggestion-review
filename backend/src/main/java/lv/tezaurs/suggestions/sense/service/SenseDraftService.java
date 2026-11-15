@@ -18,10 +18,9 @@ import lv.tezaurs.suggestions.sense.repository.ReviewSenseRepository;
 import lv.tezaurs.suggestions.suggestion.service.ReviewCompletionService;
 import lv.tezaurs.suggestions.suggestion.entity.ReviewCase;
 import lv.tezaurs.suggestions.suggestion.entity.ReviewStatus;
-import lv.tezaurs.suggestions.suggestion.entity.TezaursStatus;
+import lv.tezaurs.suggestions.suggestion.entity.CaseType;
 import lv.tezaurs.suggestions.suggestion.repository.ReviewCaseRepository;
 import lv.tezaurs.suggestions.tezaurs.repository.TezaursSenseRepository;
-import lv.tezaurs.suggestions.tezaurs.entity.TezaursSense;
 import lv.tezaurs.suggestions.tezaurs.service.TezaursFlagService;
 import lv.tezaurs.suggestions.tezaurs.service.TezaursRestrictionService;
 import org.springframework.stereotype.Service;
@@ -30,6 +29,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class SenseDraftService {
+    private static final String SENSE_SCOPE = "S";
+
     private final ReviewCompletionService completionService;
     private final ReviewSenseRepository senseRepository;
     private final ReviewCaseRepository caseRepository;
@@ -50,74 +51,42 @@ public class SenseDraftService {
         if (reviewCase.getStatus() != ReviewStatus.IN_PROGRESS) {
             throw new ConflictException("Sense drafts can only be edited while the case is in progress");
         }
-        if (reviewCase.getTezaursStatus() == TezaursStatus.NOT_FOUND && !reviewCase.canEditEntryDraft()) {
+        if (reviewCase.getType() == CaseType.ENTRY && !reviewCase.canEditEntryDraft()) {
             throw new ConflictException("Confirm word usage before editing a new entry's senses");
         }
-        if (reviewCase.getTezaursStatus() != TezaursStatus.NOT_FOUND
-                && reviewCase.getTezaursStatus() != TezaursStatus.MEANING_NOT_FOUND
-                && reviewCase.getTezaursStatus() != TezaursStatus.MEANING_NEEDS_EDITING) {
+        if (reviewCase.getType() != CaseType.ENTRY
+                && reviewCase.getType() != CaseType.SENSE) {
             throw new ConflictException("Sense drafts require an absent entry or meaning");
         }
 
-        Map<UUID, ReviewSense> existing = new HashMap<>();
+        Map<UUID, ReviewSense> savedDrafts = new HashMap<>();
         senseRepository.findAllByCaseIdAndTargetEntryIdOrderByOrderNoAscIdAsc(caseId, reviewCase.getMatchedEntryId())
-                .forEach(sense -> existing.put(sense.getId(), sense));
-        Map<Integer, TezaursSense> originals = new HashMap<>();
-        if (reviewCase.getTezaursStatus() == TezaursStatus.MEANING_NEEDS_EDITING) {
-            tezaursSenseRepository.findOrderedByEntryId(reviewCase.getMatchedEntryId())
-                    .forEach(sense -> originals.put(sense.getId(), sense));
-        }
-        validate(request, reviewCase, existing, originals);
+                .forEach(sense -> savedDrafts.put(sense.getId(), sense));
+        validate(request, reviewCase, savedDrafts);
         List<ReviewSense> senses = new ArrayList<>();
         for (int index = 0; index < request.senses().size(); index++) {
-            var item = request.senses().get(index);
-            ReviewSense sense = item.id() == null
-                    ? new ReviewSense(caseId, reviewCase.getMatchedEntryId()) : existing.remove(item.id());
+            var senseRequest = request.senses().get(index);
+            ReviewSense sense = senseRequest.id() == null
+                    ? new ReviewSense(caseId, reviewCase.getMatchedEntryId()) : savedDrafts.remove(senseRequest.id());
             if (sense == null) {
                 throw new ConflictException("A sense does not belong to this review");
             }
-            if (item.id() == null && item.sourceSenseId() != null) {
-                sense.recordSource(item.sourceSenseId());
-            }
-            sense.update(item.gloss().trim(), item.parentDraftSenseId(), item.parentTezaursSenseId(),
-                    index + 1, item.flags(), item.structuralRestrictions());
+            sense.update(senseRequest.gloss().trim(), senseRequest.parentDraftSenseId(), senseRequest.parentTezaursSenseId(),
+                    index + 1, senseRequest.flags(), senseRequest.structuralRestrictions());
             senses.add(sense);
         }
-        senseRepository.deleteAll(existing.values().stream()
-                .filter(sense -> reviewCase.getTezaursStatus() == TezaursStatus.MEANING_NEEDS_EDITING || sense.getSourceSenseId() == null)
-                .toList());
+        senseRepository.deleteAll(savedDrafts.values());
         senses = senseRepository.saveAll(senses);
         return new SaveSenseDraftsResponse(
                 senses.stream().map(SenseDraftResponse::from).toList(), completionService.response(reviewCase));
     }
 
-    private void validate(SaveSenseDraftsRequest request, ReviewCase reviewCase, Map<UUID, ReviewSense> existing,
-                          Map<Integer, TezaursSense> originals) {
+    private void validate(SaveSenseDraftsRequest request, ReviewCase reviewCase, Map<UUID, ReviewSense> savedDrafts) {
         Set<UUID> submittedIds = new HashSet<>();
-        Set<Integer> submittedSources = new HashSet<>();
-        Map<UUID, UUID> parents = new HashMap<>();
+        Map<UUID, UUID> draftParents = new HashMap<>();
         for (var sense : request.senses()) {
-            ReviewSense previous = existing.get(sense.id());
-            Integer sourceId = previous == null ? sense.sourceSenseId() : previous.getSourceSenseId();
-            TezaursSense original = originals.get(sourceId);
-            if (sourceId != null && !submittedSources.add(sourceId)) {
-                throw new ConflictException("The same original sense cannot be submitted twice");
-            }
-            if (previous != null && sense.sourceSenseId() != null && !sense.sourceSenseId().equals(sourceId)) {
-                throw new ConflictException("The source of an existing sense draft cannot be changed");
-            }
-            if (previous == null && sourceId != null && original == null) {
-                throw new ConflictException("The original sense does not belong to the selected entry");
-            }
-            if (sense.id() == null && sourceId != null && existing.values().stream()
-                    .anyMatch(draft -> sourceId.equals(draft.getSourceSenseId()))) {
-                throw new ConflictException("An edit for this original sense already exists; reload the review");
-            }
-            if (reviewCase.getTezaursStatus() != TezaursStatus.MEANING_NEEDS_EDITING
-                    && sourceId != null) {
-                throw new ConflictException("Editing existing senses has not been selected");
-            }
-            if (sense.gloss().isBlank() && sourceId == null) {
+            ReviewSense previous = savedDrafts.get(sense.id());
+            if (sense.gloss().isBlank()) {
                 throw new ConflictException("A new sense must have a definition");
             }
             if (sense.id() != null && !submittedIds.add(sense.id())) {
@@ -130,7 +99,7 @@ public class SenseDraftService {
                 throw new ConflictException("A sense cannot be its own parent");
             }
             if (sense.id() != null && sense.parentDraftSenseId() != null) {
-                parents.put(sense.id(), sense.parentDraftSenseId());
+                draftParents.put(sense.id(), sense.parentDraftSenseId());
             }
             if (sense.parentTezaursSenseId() != null
                     && (reviewCase.getMatchedEntryId() == null
@@ -138,12 +107,10 @@ public class SenseDraftService {
                             sense.parentTezaursSenseId(), reviewCase.getMatchedEntryId()))) {
                 throw new ConflictException("The selected parent sense does not belong to the matched entry");
             }
-            var gram = original == null ? Map.<String, Object>of() : object(object(original.getData()).get("Gram"));
-            var oldFlags = previous == null ? object(gram.get("Flags")) : previous.getFlags();
-            var oldRestrictions = previous == null ? gram.get("StructuralRestrictions") : previous.getStructuralRestrictions();
-            if (oldRestrictions instanceof List<?> values) oldRestrictions = Map.of("AND", values);
-            flagService.validateChanges("S", sense.flags(), oldFlags);
-            if (!java.util.Objects.equals(oldRestrictions, sense.structuralRestrictions())) {
+            Map<String, Object> previousFlags = previous == null ? Map.of() : previous.getFlags();
+            Map<String, Object> previousRestrictions = previous == null ? null : previous.getStructuralRestrictions();
+            flagService.validateChanges(SENSE_SCOPE, sense.flags(), previousFlags);
+            if (!java.util.Objects.equals(previousRestrictions, sense.structuralRestrictions())) {
                 restrictionService.validate(sense.structuralRestrictions());
             }
         }
@@ -153,53 +120,16 @@ public class SenseDraftService {
                 throw new ConflictException("A parent draft sense must be included in the same draft");
             }
         }
-        for (UUID senseId : parents.keySet()) {
+        for (UUID senseId : draftParents.keySet()) {
             Set<UUID> ancestors = new HashSet<>();
-            UUID current = senseId;
-            while (current != null) {
-                if (!ancestors.add(current)) {
+            UUID ancestorId = senseId;
+            while (ancestorId != null) {
+                if (!ancestors.add(ancestorId)) {
                     throw new ConflictException("Sense hierarchy cannot contain a cycle");
                 }
-                current = parents.get(current);
+                ancestorId = draftParents.get(ancestorId);
             }
         }
-        validateSourceHierarchy(request, existing, originals);
-    }
-
-    private void validateSourceHierarchy(SaveSenseDraftsRequest request, Map<UUID, ReviewSense> existing,
-                                         Map<Integer, TezaursSense> originals) {
-        Map<String, String> parents = new HashMap<>();
-        originals.values().forEach(sense -> parents.put("source:" + sense.getId(),
-                sense.getParentSenseId() == null ? null : "source:" + sense.getParentSenseId()));
-        Map<UUID, String> draftKeys = new HashMap<>();
-        for (var item : request.senses()) {
-            var previous = existing.get(item.id());
-            Integer sourceId = previous == null ? item.sourceSenseId() : previous.getSourceSenseId();
-            if (item.id() != null) draftKeys.put(item.id(), sourceId == null ? "draft:" + item.id() : "source:" + sourceId);
-        }
-        for (var item : request.senses()) {
-            String key = draftKeys.get(item.id());
-            if (item.id() == null && item.sourceSenseId() != null) key = "source:" + item.sourceSenseId();
-            String parent = null;
-            if (item.parentDraftSenseId() != null) parent = draftKeys.get(item.parentDraftSenseId());
-            else if (item.parentTezaursSenseId() != null) parent = "source:" + item.parentTezaursSenseId();
-            if (key != null) parents.put(key, parent);
-        }
-        for (String key : parents.keySet()) {
-            Set<String> ancestors = new HashSet<>();
-            while (key != null) {
-                if (!ancestors.add(key)) throw new ConflictException("Sense hierarchy cannot contain a cycle");
-                key = parents.get(key);
-            }
-        }
-    }
-
-    private static Map<String, Object> object(Object value) {
-        Map<String, Object> result = new HashMap<>();
-        if (value instanceof Map<?, ?> fields) fields.forEach((key, item) -> {
-            if (key instanceof String name) result.put(name, item);
-        });
-        return result;
     }
 
     private ReviewCase requireCase(UUID id) {

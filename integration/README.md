@@ -9,7 +9,10 @@ Requires Java 21+ and Docker. From the repository root:
 
 The first command builds the backend; repeat it after backend changes.
 Cucumber starts a temporary PostgreSQL container and backend on a free port,
-resetting synthetic fixtures before each scenario.
+resetting synthetic fixtures before each scenario. API scenarios use pre-created
+cases with fixed UUIDs, so they do not wait for the scheduled importer.
+The separate import scenario starts with unlinked submissions and checks the real
+scheduled job, including later arrivals and repeat imports.
 The legacy schema fixture contains the mapped tables from the Tēzaurs dump;
 the actual Flyway migration creates `review`.
 

@@ -1,21 +1,12 @@
 package lv.tezaurs.suggestions.suggestion.controller;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import java.time.Instant;
-import java.util.List;
-import lv.tezaurs.suggestions.suggestion.dto.SuggestionPageResponse;
 import lv.tezaurs.suggestions.suggestion.dto.SuggestionCountsResponse;
-import lv.tezaurs.suggestions.suggestion.dto.SuggestionResponse;
-import lv.tezaurs.suggestions.suggestion.dto.SuggestionSort;
-import lv.tezaurs.suggestions.suggestion.dto.ReviewResponse;
-import lv.tezaurs.suggestions.suggestion.dto.UpdateStatusRequest;
-import lv.tezaurs.suggestions.suggestion.entity.ReviewStatus;
 import lv.tezaurs.suggestions.suggestion.service.SuggestionService;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -33,32 +24,4 @@ class SuggestionControllerTest {
                 .andExpect(jsonPath("$.cases").value(15));
     }
 
-    @Test
-    void delegatesSourceSuggestionActions() {
-        SuggestionService service = mock(SuggestionService.class);
-        SuggestionController controller = new SuggestionController(service);
-        SuggestionResponse response = new SuggestionResponse(42, "term", "definition", null,
-                null, null, null, null, Instant.EPOCH);
-        SuggestionPageResponse page = new SuggestionPageResponse(List.of(response), 0, 1, 1);
-        UpdateStatusRequest request = new UpdateStatusRequest(ReviewStatus.READY_FOR_REVIEW);
-        ReviewResponse review = mock(ReviewResponse.class);
-        when(service.list("", 0, 20, SuggestionSort.NEWEST))
-                .thenReturn(page);
-        when(service.changeStatus(response.id(), request, null)).thenReturn(review);
-
-        assertThat(controller.list("", 0, 20, SuggestionSort.NEWEST))
-                .isEqualTo(page);
-        assertThat(controller.changeStatus(response.id(), request, null)).isEqualTo(review);
-    }
-
-    @Test
-    void rejectsInvalidPagination() throws Exception {
-        SuggestionController controller = new SuggestionController(mock(SuggestionService.class));
-        var mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
-
-        mockMvc.perform(get("/api/suggestions").param("page", "-1"))
-                .andExpect(status().isBadRequest());
-        mockMvc.perform(get("/api/suggestions").param("size", "101"))
-                .andExpect(status().isBadRequest());
-    }
 }

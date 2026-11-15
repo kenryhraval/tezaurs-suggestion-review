@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import {
   getSenseDrafts,
-  getTezaursEntry,
+  getTezaursSenses,
   getTezaursFormOptions,
   saveSenseDrafts,
 } from '../../api/client'
@@ -9,23 +9,17 @@ import type {
   Review,
   SaveSenseDraft,
   TezaursFormOptions,
-  TezaursEntryDetails,
-  TezaursSenseDetails,
-  FlagMap,
+  TezaursSense,
 } from '../../api/types'
-import { FlagEditor } from './FlagEditor'
-import { RestrictionEditor } from './RestrictionEditor'
-import { SenseDetails } from '../tezaurs/EntryDisplay'
 import { EditDialog } from '../shared/EditDialog'
 import { SenseActions } from '../tezaurs/TezaursActions'
 import { ConfirmationDialog } from '../shared/ConfirmationDialog'
-import { buildDisplayedSenses } from '../../draft/senseView'
+import { SenseFields } from './SenseFields'
 
 type Props = {
   reviewId: string
   initialGloss: string
   matchedEntryId: number | null
-  editExistingSenses: boolean
   editable: boolean
   onReviewUpdated: (review: Review) => void
   renderEntry: (senses: ReactNode, onAddSense?: () => void) => ReactNode
@@ -47,13 +41,12 @@ export function SenseDraftForm({
   reviewId,
   initialGloss,
   matchedEntryId,
-  editExistingSenses,
   editable,
   onReviewUpdated,
   renderEntry,
 }: Props) {
   const [senses, setSenses] = useState<SaveSenseDraft[]>([])
-  const [existingEntry, setExistingEntry] = useState<TezaursEntryDetails | null>(null)
+  const [existingSenses, setExistingSenses] = useState<TezaursSense[]>([])
   const [options, setOptions] = useState<TezaursFormOptions | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -65,36 +58,25 @@ export function SenseDraftForm({
 
   useEffect(() => {
     let requestIsOutdated = false
-    const entryRequest = matchedEntryId === null
-      ? Promise.resolve(null)
-      : getTezaursEntry(matchedEntryId)
+    const parentSensesRequest = matchedEntryId === null
+      ? Promise.resolve([])
+      : getTezaursSenses(matchedEntryId)
 
     async function loadSenseForm() {
       try {
-        const [loadedSenses, loadedOptions, entry] = await Promise.all([
+        const [loadedSenses, loadedOptions, loadedExistingSenses] = await Promise.all([
           getSenseDrafts(reviewId),
           getTezaursFormOptions(),
-          entryRequest,
+          parentSensesRequest,
         ])
         if (requestIsOutdated) {
           return
         }
 
-        let editableSenses = loadedSenses
-        if (!editExistingSenses) {
-          editableSenses = loadedSenses.filter((sense) => !sense.sourceSenseId)
-          for (const sense of editableSenses) {
-            const parent = loadedSenses.find((item) => item.id === sense.parentDraftSenseId)
-            if (parent?.sourceSenseId) {
-              sense.parentDraftSenseId = null
-              sense.parentTezaursSenseId = parent.sourceSenseId
-            }
-          }
-        }
-        setSenses(editableSenses)
-        setSavedSenses(editableSenses)
+        setSenses(loadedSenses)
+        setSavedSenses(loadedSenses)
         setOptions(loadedOptions)
-        setExistingEntry(entry)
+        setExistingSenses(loadedExistingSenses)
       } catch (cause) {
         if (!requestIsOutdated) {
           setError(cause instanceof Error ? cause.message : 'Neizdevās ielādēt nozīmju formu.')
@@ -111,7 +93,7 @@ export function SenseDraftForm({
     return () => {
       requestIsOutdated = true
     }
-  }, [matchedEntryId, reviewId, editExistingSenses])
+  }, [matchedEntryId, reviewId])
 
   function replaceSense(index: number, updatedSense: SaveSenseDraft) {
     setSenses((currentSenses) => {
@@ -167,26 +149,6 @@ export function SenseDraftForm({
     }
   }
 
-  function editOriginalSense(existingSense: TezaursSenseDetails, action: SenseEditAction) {
-    const grammarData = existingSense.data?.Gram as {
-      Flags?: FlagMap
-      StructuralRestrictions?: Record<string, unknown> | Record<string, unknown>[]
-    } | undefined
-    const structuralRestrictions = grammarData?.StructuralRestrictions
-    const senseDraft: SaveSenseDraft = {
-      sourceSenseId: existingSense.id,
-      gloss: existingSense.gloss ?? '',
-      parentDraftSenseId: null,
-      parentTezaursSenseId: action === 'promote' ? null : existingSense.parentSenseId,
-      flags: grammarData?.Flags ?? {},
-      structuralRestrictions: Array.isArray(structuralRestrictions) ? { AND: structuralRestrictions } : structuralRestrictions ?? null,
-    }
-    setError('')
-    setEditingParent(action !== 'edit')
-    setEditingIndex(senses.length)
-    setSenses((currentSenses) => [...currentSenses, senseDraft])
-  }
-
   async function saveSenses(nextSenses = senses) {
     setSaving(true)
     setError('')
@@ -234,125 +196,76 @@ export function SenseDraftForm({
     return renderEntry(<p className="error">{error || 'Nozīmju forma nav pieejama.'}</p>)
   }
 
-  const existingSenses = existingEntry?.senses ?? []
-  const displayedSenses = buildDisplayedSenses(existingEntry, senses)
+  const savedSensesForDisplay = senses.filter((sense) => sense.id)
 
-  function renderSenses(parentKey: string | null, prefix = '') {
-    const siblings = displayedSenses.filter((item) => item.parentKey === parentKey)
-    return siblings.map((item, index) => {
-      const number = prefix ? `${prefix}.${index + 1}` : String(index + 1)
-      const hasChildren = displayedSenses.some((child) => child.parentKey === item.key)
-      const showNumber = prefix !== '' || siblings.length > 1 || hasChildren
-      const draftIndex = item.draftIndex
-      const canEdit = editable && (draftIndex !== null || editExistingSenses)
-      const canDelete = editable && draftIndex !== null && senses.length > 1 && !hasChildren
-      function openEditor(action: SenseEditAction) {
-        if (draftIndex !== null) {
-          editSense(draftIndex, action)
-        } else {
-          editOriginalSense(item.sense, action)
-        }
-      }
+  function renderSenses(parentId: string | null, parentTezaursId: number | null, prefix = ''): ReactNode {
+    const siblings = savedSensesForDisplay.filter((sense) =>
+      sense.parentDraftSenseId === parentId && sense.parentTezaursSenseId === parentTezaursId)
+    const existingSiblingCount = parentId === null
+      ? existingSenses.filter((sense) => sense.parentSenseId === parentTezaursId).length : 0
+    return siblings.map((sense, siblingIndex) => {
+      const index = senses.indexOf(sense)
+      const position = existingSiblingCount + siblingIndex + 1
+      const number = prefix ? `${prefix}.${position}` : String(position)
+      const hasChildren = senses.some((child) => child.parentDraftSenseId === sense.id)
+      const canDelete = editable && senses.length > 1 && !hasChildren
       return (
-          <SenseDetails key={item.key} number={showNumber ? number : ''} sense={item.sense} isNew={item.isNew}
-            actions={
-              <SenseActions subsense={parentKey !== null}
-                onEdit={canEdit ? () => openEditor('edit') : undefined}
-                onAddSubsense={editable ? () => {
-                  if (draftIndex !== null) {
-                    addSense(senses[draftIndex].id ?? null)
-                  } else {
-                    addSense(null, item.sense.id)
-                  }
-                } : undefined}
-                onMove={canEdit && displayedSenses.length > 1 ? () => openEditor('move') : undefined}
-                onPromote={canEdit ? () => openEditor('promote') : undefined}
-                onDelete={canDelete ? () => {
-                  setError('')
-                  setDeletingIndex(draftIndex)
-                } : undefined}
-              />
-            }>
-            {renderSenses(item.key, number)}
-          </SenseDetails>
+        <div className="draft-sense" key={sense.id}>
+          <SenseActions subsense={parentId !== null || sense.parentTezaursSenseId !== null} readOnly={!editable}
+            onEdit={() => editSense(index, 'edit')}
+            onAddSubsense={editable ? () => addSense(sense.id) : undefined}
+            onMove={editable && (existingSenses.length > 0 || savedSensesForDisplay.length > 1)
+              ? () => editSense(index, 'move') : undefined}
+            onPromote={editable && (parentId !== null || sense.parentTezaursSenseId !== null)
+              ? () => editSense(index, 'promote') : undefined}
+            onDelete={canDelete ? () => {
+              setError('')
+              setDeletingIndex(index)
+            } : undefined} />
+          <strong>{number}.</strong>{' '}{sense.gloss || 'Skaidrojums nav norādīts.'}
+          {renderSenses(sense.id ?? null, null, number)}
+        </div>
       )
     })
   }
 
+  function existingSenseNumber(senseId: number): string {
+    const sense = existingSenses.find((existingSense) => existingSense.id === senseId)
+    if (!sense) return ''
+    const siblings = existingSenses.filter((existingSense) => existingSense.parentSenseId === sense.parentSenseId)
+    const position = siblings.indexOf(sense) + 1
+    return sense.parentSenseId === null ? String(position) : `${existingSenseNumber(sense.parentSenseId)}.${position}`
+  }
+
+  const existingParentIds = [...new Set(savedSensesForDisplay
+    .map((sense) => sense.parentTezaursSenseId).filter((id) => id !== null))]
+
   const content = (
     <section aria-label="Nozīmes">
-      {renderSenses(null)}
+      {renderSenses(null, null)}
+      {existingParentIds.map((parentId) => (
+        <div key={parentId}>{renderSenses(null, parentId, existingSenseNumber(parentId))}</div>
+      ))}
       {senses.map((sense, index) => {
-        let parentValue = ''
-        if (sense.parentDraftSenseId) {
-          parentValue = `draft:${sense.parentDraftSenseId}`
-        } else if (sense.parentTezaursSenseId) {
-          parentValue = `tezaurs:${sense.parentTezaursSenseId}`
-        }
-        let editorTitle = sense.id || sense.sourceSenseId ? 'Labot nozīmi' : 'Pievienot nozīmi'
+        let editorTitle = sense.id ? 'Labot nozīmi' : 'Pievienot nozīmi'
         if (editingParent) {
           editorTitle = 'Pārvietot nozīmi'
         }
         return (
           <div key={sense.id ?? index}>
             {editingIndex === index && (
-              <EditDialog title={editorTitle} busy={saving}
+              <EditDialog title={editable ? editorTitle : "Nozīmes dati"} busy={saving} readOnly={!editable}
                 error={error} onCancel={cancelSenseEdit} onSubmit={() => saveSenses()}>
-                {!editingParent && <label>
-                  Skaidrojums
-                  <textarea className="form-control form-control-sm"
-                    autoFocus
-                    onChange={(event) => replaceSense(index, {
-                      ...sense,
-                      gloss: event.target.value,
-                    })}
-                    required
-                    rows={4}
-                    value={sense.gloss}
-                  />
-                </label>}
-                {(existingSenses.length > 0 || senses.some((item) => item.id && item.id !== sense.id)) && (
-                  <label>
-                    Virsnozīme
-                    <select className="custom-select custom-select-sm" value={parentValue} onChange={(event) => updateParent(index, event.target.value)}>
-                      <option value="">Nav</option>
-                      {existingSenses.filter((item) => !senses.some((draft) => draft.sourceSenseId === item.id)).map((item) => (
-                        <option key={`tezaurs-${item.id}`} value={`tezaurs:${item.id}`}>
-                          Esošā: {item.gloss || item.id}
-                        </option>
-                      ))}
-                      {senses.filter((item) => item.id && item.id !== sense.id).map((item) => (
-                        <option key={`draft-${item.id}`} value={`draft:${item.id}`}>
-                          Melnraksta: {item.gloss}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                )}
-                {!editingParent && <>
-                  <FlagEditor
-                    definitions={options.flags}
-                    flags={sense.flags}
-                    onChange={(flags) => replaceSense(index, { ...sense, flags })}
-                    scope="S"
-                  />
-                  <RestrictionEditor
-                    definitions={options.flags}
-                    frequencies={options.restrictionFrequencies}
-                    onChange={(structuralRestrictions) => replaceSense(index, {
-                      ...sense,
-                      structuralRestrictions,
-                    })}
-                    restriction={sense.structuralRestrictions}
-                    types={options.restrictionTypes}
-                  />
-                </>}
+                <SenseFields sense={sense} options={options} existingSenses={existingSenses}
+                  draftSenses={senses} onlyParent={editingParent}
+                  onChange={(updatedSense) => replaceSense(index, updatedSense)}
+                  onParentChange={(value) => updateParent(index, value)} />
               </EditDialog>
             )}
           </div>
         )
       })}
-      {displayedSenses.length === 0 && <p className="muted">Nozīmes vēl nav pievienotas.</p>}
+      {savedSensesForDisplay.length === 0 && <p className="muted">Jaunas nozīmes vēl nav pievienotas.</p>}
       {deletingIndex !== null && (
         <ConfirmationDialog message={`Dzēst nozīmi “${senses[deletingIndex]?.gloss}” no melnraksta?`}
           busy={saving} error={error}

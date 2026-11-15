@@ -1,5 +1,5 @@
 import { reviewStatusLabels } from '../../review/statuses'
-import type { QueueItem, SuggestionSort, ReviewStatus } from '../../api/types'
+import type { ReviewListItem, ReviewSort, ReviewStatus } from '../../api/types'
 
 const statuses: ReviewStatus[] = [
   'NEW',
@@ -14,9 +14,9 @@ const statuses: ReviewStatus[] = [
 ]
 
 type Props = {
-  items: QueueItem[]
+  items: ReviewListItem[]
   status: ReviewStatus
-  sort: SuggestionSort
+  sort: ReviewSort
   selectedKey: string | null
   loading: boolean
   page: number
@@ -24,16 +24,8 @@ type Props = {
   totalItems: number
   onSelect: (key: string) => void
   onFilterStatusChange: (status: ReviewStatus) => void
-  onSortChange: (sort: SuggestionSort) => void
+  onSortChange: (sort: ReviewSort) => void
   onPageChange: (page: number) => void
-}
-
-function itemKey(item: QueueItem) {
-  return `${item.itemType}:${item.id}`
-}
-
-function itemTerm(item: QueueItem) {
-  return item.itemType === 'SUGGESTION' ? item.submittedTerm : item.reviewedTerm
 }
 
 export function SuggestionList({
@@ -62,7 +54,7 @@ export function SuggestionList({
           ))}
         </select>
         <select className="custom-select custom-select-sm" aria-label="Kārtot"
-          onChange={(event) => onSortChange(event.target.value as SuggestionSort)}
+          onChange={(event) => onSortChange(event.target.value as ReviewSort)}
           value={sort}
         >
           <option value="NEWEST">Jaunākie</option>
@@ -88,15 +80,15 @@ export function SuggestionList({
           {items.map((item) => (
             <li
               className="list-group-item p-0 overflow-hidden"
-              key={itemKey(item)}
+              key={item.id}
             >
               <button
-                className={itemKey(item) === selectedKey ? 'list-group-item-action suggestion-select selected' : 'list-group-item-action suggestion-select'}
-                onClick={() => onSelect(itemKey(item))}
+                className={item.id === selectedKey ? 'list-group-item-action suggestion-select selected' : 'list-group-item-action suggestion-select'}
+                onClick={() => onSelect(item.id)}
                 type="button"
               >
-                <strong>{itemTerm(item)}</strong>
-                {item.itemType === 'REVIEW' && (
+                <strong>{item.reviewedTerm}</strong>
+                {item.status !== 'NEW' && (
                   <small>
                     {item.sourceCount}{' '}
                     {item.sourceCount === 1 ? 'ieteikums' : 'ieteikumi'}

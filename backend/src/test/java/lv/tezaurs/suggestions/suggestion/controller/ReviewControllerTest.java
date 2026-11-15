@@ -11,9 +11,9 @@ import lv.tezaurs.suggestions.suggestion.dto.ReviewResponse;
 import lv.tezaurs.suggestions.suggestion.dto.ReviewSort;
 import lv.tezaurs.suggestions.suggestion.dto.ReviewPageResponse;
 import lv.tezaurs.suggestions.suggestion.dto.UpdateStatusRequest;
-import lv.tezaurs.suggestions.suggestion.dto.RecordTezaursCheckRequest;
+import lv.tezaurs.suggestions.suggestion.dto.UpdateCaseTypeRequest;
 import lv.tezaurs.suggestions.suggestion.entity.CompletionBlockReason;
-import lv.tezaurs.suggestions.suggestion.entity.TezaursStatus;
+import lv.tezaurs.suggestions.suggestion.entity.CaseType;
 import lv.tezaurs.suggestions.suggestion.entity.ReviewStatus;
 import lv.tezaurs.suggestions.suggestion.service.ReviewService;
 import lv.tezaurs.suggestions.tezaurs.dto.TezaursEntryCandidateResponse;
@@ -67,17 +67,17 @@ class ReviewControllerTest {
     @Test
     void forwardsTheUserWhenRecordingADictionaryDecision() {
         ReviewResponse response = response();
-        var request = new RecordTezaursCheckRequest(TezaursStatus.MEANING_ALREADY_EXISTS, 42);
+        var request = new UpdateCaseTypeRequest(CaseType.SENSE, 42, true);
         String authorization = "Basic bWlrdXM6cHc=";
-        when(service.recordTezaursCheck(response.id(), request, authorization)).thenReturn(response);
+        when(service.changeType(response.id(), request, authorization)).thenReturn(response);
 
-        assertThat(controller.recordTezaursCheck(response.id(), request, authorization)).isEqualTo(response);
+        assertThat(controller.changeType(response.id(), request, authorization)).isEqualTo(response);
     }
 
     private static ReviewResponse response() {
         return new ReviewResponse(UUID.randomUUID(), "term", ReviewStatus.IN_PROGRESS,
                 "mikus",
-                TezaursStatus.NOT_CHECKED, null, lv.tezaurs.suggestions.usage.entity.UsageDecision.NOT_CHECKED, null, null, null, false, CompletionBlockReason.TEZAURS_CHECK_REQUIRED,
+                CaseType.UNKNOWN, null, lv.tezaurs.suggestions.usage.entity.UsageDecision.NOT_CHECKED, null, null, null, false, CompletionBlockReason.TEZAURS_CHECK_REQUIRED,
                 Instant.EPOCH, List.of());
     }
 }
