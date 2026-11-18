@@ -3,6 +3,9 @@ package lv.tezaurs.suggestions.suggestion.controller;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.Instant;
 import java.util.List;
@@ -19,6 +22,7 @@ import lv.tezaurs.suggestions.suggestion.service.ReviewService;
 import lv.tezaurs.suggestions.tezaurs.dto.TezaursEntryCandidateResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 class ReviewControllerTest {
     private ReviewService service;
@@ -31,17 +35,41 @@ class ReviewControllerTest {
     }
 
     @Test
+    void listsAllStatusesWhenStatusFilterIsOmitted() throws Exception {
+        when(service.list(null, null, "", 0, 20, ReviewSort.NEWEST))
+                .thenReturn(new ReviewPageResponse(List.of(), 0, 0, 0));
+
+        var mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
+        mockMvc.perform(get("/api/reviews")).andExpect(status().isOk());
+
+        verify(service).list(null, null, "", 0, 20, ReviewSort.NEWEST);
+    }
+
+    @Test
+    void acceptsMultipleCaseTypes() throws Exception {
+        List<CaseType> types = List.of(CaseType.ENTRY, CaseType.SENSE);
+        when(service.list(null, types, "", 0, 20, ReviewSort.NEWEST))
+                .thenReturn(new ReviewPageResponse(List.of(), 0, 0, 0));
+
+        var mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
+        mockMvc.perform(get("/api/reviews").param("types", "ENTRY", "SENSE"))
+                .andExpect(status().isOk());
+
+        verify(service).list(null, types, "", 0, 20, ReviewSort.NEWEST);
+    }
+
+    @Test
     void looksUpAReviewByItsOwnId() {
         ReviewResponse response = response();
         ReviewPageResponse page = new ReviewPageResponse(List.of(), 0, 0, 0);
         UpdateStatusRequest request = new UpdateStatusRequest(ReviewStatus.IN_PROGRESS);
         when(service.find(response.id())).thenReturn(response);
-        when(service.list(ReviewStatus.READY_FOR_REVIEW, "term", 0, 20,
+        when(service.list(ReviewStatus.READY_FOR_REVIEW, null, "term", 0, 20,
                 ReviewSort.NEWEST)).thenReturn(page);
         when(service.changeStatus(response.id(), request, "Basic bWlrdXM6cHc=")).thenReturn(response);
 
         assertThat(controller.find(response.id())).isEqualTo(response);
-        assertThat(controller.list(ReviewStatus.READY_FOR_REVIEW, "term", 0, 20,
+        assertThat(controller.list(ReviewStatus.READY_FOR_REVIEW, null, "term", 0, 20,
                 ReviewSort.NEWEST)).isEqualTo(page);
         assertThat(controller.changeStatus(response.id(), request, "Basic bWlrdXM6cHc=")).isEqualTo(response);
     }
@@ -75,7 +103,7 @@ class ReviewControllerTest {
     }
 
     private static ReviewResponse response() {
-        return new ReviewResponse(UUID.randomUUID(), "term", ReviewStatus.IN_PROGRESS,
+        return new ReviewResponse(UUID.randomUUID(), "k7m2pa", "term", ReviewStatus.IN_PROGRESS,
                 "mikus",
                 CaseType.UNKNOWN, null, lv.tezaurs.suggestions.usage.entity.UsageDecision.NOT_CHECKED, null, null, null, false, CompletionBlockReason.TEZAURS_CHECK_REQUIRED,
                 Instant.EPOCH, List.of());

@@ -1,16 +1,18 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type MouseEvent } from 'react'
+import { Link } from 'react-router'
 import { getSuggestionCounts } from '../../api/client'
 import headerImage from '../../assets/tip-header.svg'
-import searchIcon from '../../assets/search.svg'
+import { HeaderSearch } from './HeaderSearch'
 
 type Props = {
   reloadCount: number
-  search: string
-  onSearchChange: (value: string) => void
-  onSearchSubmit: () => void
+  query: string
+  onSearch: (query: string) => void
+  onHome: () => void
 }
 
-export function AppHeader({ reloadCount, search, onSearchChange, onSearchSubmit }: Props) {
+export function AppHeader({ reloadCount, query, onSearch, onHome }: Props) {
+  const [searchResetCount, setSearchResetCount] = useState(0)
   const [counts, setCounts] = useState<{ suggestions: number; cases: number } | null>(null)
 
   useEffect(() => {
@@ -31,21 +33,19 @@ export function AppHeader({ reloadCount, search, onSearchChange, onSearchSubmit 
     return () => { requestIsOutdated = true }
   }, [reloadCount])
 
+  function openHome(event: MouseEvent<HTMLAnchorElement>) {
+    if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) {
+      return
+    }
+    onHome()
+    setSearchResetCount((current) => current + 1)
+  }
+
   return <header className="app-header">
-    <a className="app-brand" href="/" aria-label="TIP sākumlapa">
+    <Link className="app-brand" to="/" onClick={openHome} aria-label="TIP sākumlapa">
       <img src={headerImage} width="290" height="55" alt="TIP" />
-    </a>
-    <form className="header-search" role="search" onSubmit={(event) => {
-      event.preventDefault()
-      onSearchSubmit()
-    }}>
-      <label className="sr-only" htmlFor="suggestion-search">Meklēt ieteikumus</label>
-      <input id="suggestion-search" type="search" placeholder="Vārds vai nozīme"
-        value={search} onChange={(event) => onSearchChange(event.target.value)} />
-      <button type="submit" aria-label="Meklēt" title="Meklēt">
-        <img src={searchIcon} width="40" height="40" alt="" />
-      </button>
-    </form>
+    </Link>
+    <HeaderSearch key={searchResetCount} query={query} onSearch={onSearch} />
     <div className="app-header-info">
       <h1>Tēzaura ieteikumu perēklis</h1>
       {counts && <>

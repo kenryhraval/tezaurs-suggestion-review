@@ -1,5 +1,31 @@
+CREATE FUNCTION generate_case_public_id() RETURNS TEXT
+LANGUAGE plpgsql AS $$
+DECLARE
+    alphabet CONSTANT TEXT := 'abcdefghijklmnopqrstuvwxyz0123456789';
+    code_length INTEGER := 6;
+    candidate TEXT;
+BEGIN
+    -- Keep allocation atomic across concurrent case inserts.
+    PERFORM pg_advisory_xact_lock(714, 2);
+    LOOP
+        FOR attempt IN 1..10 LOOP
+            candidate := '';
+            FOR character_number IN 1..code_length LOOP
+                candidate := candidate || substr(alphabet, 1 + floor(random() * length(alphabet))::INTEGER, 1);
+            END LOOP;
+            IF NOT EXISTS (SELECT 1 FROM review.cases WHERE public_id = candidate) THEN
+                RETURN candidate;
+            END IF;
+        END LOOP;
+        code_length := code_length + 1;
+    END LOOP;
+END;
+$$;
+
 CREATE TABLE cases (
     id UUID PRIMARY KEY,
+    public_id TEXT NOT NULL UNIQUE DEFAULT generate_case_public_id()
+        CHECK (public_id ~ '^[a-z0-9]{6,}$'),
     reviewed_term TEXT NOT NULL,
     status VARCHAR(32) NOT NULL,
     last_status_changed_by VARCHAR(255) CHECK (btrim(last_status_changed_by) <> ''),

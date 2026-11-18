@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { UsageEvidence } from '../../api/types'
 import { SavedUsageEvidence } from './SavedUsageEvidence'
+import { Dialog } from '../shared/Dialog'
 
 type Props = {
   evidence: UsageEvidence[]
@@ -8,17 +9,12 @@ type Props = {
   onRemove?: (id: string) => void
 }
 
-const PAGE_SIZE = 25
-
 export function SelectedUsageEvidence({ evidence, busy, onRemove }: Props) {
-  const [page, setPage] = useState(0)
-  if (evidence.length === 0) {
+  const [open, setOpen] = useState(false)
+  if (evidence.length === 0 && !open) {
     return null
   }
 
-  const pageCount = Math.ceil(evidence.length / PAGE_SIZE)
-  const currentPage = Math.min(page, pageCount - 1)
-  const visibleEvidence = evidence.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE)
   const sourceCounts = new Map<string, number>()
   for (const item of evidence) {
     const source = item.corpusLabel ?? new URL(item.url).hostname
@@ -32,17 +28,23 @@ export function SelectedUsageEvidence({ evidence, busy, onRemove }: Props) {
 
   return (
     <section className="selected-evidence">
-      <h4>Atzīmētie piemēri ({evidence.length})</h4>
-      <p className="muted">{sourceSummary.join(' · ')}</p>
-      {visibleEvidence.map((item) => <SavedUsageEvidence key={item.id} evidence={item} busy={busy}
-        onRemove={onRemove ? () => onRemove(item.id) : undefined} />)}
-      {pageCount > 1 && <nav className="corpus-pagination" aria-label="Atzīmēto piemēru lapošana">
-        <button className="btn btn-sm btn-outline-secondary" type="button" title="Iepriekšējā lapa" aria-label="Iepriekšējā lapa" disabled={currentPage === 0}
-          onClick={() => setPage(currentPage - 1)}>‹</button>
-        <small aria-live="polite">{currentPage + 1} / {pageCount}</small>
-        <button className="btn btn-sm btn-outline-secondary" type="button" title="Nākamā lapa" aria-label="Nākamā lapa" disabled={currentPage + 1 === pageCount}
-          onClick={() => setPage(currentPage + 1)}>›</button>
-      </nav>}
+      <button className="selected-evidence-toggle" type="button" onClick={() => setOpen(true)}>
+        Atzīmētie piemēri ({evidence.length})
+      </button>
+      {open && <Dialog title={`Atzīmētie piemēri (${evidence.length})`} busy={busy} wide
+        onCancel={() => setOpen(false)}>
+        {evidence.length > 0 ? <>
+          <p className="muted">{sourceSummary.join(' · ')}</p>
+          <div className="selected-evidence-list" role="region" aria-label="Atzīmētie piemēri" tabIndex={0}>
+            {evidence.map((item) => <SavedUsageEvidence key={item.id} evidence={item} busy={busy}
+              onRemove={onRemove ? () => onRemove(item.id) : undefined} />)}
+          </div>
+        </> : <p className="muted">Nav atzīmētu piemēru.</p>}
+        <div className="modal-footer">
+          <button className="btn btn-sm btn-light border" type="button" disabled={busy}
+            onClick={() => setOpen(false)}>Aizvērt</button>
+        </div>
+      </Dialog>}
     </section>
   )
 }

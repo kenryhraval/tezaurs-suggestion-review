@@ -1,4 +1,6 @@
 import type {
+  CurrentUser,
+  CaseType,
   DuplicateReviewCandidate,
   EntryDraft,
   Review,
@@ -47,8 +49,8 @@ async function request(path: string, options?: RequestInit): Promise<Response> {
   return response
 }
 
-export async function getCurrentUser(): Promise<{ username: string | null }> {
-  const response = await request('/api/me')
+export async function getCurrentUser(signal?: AbortSignal): Promise<CurrentUser> {
+  const response = await request('/api/me', { signal })
   return response.json()
 }
 
@@ -58,19 +60,25 @@ export async function getSuggestionCounts(): Promise<{ suggestions: number; case
 }
 
 export async function getReviews(
-  status: ReviewStatus,
+  status: ReviewStatus | null,
   query: string,
   page: number,
   size: number,
   sort: ReviewSort,
+  types: CaseType[] = [],
 ): Promise<ReviewPageResponse> {
   const parameters = new URLSearchParams({
-    status,
     query,
     page: String(page),
     size: String(size),
     sort,
   })
+  if (status !== null) {
+    parameters.set('status', status)
+  }
+  for (const type of types) {
+    parameters.append('types', type)
+  }
   const response = await request(`/api/reviews?${parameters}`)
   return response.json()
 }
@@ -110,8 +118,8 @@ export async function mergeReviewCases(sourceCaseId: string, reviewId: string): 
   return response.json()
 }
 
-export async function getReview(reviewId: string): Promise<Review> {
-  const response = await request(`/api/reviews/${reviewId}`)
+export async function getReviewByPublicId(publicId: string, signal?: AbortSignal): Promise<Review> {
+  const response = await request(`/api/reviews/by-public-id/${publicId}`, { signal })
   return response.json()
 }
 

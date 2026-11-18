@@ -3,6 +3,7 @@ package lv.tezaurs.suggestions.suggestion.controller;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Pattern;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +16,7 @@ import lv.tezaurs.suggestions.suggestion.dto.ReviewSort;
 import lv.tezaurs.suggestions.suggestion.dto.UpdateStatusRequest;
 import lv.tezaurs.suggestions.suggestion.dto.LinkDuplicateRequest;
 import lv.tezaurs.suggestions.suggestion.entity.ReviewStatus;
+import lv.tezaurs.suggestions.suggestion.entity.CaseType;
 import lv.tezaurs.suggestions.suggestion.service.ReviewService;
 import lv.tezaurs.suggestions.tezaurs.dto.TezaursEntryCandidateResponse;
 import org.springframework.http.HttpHeaders;
@@ -36,17 +38,23 @@ public class ReviewController {
 
     @GetMapping
     ReviewPageResponse list(
-            @RequestParam ReviewStatus status,
+            @RequestParam(required = false) ReviewStatus status,
+            @RequestParam(required = false) List<CaseType> types,
             @RequestParam(defaultValue = "") String query,
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
             @RequestParam(defaultValue = "NEWEST") ReviewSort sort) {
-        return service.list(status, query, page, size, sort);
+        return service.list(status, types, query, page, size, sort);
     }
 
     @GetMapping("/{reviewId}")
     ReviewResponse find(@PathVariable UUID reviewId) {
         return service.find(reviewId);
+    }
+
+    @GetMapping("/by-public-id/{publicId}")
+    ReviewResponse findByPublicId(@PathVariable @Pattern(regexp = "[a-z0-9]{6,}") String publicId) {
+        return service.findByPublicId(publicId);
     }
 
     @PostMapping("/{reviewId}/status")

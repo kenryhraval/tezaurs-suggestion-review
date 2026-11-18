@@ -9,8 +9,8 @@ import lv.tezaurs.suggestions.common.error.NotFoundException;
 import lv.tezaurs.suggestions.suggestion.dto.CorrectTermRequest;
 import lv.tezaurs.suggestions.suggestion.dto.DuplicateReviewCandidateResponse;
 import lv.tezaurs.suggestions.suggestion.dto.UpdateCaseTypeRequest;
-import lv.tezaurs.suggestions.suggestion.dto.ReviewListItemResponse;
 import lv.tezaurs.suggestions.suggestion.dto.ReviewPageResponse;
+import lv.tezaurs.suggestions.suggestion.dto.ReviewListItemResponse;
 import lv.tezaurs.suggestions.suggestion.dto.ReviewResponse;
 import lv.tezaurs.suggestions.suggestion.dto.ReviewSort;
 import lv.tezaurs.suggestions.suggestion.dto.UpdateStatusRequest;
@@ -25,6 +25,7 @@ import lv.tezaurs.suggestions.tezaurs.repository.TezaursEntryRepository;
 import lv.tezaurs.suggestions.tezaurs.service.TezaursEntrySearchService;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.JpaSort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,23 +41,32 @@ public class ReviewService {
 
     @Transactional(readOnly = true)
     public ReviewPageResponse list(
-            ReviewStatus status, String query, int page, int size, ReviewSort sort) {
+            ReviewStatus status, List<CaseType> types, String query, int page, int size, ReviewSort sort) {
         String searchQuery = query == null ? "" : query.trim();
+        List<CaseType> includedTypes = types == null || types.isEmpty()
+                ? List.of(CaseType.values()) : types;
         Sort reviewSort = switch (sort) {
             case NEWEST -> Sort.by(Sort.Direction.DESC, "createdAt");
             case OLDEST -> Sort.by(Sort.Direction.ASC, "createdAt");
-            case MOST_SUGGESTIONS -> Sort.by(Sort.Direction.DESC, "sourceCount")
+            case MOST_SUGGESTIONS -> JpaSort.unsafe(Sort.Direction.DESC, "SIZE(review.sources)")
                     .and(Sort.by(Sort.Direction.DESC, "createdAt"));
         };
         reviewSort = reviewSort.and(Sort.by("id"));
         return ReviewPageResponse.from(reviewRepository.findForReviewQueue(
-                        status, searchQuery, PageRequest.of(page, size, reviewSort))
+                status, includedTypes, searchQuery, PageRequest.of(page, size, reviewSort))
                 .map(ReviewListItemResponse::from));
     }
 
     @Transactional(readOnly = true)
     public ReviewResponse find(UUID reviewId) {
         return completionService.response(requireReview(reviewId));
+    }
+
+    @Transactional(readOnly = true)
+    public ReviewResponse findByPublicId(String publicId) {
+        ReviewCase review = reviewRepository.findByPublicId(publicId)
+                .orElseThrow(() -> new NotFoundException("Review " + publicId + " was not found"));
+        return completionService.response(review);
     }
 
     @Transactional

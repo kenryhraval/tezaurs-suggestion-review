@@ -19,7 +19,10 @@ import lombok.NoArgsConstructor;
 import lv.tezaurs.suggestions.common.error.ConflictException;
 import lv.tezaurs.suggestions.usage.entity.UsageDecision;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.BatchSize;
+import org.hibernate.annotations.Generated;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.generator.EventType;
 
 @Entity
 @Table(name = "cases", schema = "review")
@@ -28,6 +31,10 @@ import org.hibernate.annotations.UpdateTimestamp;
 public class ReviewCase {
     @Id
     private UUID id;
+
+    @Generated(event = EventType.INSERT)
+    @Column(name = "public_id", nullable = false, insertable = false, updatable = false, columnDefinition = "text")
+    private String publicId;
 
     @Column(name = "reviewed_term", nullable = false, columnDefinition = "text")
     private String reviewedTerm;
@@ -72,6 +79,7 @@ public class ReviewCase {
     private Instant updatedAt;
 
     @OneToMany(mappedBy = "reviewCase", fetch = FetchType.LAZY)
+    @BatchSize(size = 100)
     private List<CaseSuggestion> sources = new ArrayList<>();
 
     public ReviewCase(String submittedTerm, String username) {

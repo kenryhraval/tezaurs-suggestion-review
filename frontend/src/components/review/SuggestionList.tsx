@@ -1,5 +1,8 @@
-import { reviewStatusLabels } from '../../review/statuses'
-import type { ReviewListItem, ReviewSort, ReviewStatus } from '../../api/types'
+import { caseTypeLabels, reviewStatusLabels } from '../../review/statuses'
+import type { CaseType, ReviewListItem, ReviewSort, ReviewStatus } from '../../api/types'
+import { casePath } from '../../review/links'
+import { Link } from 'react-router'
+import { Pagination } from '../shared/Pagination'
 
 const statuses: ReviewStatus[] = [
   'NEW',
@@ -12,18 +15,20 @@ const statuses: ReviewStatus[] = [
   'COMPLETED',
   'GARBAGE',
 ]
+const caseTypes: CaseType[] = ['ENTRY', 'SENSE']
 
 type Props = {
   items: ReviewListItem[]
-  status: ReviewStatus
+  status: ReviewStatus | null
+  types: CaseType[]
   sort: ReviewSort
   selectedKey: string | null
   loading: boolean
   page: number
   totalPages: number
   totalItems: number
-  onSelect: (key: string) => void
-  onFilterStatusChange: (status: ReviewStatus) => void
+  onFilterStatusChange: (status: ReviewStatus | null) => void
+  onTypesChange: (types: CaseType[]) => void
   onSortChange: (sort: ReviewSort) => void
   onPageChange: (page: number) => void
 }
@@ -31,24 +36,34 @@ type Props = {
 export function SuggestionList({
   items,
   status,
+  types,
   sort,
   selectedKey,
   loading,
   page,
   totalPages,
   totalItems,
-  onSelect,
   onFilterStatusChange,
+  onTypesChange,
   onSortChange,
   onPageChange,
 }: Props) {
+  function toggleType(type: CaseType, checked: boolean) {
+    if (checked) {
+      onTypesChange([...types, type])
+    } else {
+      onTypesChange(types.filter((selectedType) => selectedType !== type))
+    }
+  }
+
   return (
     <aside aria-label="Ieteikumu saraksts">
       <div className="suggestion-filters">
         <select className="custom-select custom-select-sm" aria-label="Statuss"
-          onChange={(event) => onFilterStatusChange(event.target.value as ReviewStatus)}
-          value={status}
+          onChange={(event) => onFilterStatusChange(event.target.value === '' ? null : event.target.value as ReviewStatus)}
+          value={status ?? ''}
         >
+          <option value="">Visi</option>
           {statuses.map((value) => (
             <option key={value} value={value}>{reviewStatusLabels[value]}</option>
           ))}
@@ -63,60 +78,50 @@ export function SuggestionList({
             <option value="MOST_SUGGESTIONS">Visvairāk ieteikumu</option>
           )}
         </select>
-      </div>
-
-      <div className="suggestion-group-heading">
-        <h3>
-          {reviewStatusLabels[status]}
-          <span className="suggestion-count">{totalItems}</span>
-        </h3>
-      </div>
-
-      {loading && <p>Ielādē...</p>}
-      {!loading && items.length === 0 && <p className="empty-group">Nav ieteikumu.</p>}
-
-      {!loading && items.length > 0 && (
-        <ul className="list-group suggestion-list">
-          {items.map((item) => (
-            <li
-              className="list-group-item p-0 overflow-hidden"
-              key={item.id}
-            >
-              <button
-                className={item.id === selectedKey ? 'list-group-item-action suggestion-select selected' : 'list-group-item-action suggestion-select'}
-                onClick={() => onSelect(item.id)}
-                type="button"
-              >
-                <strong>{item.reviewedTerm}</strong>
-                {item.status !== 'NEW' && (
-                  <small>
-                    {item.sourceCount}{' '}
-                    {item.sourceCount === 1 ? 'ieteikums' : 'ieteikumi'}
-                  </small>
-                )}
-              </button>
-            </li>
+        <fieldset className="case-type-filters">
+          <legend className="sr-only">Izskatīšanas tips (neatzīmējot — visi)</legend>
+          {caseTypes.map((type) => (
+            <label className="checkbox-label" key={type}>
+              <input type="checkbox" checked={types.includes(type)}
+                onChange={(event) => toggleType(type, event.target.checked)} />
+              {caseTypeLabels[type]}
+            </label>
           ))}
-        </ul>
-      )}
+        </fieldset>
+      </div>
 
-      {totalPages > 1 && (
-        <div className="suggestion-pagination">
-          <button className="btn btn-sm btn-outline-secondary" aria-label="Iepriekšējā lapa" title="Iepriekšējā lapa"
-            disabled={page === 0} onClick={() => onPageChange(page - 1)} type="button">
-            ‹
-          </button>
-          <span>{page + 1} / {totalPages}</span>
-          <button className="btn btn-sm btn-outline-secondary"
-            aria-label="Nākamā lapa" title="Nākamā lapa"
-            disabled={page + 1 >= totalPages}
-            onClick={() => onPageChange(page + 1)}
-            type="button"
-          >
-            ›
-          </button>
-        </div>
-      )}
+      <p className="suggestion-count" role="status">
+        {loading ? 'Ielādē...' : `${totalItems} atbilstoši ieraksti`}
+      </p>
+
+      <section className="suggestion-group" aria-label={status === null ? 'Visi' : reviewStatusLabels[status]} aria-busy={loading}>
+        {!loading && items.length === 0 && <p className="empty-group">Nav ieteikumu.</p>}
+
+        {items.length > 0 && (
+          <ul className="suggestion-list" inert={loading}>
+            {items.map((item) => (
+              <li key={item.id}>
+                <Link
+                  className={item.id === selectedKey ? 'suggestion-select selected' : 'suggestion-select'}
+                  aria-current={item.id === selectedKey ? 'page' : undefined}
+                  to={casePath(item.publicId)}
+                >
+                  <span>{item.reviewedTerm}</span>
+                  {item.status !== 'NEW' && (
+                    <small>
+                      {item.sourceCount}{' '}
+                      {item.sourceCount === 1 ? 'ieteikums' : 'ieteikumi'}
+                    </small>
+                  )}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <Pagination page={page} totalPages={totalPages} disabled={loading}
+        label="Ieteikumu saraksta lapošana" onPageChange={onPageChange} />
     </aside>
   )
 }

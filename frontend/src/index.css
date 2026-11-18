@@ -3,6 +3,8 @@
   --theme-color-lite: #f7e4ef;
 }
 
+html { scrollbar-gutter: stable; }
+
 body {
   margin: 0;
   color: #424242;

@@ -23,7 +23,6 @@ import lv.tezaurs.suggestions.sense.repository.ReviewSenseRepository;
 import lv.tezaurs.suggestions.suggestion.dto.UpdateCaseTypeRequest;
 import lv.tezaurs.suggestions.suggestion.dto.ReviewResponse;
 import lv.tezaurs.suggestions.suggestion.dto.ReviewSort;
-import lv.tezaurs.suggestions.suggestion.dto.ReviewCaseListItem;
 import lv.tezaurs.suggestions.suggestion.dto.ReviewSourceResponse;
 import lv.tezaurs.suggestions.suggestion.dto.UpdateStatusRequest;
 import lv.tezaurs.suggestions.suggestion.entity.IncubatorSuggestion;
@@ -82,6 +81,22 @@ class ReviewServiceTest {
         when(reviewRepository.findById(missingId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.find(missingId))
+                .isInstanceOf(NotFoundException.class);
+    }
+
+    @Test
+    void publicLinkFindsTheCaseAfterItsTitleChanges() {
+        ReviewCase review = inProgressReview();
+        ReflectionTestUtils.setField(review, "publicId", "k7m2pa");
+        when(reviewRepository.findByPublicId("k7m2pa")).thenReturn(Optional.of(review));
+
+        assertThat(service.findByPublicId("k7m2pa").id()).isEqualTo(review.getId());
+        review.correctTerm("corrected title");
+
+        ReviewResponse response = service.findByPublicId("k7m2pa");
+        assertThat(response.publicId()).isEqualTo("k7m2pa");
+        assertThat(response.reviewedTerm()).isEqualTo("corrected title");
+        assertThatThrownBy(() -> service.findByPublicId("absent"))
                 .isInstanceOf(NotFoundException.class);
     }
 
@@ -208,26 +223,29 @@ class ReviewServiceTest {
     void listsAndChangesReviewsByReviewId() {
         ReviewCase review = new ReviewCase("term", "reviewer");
         review.changeStatus(ReviewStatus.READY_FOR_REVIEW, "reviewer");
-        ReviewCaseListItem item = mock(ReviewCaseListItem.class);
-        when(item.getId()).thenReturn(review.getId());
-        when(item.getReviewedTerm()).thenReturn("term");
-        when(item.getStatus()).thenReturn(ReviewStatus.READY_FOR_REVIEW);
-        when(item.getSourceCount()).thenReturn(2L);
+        ReflectionTestUtils.setField(review, "publicId", "k7m2pa");
+        new CaseSuggestion(new IncubatorSuggestion(1, "term", "one meaning"), review);
+        new CaseSuggestion(new IncubatorSuggestion(2, "term", "another meaning"), review);
         when(reviewRepository.findForReviewQueue(
                 org.mockito.ArgumentMatchers.eq(ReviewStatus.READY_FOR_REVIEW),
+                org.mockito.ArgumentMatchers.eq(List.of(CaseType.values())),
                 org.mockito.ArgumentMatchers.eq("term"), any(Pageable.class)))
-                .thenReturn(new PageImpl<>(List.of(item)));
+                .thenReturn(new PageImpl<>(List.of(review)));
         when(reviewRepository.findById(review.getId())).thenReturn(Optional.of(review));
         when(reviewRepository.findLockedById(review.getId())).thenReturn(Optional.of(review));
 
-        var page = service.list(ReviewStatus.READY_FOR_REVIEW,
+        var page = service.list(ReviewStatus.READY_FOR_REVIEW, null,
                 " term ", 0, 20, ReviewSort.MOST_SUGGESTIONS);
         when(reviewRepository.findLockedById(review.getId())).thenReturn(Optional.of(review));
         var changed = service.changeStatus(review.getId(),
                 new UpdateStatusRequest(ReviewStatus.IN_PROGRESS), "Basic bWlrdXM6cHc=");
 
         assertThat(page.items()).singleElement()
-                .satisfies(result -> assertThat(result.id()).isEqualTo(review.getId()));
+                .satisfies(result -> {
+                    assertThat(result.id()).isEqualTo(review.getId());
+                    assertThat(result.publicId()).isEqualTo("k7m2pa");
+                    assertThat(result.sourceCount()).isEqualTo(2);
+                });
         assertThat(changed.status()).isEqualTo(ReviewStatus.IN_PROGRESS);
         assertThat(changed.lastStatusChangedBy()).isEqualTo("mikus");
     }

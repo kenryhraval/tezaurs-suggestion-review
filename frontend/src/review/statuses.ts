@@ -1,4 +1,10 @@
-import type { ReviewStatus } from '../api/types'
+import type { CaseType, ReviewStatus } from '../api/types'
+
+export const caseTypeLabels: Record<CaseType, string> = {
+  UNKNOWN: 'Nav noteikts',
+  ENTRY: 'Šķirklis',
+  SENSE: 'Nozīme',
+}
 
 export const reviewStatusLabels: Record<ReviewStatus, string> = {
   NEW: 'Jauns',

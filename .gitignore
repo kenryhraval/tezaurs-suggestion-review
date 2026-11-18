@@ -4,3 +4,6 @@
 
 # OS metadata
 .DS_Store
+
+# Local documentation drafts
+/local-docs/

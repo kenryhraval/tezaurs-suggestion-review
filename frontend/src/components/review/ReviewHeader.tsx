@@ -1,13 +1,11 @@
 import { useState, type ReactNode } from 'react'
-import type { Review, ReviewStatus } from '../../api/types'
-import { reviewStatusLabels, reviewStatusTransitions } from '../../review/statuses'
+import type { Review } from '../../api/types'
+import { caseTypeLabels, reviewStatusLabels, reviewStatusTransitions } from '../../review/statuses'
 import { ConfirmationDialog } from '../shared/ConfirmationDialog'
 import { EditButton } from '../shared/EditButton'
 
 type Props = {
-  title: string
-  status: ReviewStatus
-  review: Review | null
+  review: Review
   username: string | null
   changingAssignment: boolean
   onStatusChange: (status: 'IN_PROGRESS' | 'READY_FOR_REVIEW') => Promise<Review>
@@ -15,19 +13,20 @@ type Props = {
 }
 
 export function ReviewHeader({
-  title, status, review, username, changingAssignment, onStatusChange, onTitleChange,
+  review, username, changingAssignment, onStatusChange, onTitleChange,
 }: Props) {
   const [assignmentError, setAssignmentError] = useState('')
   const [editingTitle, setEditingTitle] = useState(false)
   const [editedTitle, setEditedTitle] = useState('')
   const [savingTitle, setSavingTitle] = useState(false)
   const [titleError, setTitleError] = useState('')
+  const status = review.status
   const reviewInProgress = status === 'IN_PROGRESS'
-  const canTakeForReview = review !== null && username !== null
+  const canTakeForReview = username !== null
     && (reviewStatusTransitions[status].includes('IN_PROGRESS')
       || (reviewInProgress && review.lastStatusChangedBy === null))
 
-  const canGiveUpReview = reviewInProgress && username !== null && review?.lastStatusChangedBy === username
+  const canGiveUpReview = reviewInProgress && username !== null && review.lastStatusChangedBy === username
 
   async function changeAssignment(nextStatus: 'IN_PROGRESS' | 'READY_FOR_REVIEW') {
     if (changingAssignment) {
@@ -63,13 +62,13 @@ export function ReviewHeader({
   }
 
   function openTitleEditor() {
-    setEditedTitle(title)
+    setEditedTitle(review.reviewedTerm)
     setTitleError('')
     setEditingTitle(true)
   }
 
   let statusInfo: ReactNode = null
-  if (review && status !== 'NEW') {
+  if (status !== 'NEW') {
     if (status === 'READY_FOR_REVIEW' || (reviewInProgress && !review.lastStatusChangedBy)) {
       statusInfo = 'Perēkli neviens nav paņēmis apstrādē'
     } else if (reviewInProgress) {
@@ -83,32 +82,30 @@ export function ReviewHeader({
     <>
       <div className="review-heading">
         <span className="muted">{reviewStatusLabels[status]}</span>
-        <h2 className="suggestion-title">{title}</h2>
-        {reviewInProgress && review && (
+        {review.type !== 'UNKNOWN' && (
+          <span className="muted">[{caseTypeLabels[review.type]}]</span>
+        )}
+        <h2 className="suggestion-title">{review.reviewedTerm}</h2>
+        {reviewInProgress && (
           <EditButton label="Labot izskatīšanas nosaukumu" onClick={openTitleEditor} />
         )}
       </div>
       {statusInfo && (
         <div className="review-assignment">
+          <span>{statusInfo}</span>{' '}
           {canGiveUpReview ? (
-            <button className="icon-button text-danger" type="button" disabled={changingAssignment}
+            <button className="review-assignment-action" type="button" disabled={changingAssignment}
               title="Atteikties no apstrādes" aria-label="Atteikties no apstrādes"
               onClick={() => changeAssignment('READY_FOR_REVIEW')}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <rect x="5" y="4" width="5" height="16" />
-                <rect x="14" y="4" width="5" height="16" />
-              </svg>
+              (Atteikties)
             </button>
           ) : canTakeForReview && (
-            <button className="icon-button text-success" type="button" disabled={changingAssignment}
+            <button className="review-assignment-action" type="button" disabled={changingAssignment}
               title="Paņemt apstrādē" aria-label="Paņemt apstrādē"
               onClick={() => changeAssignment('IN_PROGRESS')}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <path d="M6 3v18l15-9Z" />
-              </svg>
+              (Paņemt)
             </button>
           )}
-          <span>{statusInfo}</span>
         </div>
       )}
       {assignmentError && <p className="error" role="alert">{assignmentError}</p>}

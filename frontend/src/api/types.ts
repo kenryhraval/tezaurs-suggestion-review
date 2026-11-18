@@ -1,3 +1,7 @@
+export type CurrentUser = {
+  username: string | null
+}
+
 export type ReviewStatus =
   | 'NEW'
   | 'READY_FOR_REVIEW'
@@ -27,6 +31,7 @@ export type CompletionBlockReason =
 
 export type ReviewListItem = {
   id: string
+  publicId: string
   reviewedTerm: string
   status: ReviewStatus
   createdAt: string
@@ -42,6 +47,7 @@ export type ReviewPageResponse = {
 
 export type Review = {
   id: string
+  publicId: string
   reviewedTerm: string
   status: ReviewStatus
   lastStatusChangedBy: string | null
