@@ -1,6 +1,7 @@
 package lv.tezaurs.tip.common.error;
 
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.ConstraintViolationException;
 import java.time.Instant;
 import java.util.List;
 import org.springframework.dao.OptimisticLockingFailureException;
@@ -8,8 +9,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.ServletRequestBindingException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
@@ -51,6 +55,13 @@ public class ApiExceptionHandler {
     @ExceptionHandler(HttpMessageNotReadableException.class)
     ResponseEntity<ApiError> unreadable(HttpMessageNotReadableException exception, HttpServletRequest request) {
         return error(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "Pieprasījuma dati nav derīgi.", request, List.of());
+    }
+
+    @ExceptionHandler({HandlerMethodValidationException.class, ConstraintViolationException.class,
+            ServletRequestBindingException.class, MethodArgumentTypeMismatchException.class})
+    ResponseEntity<ApiError> invalidParameters(Exception exception, HttpServletRequest request) {
+        return error(HttpStatus.BAD_REQUEST, "INVALID_REQUEST",
+                "Pārbaudiet pieprasījuma parametrus un obligātās galvenes.", request, List.of());
     }
 
     private ResponseEntity<ApiError> error(HttpStatus status, String code, String message,

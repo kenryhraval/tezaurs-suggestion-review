@@ -15,6 +15,7 @@ import lv.tezaurs.tip.review.repository.ReviewRepository;
 import lv.tezaurs.tip.review.repository.ReviewSuggestionRepository;
 import lv.tezaurs.tip.entry.service.EntryService;
 import lv.tezaurs.tip.sense.repository.SenseRepository;
+import lv.tezaurs.tip.sense.service.SenseService;
 import lv.tezaurs.tip.tezaurs.repository.TezaursEntryRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -23,7 +24,7 @@ class ReviewCreationTest {
     private final ReviewRepository reviews = mock(ReviewRepository.class);
     private final ReviewService service = new ReviewService(reviews, mock(ReviewSuggestionRepository.class),
             mock(TezaursEntryRepository.class), new CurrentUserService(),
-            mock(EntryService.class), mock(SenseRepository.class));
+            mock(EntryService.class), mock(SenseRepository.class), mock(SenseService.class));
 
     @Test
     void createsAReviewWithASixCharacterLowercaseAlphanumericId() {

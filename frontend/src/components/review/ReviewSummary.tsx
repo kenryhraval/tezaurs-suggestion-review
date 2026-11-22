@@ -1,19 +1,21 @@
 import { useState, type ReactNode } from 'react'
-import type { Review } from '../../api/types'
+import type { Review, TezaursEntryCandidate } from '../../api/types'
 import { reviewTypeLabels, reviewStatusLabels, reviewStatusTransitions } from '../../review/statuses'
 import { ConfirmationDialog } from '../shared/ConfirmationDialog'
 import { EditButton } from '../shared/EditButton'
+import { TezaursEntryLink } from '../tezaurs/TezaursEntryLink'
 
 type Props = {
   review: Review
+  matchedEntry: TezaursEntryCandidate | null
   username: string | null
   changingAssignment: boolean
   onStatusChange: (status: 'IN_PROGRESS' | 'READY_FOR_REVIEW') => Promise<Review>
   onTitleChange: (title: string) => Promise<void>
 }
 
-export function ReviewHeader({
-  review, username, changingAssignment, onStatusChange, onTitleChange,
+export function ReviewSummary({
+  review, matchedEntry, username, changingAssignment, onStatusChange, onTitleChange,
 }: Props) {
   const [assignmentError, setAssignmentError] = useState('')
   const [editingTitle, setEditingTitle] = useState(false)
@@ -79,20 +81,19 @@ export function ReviewHeader({
   }
 
   return (
-    <>
-      <div className="review-heading">
+    <aside className="review-summary" aria-label="Perēkļa informācija">
+      <div className="review-summary-meta">
         <span className="muted">{reviewStatusLabels[status]}</span>
-        {review.type !== 'UNKNOWN' && (
-          <span className="muted">[{reviewTypeLabels[review.type]}]</span>
-        )}
+      </div>
+      <div className="review-heading">
         <h2 className="suggestion-title">{review.reviewedTerm}</h2>
         {reviewInProgress && (
-          <EditButton label="Labot izskatīšanas nosaukumu" onClick={openTitleEditor} />
+          <EditButton label="Labot perēkļa nosaukumu" onClick={openTitleEditor} />
         )}
       </div>
       {statusInfo && (
         <div className="review-assignment">
-          <span>{statusInfo}</span>{' '}
+          <div>{statusInfo}</div>
           {canGiveUpReview ? (
             <button className="review-assignment-action" type="button" disabled={changingAssignment}
               title="Atteikties no apstrādes" aria-label="Atteikties no apstrādes"
@@ -109,10 +110,16 @@ export function ReviewHeader({
         </div>
       )}
       {assignmentError && <p className="error" role="alert">{assignmentError}</p>}
+      {review.type !== 'UNKNOWN' && <div className="review-summary-type">
+        {reviewTypeLabels[review.type]}
+        {matchedEntry && matchedEntry.id === review.matchedEntryId && <div>
+          {matchedEntry.heading} <TezaursEntryLink humanKey={matchedEntry.humanKey} />
+        </div>}
+      </div>}
       {editingTitle && (
         <ConfirmationDialog
-          title="Labot izskatīšanas nosaukumu"
-          message="Mainīsies tikai izskatīšanas nosaukums."
+          title="Labot perēkļa nosaukumu"
+          message="Mainīsies tikai perēkļa nosaukums."
           busy={savingTitle}
           error={titleError}
           onConfirm={() => handleTermCorrection()}
@@ -129,6 +136,6 @@ export function ReviewHeader({
           </label>
         </ConfirmationDialog>
       )}
-    </>
+    </aside>
   )
 }

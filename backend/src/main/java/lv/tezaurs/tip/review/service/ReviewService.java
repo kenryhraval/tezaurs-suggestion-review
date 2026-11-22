@@ -3,6 +3,7 @@ package lv.tezaurs.tip.review.service;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lv.tezaurs.tip.auth.service.CurrentUserService;
@@ -27,6 +28,7 @@ import lv.tezaurs.tip.common.error.NotFoundException;
 import lv.tezaurs.tip.entry.service.EntryService;
 import lv.tezaurs.tip.sense.entity.Sense;
 import lv.tezaurs.tip.sense.repository.SenseRepository;
+import lv.tezaurs.tip.sense.service.SenseService;
 import lv.tezaurs.tip.tezaurs.repository.TezaursEntryRepository;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -46,6 +48,7 @@ public class ReviewService {
     private final CurrentUserService currentUserService;
     private final EntryService entryService;
     private final SenseRepository senseRepository;
+    private final SenseService senseService;
     private final SecureRandom random = new SecureRandom();
 
     @Transactional
@@ -122,6 +125,10 @@ public class ReviewService {
         Review sourceReview = lockReviewOrThrow(sourceReviewId);
         Review targetReview = lockReviewOrThrow(targetReviewId);
 
+        if (sourceReview.getStatus() == ReviewStatus.COMPLETED || targetReview.getStatus() == ReviewStatus.COMPLETED) {
+            throw new ConflictException("Gatavu perēkli nevar apvienot ar citu perēkli vai tam pievienot ieteikumus.");
+        }
+
         for (ReviewSuggestion link : List.copyOf(sourceReview.getSuggestions())) {
             link.reassignTo(targetReview);
         }
@@ -170,10 +177,15 @@ public class ReviewService {
         Review review = lockReviewOrThrow(reviewId);
 
         validateTypeChange(review, request);
+        boolean selectionChanged = review.getType() != request.type()
+                || !Objects.equals(review.getMatchedEntryId(), request.matchedEntryId());
 
         review.setType(request.type());
         review.setMatchedEntryId(request.matchedEntryId());
 
+        if (selectionChanged) {
+            senseService.initializeForSelection(reviewId, Boolean.TRUE.equals(request.meaningAlreadyExists()));
+        }
         if (Boolean.TRUE.equals(request.meaningAlreadyExists())) {
             applyStatusChange(review, ReviewStatus.ALREADY_EXISTS, username);
         }
@@ -242,7 +254,7 @@ public class ReviewService {
             throw new ConflictException("Norādiet, vai jāveido jauns šķirklis vai nozīme.");
         }
         if (request.type() != ReviewType.SENSE && request.matchedEntryId() != null) {
-            throw new ConflictException("Esošu Tēzaura šķirkli var piesaistīt tikai nozīmes izskatīšanai.");
+            throw new ConflictException("Esošu Tēzaura šķirkli var piesaistīt tikai jaunas nozīmes perēklim.");
         }
         if (Boolean.TRUE.equals(request.meaningAlreadyExists()) && request.type() != ReviewType.SENSE) {
             throw new ConflictException("Lai atzīmētu nozīmi kā jau esošu, izvēlieties atbilstošo Tēzaura šķirkli.");

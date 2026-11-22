@@ -7,8 +7,7 @@ import java.util.UUID;
 
 public record SaveSenseRequest(
         @NotBlank @Size(max = 10000) String gloss,
-        UUID parentDraftSenseId,
-        Integer parentTezaursSenseId,
+        UUID parentSenseId,
         Map<String, Object> flags,
         Boolean approved) {
 }

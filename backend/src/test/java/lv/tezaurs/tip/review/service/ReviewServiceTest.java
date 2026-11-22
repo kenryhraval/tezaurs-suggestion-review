@@ -32,6 +32,7 @@ import lv.tezaurs.tip.common.error.ConflictException;
 import lv.tezaurs.tip.common.error.NotFoundException;
 import lv.tezaurs.tip.entry.service.EntryService;
 import lv.tezaurs.tip.sense.repository.SenseRepository;
+import lv.tezaurs.tip.sense.service.SenseService;
 import lv.tezaurs.tip.suggestion.entity.IncubatorSuggestion;
 import lv.tezaurs.tip.tezaurs.repository.TezaursEntryRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -62,7 +63,7 @@ class ReviewServiceTest {
         senseRepository = mock(SenseRepository.class);
         service = new ReviewService(reviewRepository, reviewSourceRepository,
                 tezaursEntryRepository, new CurrentUserService(),
-                mock(EntryService.class), senseRepository);
+                mock(EntryService.class), senseRepository, mock(SenseService.class));
         when(reviewRepository.save(any(Review.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
         when(reviewSourceRepository.save(any(ReviewSuggestion.class)))
@@ -123,6 +124,24 @@ class ReviewServiceTest {
         assertThat(sourceLink.getReview()).isSameAs(target);
         verify(reviewRepository).delete(sourceReview);
         verify(reviewRepository, never()).save(any());
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void rejectsMergingWhenEitherReviewIsCompleted(boolean sourceIsCompleted) {
+        Review source = inProgressReview();
+        Review target = inProgressReview();
+        (sourceIsCompleted ? source : target).setStatus(ReviewStatus.COMPLETED);
+        ReviewSuggestion link = new ReviewSuggestion(source(), source);
+        when(reviewRepository.findLockedById(source.getId())).thenReturn(Optional.of(source));
+        when(reviewRepository.findLockedById(target.getId())).thenReturn(Optional.of(target));
+
+        assertThatThrownBy(() -> service.mergeReviews(source.getId(), target.getId()))
+                .isInstanceOf(ConflictException.class);
+
+        assertThat(link.getReview()).isSameAs(source);
+        verify(reviewSourceRepository, never()).flush();
+        verify(reviewRepository, never()).delete(any());
     }
 
     @Test
@@ -190,7 +209,7 @@ class ReviewServiceTest {
     }
 
     @ParameterizedTest
-    @EnumSource(ReviewStatus.class)
+    @EnumSource(value = ReviewStatus.class, names = "COMPLETED", mode = EnumSource.Mode.EXCLUDE)
     void mergingPreservesTheDestinationStatus(ReviewStatus status) {
         IncubatorSuggestion source = source();
         Review sourceReview = inProgressReview();

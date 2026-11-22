@@ -9,7 +9,6 @@ import com.sun.net.httpserver.HttpServer;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
-import java.util.UUID;
 import lv.tezaurs.tip.sense.dto.ClusteredSenses;
 import lv.tezaurs.tip.sense.dto.SenseDefinitions;
 import lv.tezaurs.tip.common.error.ConflictException;
@@ -52,8 +51,8 @@ class ModelServiceTest {
         localModel.setModel("local-model");
         settings.setDefaultModel("local");
         settings.getModels().put("local", localModel);
-        settings.getPrompts().put("clustering", new ByteArrayResource("Cluster prompt".getBytes(StandardCharsets.UTF_8)));
-        settings.getPrompts().put("definitions", new ByteArrayResource("Definition prompt".getBytes(StandardCharsets.UTF_8)));
+        settings.getPrompts().put("clustering", new ByteArrayResource("Cluster prompt\n\nCluster format".getBytes(StandardCharsets.UTF_8)));
+        settings.getPrompts().put("definitions", new ByteArrayResource("Definition prompt\n\nDefinition format".getBytes(StandardCharsets.UTF_8)));
     }
 
     @AfterEach
@@ -63,26 +62,37 @@ class ModelServiceTest {
 
     @Test
     void sendsStandardChatRequestsWithConfigurablePromptsAndParsesClusterIds() {
-        content = "{\"groups\":[{\"description\":\"Nozīme\",\"existingSenseId\":null,\"exampleIds\":[1,2]}]}";
+        content = "{\"groups\":[{\"description\":\"Nozīme\",\"senseId\":null,\"exampleIds\":[1,2]}]}";
         localModel.setApiKey("test-key");
         var result = cluster(null, Map.of("term", "vārds"));
         assertThat(result.groups().getFirst().exampleIds()).containsExactly(1, 2);
         assertThat(lastAuthorization).isEqualTo("Bearer test-key");
         assertThat(lastRequest.path("model").asString()).isEqualTo("local-model");
-        assertThat(lastRequest.path("messages").path(0).path("content").asString()).isEqualTo("Cluster prompt");
+        assertThat(lastRequest.path("messages").path(0).path("content").asString()).isEqualTo("Cluster prompt\n\nCluster format");
         assertThat(lastRequest.path("response_format").path("type").asString()).isEqualTo("json_object");
         assertThat(lastRequest.toString()).doesNotContain("test-key");
     }
 
     @Test
+    void sendsReviewerGuidanceAlongsideDataWithoutReplacingThePrompt() {
+        content = "{\"groups\":[]}";
+
+        settings.requestStructuredResponse("clustering", null, "Atšķir pārnesto nozīmi.", Map.of("term", "vārds"), ClusteredSenses.class);
+
+        assertThat(settings.getPrompt("clustering")).isEqualTo("Cluster prompt\n\nCluster format");
+        assertThat(lastRequest.path("messages").path(0).path("content").asString()).isEqualTo("Cluster prompt\n\nCluster format");
+        assertThat(lastRequest.path("messages").path(1).path("content").asString())
+                .contains("Atšķir pārnesto nozīmi.", "vārds");
+    }
+
+    @Test
     void localProvidersCanUseNoKeyWhileStillRequestingJson() {
-        UUID senseId = UUID.randomUUID();
-        content = "{\"definitions\":[{\"senseId\":\"" + senseId + "\",\"definition\":\"Skaidrojums\"}]}";
-        var result = settings.requestStructuredResponse("definitions", null, Map.of("groups", java.util.List.of()), SenseDefinitions.class);
-        assertThat(result.definitions().getFirst().senseId()).isEqualTo(senseId);
+        content = "{\"definitions\":[{\"senseId\":1,\"definition\":\"Skaidrojums\"}]}";
+        var result = settings.requestStructuredResponse("definitions", null, null, Map.of("groups", java.util.List.of()), SenseDefinitions.class);
+        assertThat(result.definitions().getFirst().senseId()).isEqualTo(1);
         assertThat(lastAuthorization).isNull();
         assertThat(lastRequest.path("response_format").path("type").asString()).isEqualTo("json_object");
-        assertThat(lastRequest.path("messages").path(0).path("content").asString()).isEqualTo("Definition prompt");
+        assertThat(lastRequest.path("messages").path(0).path("content").asString()).isEqualTo("Definition prompt\n\nDefinition format");
     }
 
     @Test
@@ -173,6 +183,6 @@ class ModelServiceTest {
         assertThatThrownBy(() -> cluster(null, Map.of())).isInstanceOf(SenseModelException.class);
     }
     private ClusteredSenses cluster(String modelId, Object input) {
-        return settings.requestStructuredResponse("clustering", modelId, input, ClusteredSenses.class);
+        return settings.requestStructuredResponse("clustering", modelId, null, input, ClusteredSenses.class);
     }
 }

@@ -39,15 +39,6 @@ export function FlagEditor({ scope, definitions, flags, onChange }: Props) {
     onChange(updatedFlags)
   }
 
-  function updateFreeText(flag: TezaursFlagDefinition, text: string) {
-    if (flag.multiple) {
-      const values = text.split('|').map((value) => value.trim()).filter((value) => value !== '')
-      updateFlag(flag.name, values)
-    } else {
-      updateFlag(flag.name, text)
-    }
-  }
-
   function renderFlagInput(flag: TezaursFlagDefinition) {
     const currentValue = flags[flag.name]
     const selectedValues = Array.isArray(currentValue) ? currentValue : []
@@ -59,7 +50,7 @@ export function FlagEditor({ scope, definitions, flags, onChange }: Props) {
         inputText = currentValue.join(' | ')
       }
       return (
-        <input className="form-control form-control-sm" value={inputText} onChange={(event) => updateFreeText(flag, event.target.value)}
+        <input className="form-control form-control-sm" value={inputText} onChange={(event) => updateFlag(flag.name, event.target.value)}
           placeholder={flag.multiple ? 'Vērtības atdaliet ar |' : 'Vērtība'} />
       )
     }

@@ -66,7 +66,7 @@ public class ReviewController {
 
     @GetMapping("/duplicate-candidates")
     List<DuplicateReviewCandidateResponse> findDuplicateCandidates(
-            @RequestParam String query, @RequestParam(value = "excludedCaseId", required = false) UUID excludedReviewId) {
+            @RequestParam String query, @RequestParam(value = "excludedReviewId", required = false) UUID excludedReviewId) {
         return service.findDuplicateCandidates(query, excludedReviewId);
     }
 

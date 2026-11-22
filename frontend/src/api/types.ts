@@ -149,8 +149,7 @@ export type Sense = {
   exampleIds: string[]
   id: string
   gloss: string
-  parentDraftSenseId: string | null
-  parentTezaursSenseId: number | null
+  parentSenseId: string | null
   orderNo: number
   flags: FlagMap
 }
@@ -159,8 +158,7 @@ export type SaveSense = {
   id?: string
   gloss: string
   approved?: boolean
-  parentDraftSenseId?: string | null
-  parentTezaursSenseId?: number | null
+  parentSenseId?: string | null
   flags?: FlagMap
 }
 
@@ -203,6 +201,8 @@ export type SaveExample = {
   tokenNumber: number | null
   query: string
   citation: string
+  matchStart?: number | null
+  matchEnd?: number | null
   url: string
   reference: string | null
   note: string | null
@@ -210,7 +210,7 @@ export type SaveExample = {
 
 export type Example = SaveExample & {
   senseId: string | null
-  inDraft: boolean
+  approved: boolean
   corpusLabel: string | null
   sourceLabel: string
   sourceUrl: string | null
@@ -253,19 +253,10 @@ export type CorpusOption = {
   label: string
 }
 
-export type DefinitionInput = {
-  id: string
-  description: string
-  exampleIds: string[]
-}
-
-export type GeneratedDefinition = {
-  senseId: string
-  definition: string
-}
-
 export type SenseModelOption = {
   id: string
   label: string
   defaultModel: boolean
 }
+
+export type ModelOperation = 'clustering' | 'definitions'

@@ -43,13 +43,9 @@ public class Sense {
     @Column(name = "existing_sense_id", updatable = false)
     private Integer existingSenseId;
 
-    @Column(name = "parent_draft_sense_id")
+    @Column(name = "parent_sense_id")
     @Setter
-    private UUID parentDraftSenseId;
-
-    @Column(name = "parent_tezaurs_sense_id")
-    @Setter
-    private Integer parentTezaursSenseId;
+    private UUID parentSenseId;
 
     @Column(nullable = false, columnDefinition = "text")
     @Setter

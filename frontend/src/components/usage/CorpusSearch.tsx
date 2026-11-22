@@ -1,18 +1,17 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { getCorpora, searchCorpus } from '../../api/client'
-import type { CorpusOption, CorpusExample, CorpusSearchResult, SaveExample, SelectCorpusExamples, Example } from '../../api/types'
-import { SavedExample } from './SavedExample'
-import { UsageSourceLink } from './UsageSourceLink'
-import { Pagination } from '../shared/Pagination'
+import type { CorpusOption, CorpusSearchResult, SaveExample, SelectCorpusExamples, Example } from '../../api/types'
+import { CorpusExamplesDialog } from './CorpusExamplesDialog'
 import { CorpusSelector } from './CorpusSelector'
 
 type Props = {
   term: string
   examples: Example[]
   saving: boolean
-  onSave: (examples: SaveExample[]) => Promise<boolean>
+  editable: boolean
+  onSave: (example: SaveExample) => Promise<void>
   onSelectCorpus: (selection: SelectCorpusExamples) => Promise<void>
-  onRemove: (id: string) => void
+  onRemove: (id: string) => Promise<void>
   onRemoveCorpus: (corpus: string) => Promise<void>
   onAddSource: () => void
 }
@@ -49,7 +48,6 @@ async function searchCorpora(
   shouldContinueSearching: () => boolean,
   onResult: (corpusSearch: CorpusSearchState) => void,
 ) {
-  const completedCorpora: CorpusSearchState[] = []
   let nextCorpusIndex = 0
 
   async function searchNextCorpus() {
@@ -60,13 +58,11 @@ async function searchCorpora(
       if (!shouldContinueSearching()) {
         return
       }
-      completedCorpora.push(result)
       onResult(result)
     }
   }
 
   await Promise.all([searchNextCorpus(), searchNextCorpus(), searchNextCorpus()])
-  return completedCorpora
 }
 
 function compareMatchCounts(first: CorpusSearchState, second: CorpusSearchState) {
@@ -75,13 +71,7 @@ function compareMatchCounts(first: CorpusSearchState, second: CorpusSearchState)
   return secondCount - firstCount
 }
 
-function createExampleRequest(result: CorpusSearchResult, example: CorpusExample): SaveExample {
-  return { source: 'CORPUS', corpus: result.corpus, tokenNumber: example.tokenNumber,
-    query: result.query, citation: example.citation, url: result.url,
-    reference: example.reference || null, note: null }
-}
-
-export function CorpusSearch({ term, examples, saving, onSave, onSelectCorpus, onRemove, onRemoveCorpus, onAddSource }: Props) {
+export function CorpusSearch({ term, examples, saving, editable, onSave, onSelectCorpus, onRemove, onRemoveCorpus, onAddSource }: Props) {
   const [corpusSearches, setCorpusSearches] = useState<CorpusSearchState[]>([])
   const [searching, setSearching] = useState(true)
   const [error, setError] = useState('')
@@ -89,15 +79,11 @@ export function CorpusSearch({ term, examples, saving, onSave, onSelectCorpus, o
   const [searchInput, setSearchInput] = useState(term)
   const [query, setQuery] = useState(term)
   const [exactOnly, setExactOnly] = useState(false)
-  const [selectedCorpusId, setSelectedCorpusId] = useState<string | null>(null)
-  const [requestedSampleSize, setRequestedSampleSize] = useState(50)
+  const [openedCorpusId, setOpenedCorpusId] = useState<string | null>(null)
   const nextPageRequestId = useRef(0)
-  const resultsRef = useRef<HTMLDivElement>(null)
-  const selectedCorpusSearch = corpusSearches.find((corpusSearch) => corpusSearch.id === selectedCorpusId)
-  const selectedCorpusResult = selectedCorpusSearch?.result
-  const sampleSize = Math.min(requestedSampleSize, selectedCorpusResult?.total ?? 0)
-  const selectedCount = examples.filter((item) => item.corpus === selectedCorpusId).length
-  const removableCount = examples.filter((item) => item.corpus === selectedCorpusId && !item.inDraft).length
+  const openedCorpusSearch = corpusSearches.find((corpusSearch) => corpusSearch.id === openedCorpusId)
+  const openedCorpusResult = openedCorpusSearch?.result
+  const openedCorpusExamples = examples.filter((example) => example.corpus === openedCorpusId)
 
   useEffect(() => {
     let searchIsOutdated = false
@@ -109,16 +95,7 @@ export function CorpusSearch({ term, examples, saving, onSave, onSelectCorpus, o
         }
         const pendingCorpora = corpora.map(createCorpusSearchState)
         setCorpusSearches(pendingCorpora)
-        const completedCorpora = await searchCorpora(query, exactOnly, pendingCorpora, () => !searchIsOutdated, updateCorpusSearch)
-        if (searchIsOutdated) {
-          return
-        }
-        const corporaWithMatches = completedCorpora.filter((corpus) => corpus.result && corpus.result.total > 0)
-        corporaWithMatches.sort(compareMatchCounts)
-        const corpusWithMostMatches = corporaWithMatches[0]
-        if (corpusWithMostMatches) {
-          setSelectedCorpusId((current) => current ?? corpusWithMostMatches.id)
-        }
+        await searchCorpora(query, exactOnly, pendingCorpora, () => !searchIsOutdated, updateCorpusSearch)
       } catch (cause) {
         if (!searchIsOutdated) {
           setError(cause instanceof Error ? cause.message : 'Neizdevās ielādēt korpusu sarakstu')
@@ -134,12 +111,6 @@ export function CorpusSearch({ term, examples, saving, onSave, onSelectCorpus, o
       searchIsOutdated = true
     }
   }, [query, exactOnly, retry])
-
-  useEffect(() => {
-    if (resultsRef.current) {
-      resultsRef.current.scrollTop = 0
-    }
-  }, [selectedCorpusId, selectedCorpusResult?.page])
 
   function updateCorpusSearch(updatedCorpusSearch: CorpusSearchState) {
     setCorpusSearches((current) => current.map((corpusSearch) => corpusSearch.id === updatedCorpusSearch.id ? updatedCorpusSearch : corpusSearch))
@@ -162,7 +133,7 @@ export function CorpusSearch({ term, examples, saving, onSave, onSelectCorpus, o
     setCorpusSearches([])
     setError('')
     setSearching(true)
-    setSelectedCorpusId(null)
+    setOpenedCorpusId(null)
     setQuery(nextQuery)
     setRetry((value) => value + 1)
   }
@@ -176,12 +147,7 @@ export function CorpusSearch({ term, examples, saving, onSave, onSelectCorpus, o
     startSearch(nextQuery)
   }
 
-  async function saveCorpusExample(result: CorpusSearchResult, example: CorpusExample) {
-    await onSave([createExampleRequest(result, example)])
-  }
-
-  const corpusMatches = corpusSearches.filter((corpusSearch) => corpusSearch.result && corpusSearch.result.total > 0)
-    .sort(compareMatchCounts)
+  const sortedCorpora = [...corpusSearches].sort(compareMatchCounts)
   const searchFailed = corpusSearches.some((corpusSearch) => corpusSearch.error)
   let emptyResultsMessage = 'Korpusos sakritību nav.'
   if (searching) {
@@ -215,87 +181,28 @@ export function CorpusSearch({ term, examples, saving, onSave, onSelectCorpus, o
           Tikai precīzas sakritības
         </label>
       </form>
-      {searching && corpusMatches.length > 0 && <p className="muted">Meklēšana turpinās...</p>}
-      {!searching && searchFailed && corpusMatches.length > 0 && (
+      {searching && sortedCorpora.length > 0 && <p className="muted">Meklēšana turpinās...</p>}
+      {!searching && searchFailed && sortedCorpora.length > 0 && (
         <p className="muted">Daļa korpusu nebija pieejami.</p>
       )}
       {error && <p className="error" role="alert">{error}</p>}
       {(error || searchFailed) && <button className="btn btn-sm btn-outline-secondary" type="button" disabled={searching || saving}
         onClick={() => startSearch(query)}>Atkārtot meklēšanu</button>}
-      {corpusMatches.length > 0 ? <CorpusSelector
-        choices={corpusMatches.map((corpus) => ({ id: corpus.id, label: corpus.label, total: corpus.result?.total ?? 0 }))}
-        selectedId={selectedCorpusId} disabled={saving} onSelect={setSelectedCorpusId} />
+      {sortedCorpora.length > 0 ? <CorpusSelector
+        choices={sortedCorpora.map((corpus) => ({ id: corpus.id, label: corpus.label,
+          total: corpus.result?.total ?? null, error: corpus.error }))}
+        disabled={saving} onSelect={setOpenedCorpusId} />
         : !error && <p className="muted">{emptyResultsMessage}</p>}
-      {selectedCorpusSearch && selectedCorpusResult && <div className="corpus-selection">
-        <div className="corpus-selection-summary">
-          <span>Atzīmēti šajā korpusā: <strong>{selectedCount}</strong></span>
-        </div>
-        {selectedCorpusResult.total > 0 && <div className="corpus-selection-actions">
-          <div className="input-group input-group-sm corpus-sample-input">
-            <input className="form-control" type="number" min={1} max={selectedCorpusResult.total}
-              aria-label="Nejauši pievienojamo piemēru skaits" value={sampleSize} disabled={saving}
-              onChange={(event) => setRequestedSampleSize(Number(event.target.value))} />
-            <div className="input-group-append">
-              <button className="btn btn-primary" type="button"
-                disabled={saving || selectedCorpusSearch.loading || !!selectedCorpusSearch.error || !Number.isInteger(sampleSize) || sampleSize < 1}
-                onClick={() => onSelectCorpus({ corpus: selectedCorpusResult.corpus, query, exactOnly, count: sampleSize })}>
-                Pievienot nejaušus
-              </button>
-            </div>
-          </div>
-          <div className="d-flex">
-            <button className="btn btn-sm btn-outline-secondary" type="button"
-              disabled={saving || selectedCorpusSearch.loading || !!selectedCorpusSearch.error}
-              onClick={() => onSelectCorpus({ corpus: selectedCorpusResult.corpus, query, exactOnly, count: null })}>
-              Pievienot visus
-            </button>
-            <button className="btn btn-sm btn-outline-secondary ml-2" type="button" disabled={saving || removableCount === 0}
-              title="Noņemt piemērus, kas nav piesaistīti melnraksta nozīmēm"
-              onClick={() => onRemoveCorpus(selectedCorpusResult.corpus)}>Noņemt atlasi</button>
-          </div>
-          {saving && <small role="status">Saglabā...</small>}
-        </div>}
-      </div>}
-      {selectedCorpusSearch && <div className="corpus-results" ref={resultsRef}
-        role="region" aria-label={`${selectedCorpusSearch.label}: piemēri`} tabIndex={0}>
-        {selectedCorpusSearch.loading && <p className="muted">Gaida rezultātus...</p>}
-        {selectedCorpusSearch.error && <p className="error" role="alert">{selectedCorpusSearch.error}{' '}
-          <button className="btn btn-sm btn-outline-secondary" type="button" disabled={searching || saving} onClick={() => loadCorpusPageNumber(selectedCorpusSearch, selectedCorpusSearch.requestedPage)}>Atkārtot</button>
-        </p>}
-        {selectedCorpusResult && <>
-          {selectedCorpusResult.examples.length === 0 && <p className="muted">Šajā meklēšanā piemēri netika atrasti.</p>}
-          {selectedCorpusResult.examples.map((example) => {
-            const saved = examples.find((item) => item.corpus === selectedCorpusResult.corpus && item.tokenNumber === example.tokenNumber)
-            const exampleText = <>{example.left}<strong>{example.match}</strong>{example.right}</>
-            if (saved) {
-              return <SavedExample key={`${selectedCorpusResult.corpus}:${example.tokenNumber}`} example={saved} busy={saving || selectedCorpusSearch.loading} highlighted
-              onRemove={saved.inDraft ? undefined : () => onRemove(saved.id)}>{exampleText}</SavedExample>
-            }
-            return <article className="usage-example" key={`${selectedCorpusResult.corpus}:${example.tokenNumber}`}>
-              <div className="example-text">
-                <p>{exampleText}</p>
-                <button className="icon-button" title="Atzīmēt piemēru" aria-label="Atzīmēt piemēru"
-                  disabled={saving || selectedCorpusSearch.loading} type="button" onClick={() => saveCorpusExample(selectedCorpusResult, example)}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
-                    <path d="M6 3h12v18l-6-4-6 4Z" />
-                  </svg>
-                </button>
-              </div>
-              <UsageSourceLink label={example.sourceLabel} url={example.sourceUrl ?? selectedCorpusResult.url}
-                originalSource={example.sourceUrl !== null} />
-            </article>
-          })}
-        </>}
-      </div>}
+      {openedCorpusSearch && <CorpusExamplesDialog key={openedCorpusId}
+        corpusId={openedCorpusSearch.id} label={openedCorpusSearch.label} result={openedCorpusResult ?? null}
+        loading={openedCorpusSearch.loading} error={openedCorpusSearch.error} examples={openedCorpusExamples}
+        saving={saving} editable={editable} exactOnly={exactOnly} onSave={onSave} onSelectCorpus={onSelectCorpus}
+        onRemove={onRemove} onRemoveCorpus={onRemoveCorpus}
+        onPageChange={(page) => loadCorpusPageNumber(openedCorpusSearch, page)} onClose={() => setOpenedCorpusId(null)} />}
       <div className="corpus-footer">
-        <button type="button" className="btn btn-sm btn-outline-secondary add-source-button" disabled={saving} onClick={onAddSource}>
-          <span aria-hidden="true">＋</span> Pievienot citu avotu
+        <button type="button" className="add-source-button" disabled={saving || !editable} onClick={onAddSource}>
+          Pievienot citu avotu
         </button>
-        {selectedCorpusSearch && selectedCorpusResult && <Pagination
-          page={selectedCorpusResult.page - 1}
-          totalPages={Math.ceil(selectedCorpusResult.total / selectedCorpusResult.pageSize)}
-          disabled={selectedCorpusSearch.loading || saving} label={`${selectedCorpusSearch.label}: lapošana`}
-          onPageChange={(page) => loadCorpusPageNumber(selectedCorpusSearch, page + 1)} />}
       </div>
     </div>
   )

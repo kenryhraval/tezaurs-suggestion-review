@@ -1,5 +1,5 @@
-import { useEffect, useState, type FormEvent, type SyntheticEvent } from 'react'
-import { deleteCorpusExamples, deleteExample, getExamplesForCase, saveExamples, selectCorpusExamples } from '../../api/client'
+import { useState, type FormEvent, type SyntheticEvent } from 'react'
+import { deleteCorpusExamples, deleteExample, saveExample, selectCorpusExamples } from '../../api/client'
 import type { Review, SaveExample, SelectCorpusExamples, UsageDecision, Example } from '../../api/types'
 import { ConfirmationDialog } from '../shared/ConfirmationDialog'
 import { CorpusSearch } from './CorpusSearch'
@@ -8,10 +8,14 @@ import { SelectedExamples } from './SelectedExamples'
 
 type Props = {
   review: Review
+  examples: Example[]
+  loading: boolean
+  onExampleSaved: (example: Example) => void
+  onExampleRemoved: (id: string) => void
+  onExamplesReplaced: (examples: Example[]) => void
   defaultOpen: boolean
   readOnly: boolean
   onSaveDecision: (decision: UsageDecision) => Promise<void>
-  onExamplesChange: () => void
 }
 
 const decisionLabels: Record<UsageDecision, string> = {
@@ -20,10 +24,9 @@ const decisionLabels: Record<UsageDecision, string> = {
   INVENTED: 'Izdomāts vārds',
 }
 
-export function UsageCheck({ review, onSaveDecision, onExamplesChange, defaultOpen, readOnly }: Props) {
+export function UsageCheck({ review, examples, loading, onSaveDecision, onExampleSaved,
+  onExampleRemoved, onExamplesReplaced, defaultOpen, readOnly }: Props) {
   const [expandedByUser, setExpanded] = useState(defaultOpen)
-  const [examples, setExamples] = useState<Example[]>([])
-  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [addingSource, setAddingSource] = useState(false)
@@ -38,46 +41,12 @@ export function UsageCheck({ review, onSaveDecision, onExamplesChange, defaultOp
   const canCollapse = readOnly || !needsUsageDecision || decided
   const expanded = expandedByUser || !canCollapse
 
-  useEffect(() => {
-    let requestIsOutdated = false
-    async function loadSavedExamples() {
-      try {
-        const loaded = await getExamplesForCase(review.id)
-        if (!requestIsOutdated) {
-          setExamples(loaded)
-        }
-      } catch (cause) {
-        if (!requestIsOutdated) {
-          setError(cause instanceof Error ? cause.message : 'Neizdevās ielādēt atradumus.')
-        }
-      } finally {
-        if (!requestIsOutdated) {
-          setLoading(false)
-        }
-      }
-    }
-
-    loadSavedExamples()
-    return () => {
-      requestIsOutdated = true
-    }
-  }, [review.id])
-
-  async function addExamples(requests: SaveExample[]) {
+  async function addExample(request: SaveExample) {
     setSaving(true)
     setError('')
     try {
-      const saved = await saveExamples(review.id, requests)
-      setExamples((current) => {
-        const byId = new Map(current.map((item) => [item.id, item]))
-        saved.forEach((item) => byId.set(item.id, item))
-        return [...byId.values()]
-      })
-      onExamplesChange()
-      return true
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Neizdevās saglabāt atradumu.')
-      return false
+      const saved = await saveExample(review.id, request)
+      onExampleSaved(saved)
     } finally {
       setSaving(false)
     }
@@ -87,18 +56,21 @@ export function UsageCheck({ review, onSaveDecision, onExamplesChange, defaultOp
     event.preventDefault()
     const form = event.currentTarget
     const data = new FormData(form)
-    const saved = await addExamples([{
-      source: 'EXTERNAL',
-      corpus: null,
-      tokenNumber: null,
-      query: review.reviewedTerm,
-      citation: String(data.get('citation')),
-      url: String(data.get('url')),
-      reference: null,
-      note: null,
-    }])
-    if (saved) {
+    setError('')
+    try {
+      await addExample({
+        source: 'EXTERNAL',
+        corpus: null,
+        tokenNumber: null,
+        query: review.reviewedTerm,
+        citation: String(data.get('citation')),
+        url: String(data.get('url')),
+        reference: null,
+        note: null,
+      })
       setAddingSource(false)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Neizdevās saglabāt avotu.')
     }
   }
 
@@ -107,10 +79,7 @@ export function UsageCheck({ review, onSaveDecision, onExamplesChange, defaultOp
     setError('')
     try {
       const saved = await selectCorpusExamples(review.id, selection)
-      setExamples(saved)
-      onExamplesChange()
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Neizdevās atlasīt korpusa piemērus.')
+      onExamplesReplaced(saved)
     } finally {
       setSaving(false)
     }
@@ -143,19 +112,13 @@ export function UsageCheck({ review, onSaveDecision, onExamplesChange, defaultOp
     }
   }
 
-  async function removeExample() {
-    if (!deletingId) {
-      return
-    }
+  async function removeExample(exampleId: string) {
     setSaving(true)
     setError('')
     try {
-      await deleteExample(review.id, deletingId)
-      setExamples((current) => current.filter((item) => item.id !== deletingId))
-      onExamplesChange()
+      await deleteExample(review.id, exampleId)
+      onExampleRemoved(exampleId)
       setDeletingId(null)
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Neizdevās noņemt atradumu.')
     } finally {
       setSaving(false)
     }
@@ -166,10 +129,7 @@ export function UsageCheck({ review, onSaveDecision, onExamplesChange, defaultOp
     setError('')
     try {
       const remaining = await deleteCorpusExamples(review.id, corpus)
-      setExamples(remaining)
-      onExamplesChange()
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Neizdevās noņemt korpusa piemērus.')
+      onExamplesReplaced(remaining)
     } finally {
       setSaving(false)
     }
@@ -178,7 +138,7 @@ export function UsageCheck({ review, onSaveDecision, onExamplesChange, defaultOp
   function toggleSection(event: SyntheticEvent<HTMLDetailsElement>) {
     const isOpen = event.currentTarget.open
     setExpanded(isOpen)
-    if (isOpen && editable) {
+    if (isOpen) {
       setSearchStarted(true)
     }
   }
@@ -207,20 +167,18 @@ export function UsageCheck({ review, onSaveDecision, onExamplesChange, defaultOp
           }}>
           3. {needsUsageDecision ? 'Lietojuma pārbaude' : 'Piemēru atlase'}
         </summary>
-        {editable && searchStarted && <CorpusSearch term={review.reviewedTerm}
-            examples={examples} saving={saving || loading} onSave={addExamples} onSelectCorpus={handleCorpusSelection}
-            onRemove={requestExampleRemoval} onRemoveCorpus={removeCorpusExamples}
+        {searchStarted && <CorpusSearch term={review.reviewedTerm} editable={editable}
+            examples={examples} saving={saving || loading} onSave={addExample} onSelectCorpus={handleCorpusSelection}
+            onRemove={removeExample} onRemoveCorpus={removeCorpusExamples}
             onAddSource={openSourceForm} />}
         {error && !addingSource && !deletingId && !pendingDecision && (
           <p className="error" role="alert">{error}</p>
         )}
         {loading && <p className="muted">Ielādē saglabātos atradumus...</p>}
-        {readOnly && !loading && !error && examples.length === 0 && (
-          <p className="muted">Nav atzīmētu piemēru.</p>
-        )}
-        <SelectedExamples examples={examples} busy={saving}
+        <SelectedExamples examples={examples.filter((example) => example.source === 'EXTERNAL')}
+          label="Citi avoti" busy={saving}
           onRemove={editable ? requestExampleRemoval : undefined} />
-        {readOnly && review.usageNote && <p>{review.usageNote}</p>}
+        {review.usageNote && <p>{review.usageNote}</p>}
         {needsUsageDecision && <>
         <p><strong>Vai atzīstat, ka vārdu lieto?</strong></p>
         <div className="tezaurs-dropdown" onBlur={(event) => {
@@ -265,7 +223,10 @@ export function UsageCheck({ review, onSaveDecision, onExamplesChange, defaultOp
         <label>Citāts<textarea className="form-control form-control-sm" name="citation" required maxLength={10000} rows={3} disabled={saving} /></label>
       </EditDialog>}
       {deletingId && <ConfirmationDialog busy={saving} error={error}
-        message="Noņemt šo atradumu no izskatīšanas?" onConfirm={() => removeExample()}
+        message="Noņemt šo atradumu no perēkļa?" onConfirm={async () => {
+          try { await removeExample(deletingId) }
+          catch (cause) { setError(cause instanceof Error ? cause.message : 'Neizdevās noņemt avotu.') }
+        }}
         onCancel={() => {
           setDeletingId(null)
           setError('')

@@ -1,52 +1,24 @@
-import { useEffect, useState, type ReactNode } from 'react'
-import { getTezaursEntry } from '../../api/client'
+import { useState, type ReactNode } from 'react'
+import type { TezaursEntryCandidate } from '../../api/types'
 import { TezaursEntryLink } from './TezaursEntryLink'
 
 type Props = {
-  entryId: number
+  entry: TezaursEntryCandidate | null
+  loading: boolean
   defaultOpen: boolean
   complete: boolean
   children: ReactNode
-  onAddSense?: () => void
 }
 
-export function ExistingEntryReference({ entryId, children, onAddSense, defaultOpen, complete }: Props) {
+export function ExistingEntryReference({ entry, loading, children, defaultOpen, complete }: Props) {
   const [expanded, setExpanded] = useState(defaultOpen)
-  const [entry, setEntry] = useState<{ heading: string; humanKey: string } | null>(null)
-  const [error, setError] = useState('')
-
-  useEffect(() => {
-    let requestIsOutdated = false
-    async function loadEntryReference() {
-      try {
-        const loadedEntry = await getTezaursEntry(entryId)
-        if (!requestIsOutdated) {
-          setEntry({ heading: loadedEntry.heading, humanKey: loadedEntry.humanKey })
-        }
-      } catch (cause) {
-        if (!requestIsOutdated) {
-          setError(cause instanceof Error ? cause.message : 'Neizdevās ielādēt šķirkļa saiti.')
-        }
-      }
-    }
-    loadEntryReference()
-    return () => { requestIsOutdated = true }
-  }, [entryId])
-
-  return (
-    <details open={expanded} onToggle={(event) => setExpanded(event.currentTarget.open)}
-      className="entry-draft-section review-section">
-      <summary className={!expanded && complete ? 'section-title confirmed' : 'section-title'}>5. Labojumu melnraksts</summary>
-      {error && <p className="error">{error}</p>}
-      <div className="draft-heading">
-        {entry && <span className="existing-record">
-          <strong>{entry.heading}</strong> <TezaursEntryLink humanKey={entry.humanKey} />
-        </span>}
-        {onAddSense && <button className="btn btn-sm btn-outline-secondary" type="button" onClick={onAddSense}>
-          Pievienot nozīmi
-        </button>}
-      </div>
-      {children}
-    </details>
-  )
+  return <details open={expanded} onToggle={(event) => setExpanded(event.currentTarget.open)}
+    className="entry-draft-section review-section">
+    <summary className={!expanded && complete ? 'section-title confirmed' : 'section-title'}>5. Labojumu melnraksts</summary>
+    {loading && <p className="muted">Ielādē šķirkli...</p>}
+    {entry && <div className="draft-heading">
+      <span className="existing-record"><strong>{entry.heading}</strong> <TezaursEntryLink humanKey={entry.humanKey} /></span>
+    </div>}
+    {children}
+  </details>
 }

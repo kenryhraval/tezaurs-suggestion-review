@@ -14,6 +14,7 @@ import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 import lv.tezaurs.tip.common.error.ConflictException;
 import lv.tezaurs.tip.corpus.dto.Corpus;
 import lv.tezaurs.tip.example.dto.SaveExampleRequest;
@@ -33,6 +34,10 @@ public class Example {
     @JoinColumn(name = "sense_id")
     private Sense sense;
 
+    @Column(nullable = false)
+    @Setter
+    private boolean approved;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 16)
     private ExampleSource source;
@@ -45,6 +50,10 @@ public class Example {
     private String query;
     @Column(nullable = false, columnDefinition = "text")
     private String citation;
+    @Column(name = "match_start")
+    private Integer matchStart;
+    @Column(name = "match_end")
+    private Integer matchEnd;
     @Column(nullable = false, columnDefinition = "text")
     private String url;
     @Column(columnDefinition = "text")
@@ -64,6 +73,8 @@ public class Example {
         tokenNumber = request.tokenNumber();
         query = request.query().trim();
         citation = request.citation().trim();
+        matchStart = request.matchStart();
+        matchEnd = request.matchEnd();
         url = request.url().trim();
         reference = request.reference();
         note = request.note();
@@ -83,12 +94,10 @@ public class Example {
             sense.getExamples().remove(this);
         }
         sense = targetSense;
+        approved = false;
         if (targetSense != null && !targetSense.getExamples().contains(this)) {
             targetSense.getExamples().add(this);
         }
     }
 
-    public boolean isAttachedToApprovedSense() {
-        return sense != null && sense.isApprovedDraft();
-    }
 }

@@ -1,7 +1,6 @@
 import type {
   SenseModelOption,
-  DefinitionInput,
-  GeneratedDefinition,
+  ModelOperation,
   CurrentUser,
   ReviewType,
   DuplicateReviewCandidate,
@@ -16,7 +15,6 @@ import type {
   SaveLexemeDraft,
   LexemeDraft,
   TezaursEntryCandidate,
-  TezaursSense,
   TezaursFormOptions,
   SaveReviewType,
   UsageDecision,
@@ -34,20 +32,22 @@ async function request(path: string, options?: RequestInit): Promise<Response> {
   })
 
   if (!response.ok) {
-    if (response.status === 400) {
-      throw new Error('Pārbaudiet ievadītos datus.')
-    }
-    if (response.status === 404) {
-      throw new Error('Ieraksts netika atrasts.')
-    }
-    if (response.status === 409 || response.status === 502) {
-      const error = await response.json().catch(() => null)
-      if (typeof error?.message === 'string' && error.message.trim()) {
-        throw new Error(error.message)
+    const error = await response.json().catch(() => null)
+    let message = typeof error?.message === 'string' && error.message.trim() ? error.message : ''
+    if (!message) {
+      switch (response.status) {
+        case 400: message = 'Pārbaudiet ievadītos datus.'; break
+        case 401:
+        case 403: message = 'Lai veiktu šo darbību, jāpiesakās.'; break
+        case 404: message = 'Ieraksts netika atrasts.'; break
+        default: message = 'Pieprasījumu neizdevās izpildīt.'
       }
-      throw new Error('Darbību nevar izpildīt pašreizējā stāvoklī.')
     }
-    throw new Error('Pieprasījumu neizdevās izpildīt.')
+    if (Array.isArray(error?.fieldErrors) && error.fieldErrors.length > 0) {
+      const fields = error.fieldErrors.map((violation: { field: string }) => violation.field).join(', ')
+      message += ` Neatbilstošie lauki: ${fields}.`
+    }
+    throw new Error(message)
   }
 
   return response
@@ -107,15 +107,15 @@ export async function changeReviewStatus(
 
 export async function getDuplicateReviewCandidates(
   query: string,
-  excludedCaseId: string,
+  excludedReviewId: string,
 ): Promise<DuplicateReviewCandidate[]> {
-  const parameters = new URLSearchParams({ query, excludedCaseId })
+  const parameters = new URLSearchParams({ query, excludedReviewId })
   const response = await request(`/api/reviews/duplicate-candidates?${parameters}`)
   return response.json()
 }
 
-export async function mergeReviewCases(sourceCaseId: string, reviewId: string): Promise<Review> {
-  const response = await request(`/api/reviews/${sourceCaseId}/duplicate`, {
+export async function mergeReviews(sourceReviewId: string, reviewId: string): Promise<Review> {
+  const response = await request(`/api/reviews/${sourceReviewId}/duplicate`, {
     method: 'POST',
     body: JSON.stringify({ reviewId }),
   })
@@ -127,8 +127,8 @@ export async function getReviewByPublicId(publicId: string, signal?: AbortSignal
   return response.json()
 }
 
-export async function updateCaseTitle(caseId: string, title: string): Promise<Review> {
-  const response = await request(`/api/reviews/${caseId}/term-correction`, {
+export async function updateReviewTitle(reviewId: string, title: string): Promise<Review> {
+  const response = await request(`/api/reviews/${reviewId}/term-correction`, {
     method: 'POST',
     body: JSON.stringify({ reviewedTerm: title }),
   })
@@ -156,20 +156,10 @@ export async function getEntryDraft(reviewId: string): Promise<EntryDraft | null
   return response.json()
 }
 
-export async function createEntryDraft(
-  reviewId: string,
-): Promise<{ draft: EntryDraft; review: Review }> {
-  const response = await request(
-    `/api/reviews/${reviewId}/entry`,
-    { method: 'POST' },
-  )
-  return response.json()
-}
-
 export async function updateEntryDraft(
   reviewId: string,
   draft: SaveEntryDraft,
-): Promise<{ draft: EntryDraft; review: Review }> {
+): Promise<EntryDraft> {
   const response = await request(
     `/api/reviews/${reviewId}/entry`,
     { method: 'PUT', body: JSON.stringify(draft) },
@@ -180,7 +170,7 @@ export async function updateEntryDraft(
 export async function createLexemeDraft(
   reviewId: string,
   lexeme: SaveLexemeDraft,
-): Promise<{ lexeme: LexemeDraft; review: Review }> {
+): Promise<LexemeDraft> {
   const response = await request(
     `/api/reviews/${reviewId}/entry/lexemes`,
     { method: 'POST', body: JSON.stringify(lexeme) },
@@ -192,7 +182,7 @@ export async function updateLexemeDraft(
   reviewId: string,
   lexemeId: string,
   lexeme: SaveLexemeDraft,
-): Promise<{ lexeme: LexemeDraft; review: Review }> {
+): Promise<LexemeDraft> {
   const response = await request(
     `/api/reviews/${reviewId}/entry/lexemes/${lexemeId}`,
     { method: 'PUT', body: JSON.stringify(lexeme) },
@@ -203,12 +193,8 @@ export async function updateLexemeDraft(
 export async function deleteLexemeDraft(
   reviewId: string,
   lexemeId: string,
-): Promise<Review> {
-  const response = await request(
-    `/api/reviews/${reviewId}/entry/lexemes/${lexemeId}`,
-    { method: 'DELETE' },
-  )
-  return response.json()
+): Promise<void> {
+  await request(`/api/reviews/${reviewId}/entry/lexemes/${lexemeId}`, { method: 'DELETE' })
 }
 
 export async function getTezaursFormOptions(): Promise<TezaursFormOptions> {
@@ -221,56 +207,51 @@ export async function getTezaursEntry(entryId: number): Promise<TezaursEntryCand
   return response.json()
 }
 
-export async function getTezaursSenses(entryId: number): Promise<TezaursSense[]> {
-  const response = await request(`/api/tezaurs/entries/${entryId}/senses`)
-  return response.json()
-}
-
 export async function getSenses(reviewId: string): Promise<Sense[]> {
   const response = await request(`/api/reviews/${reviewId}/senses`)
   return response.json()
 }
 
-export async function getSenseDrafts(reviewId: string): Promise<Sense[]> {
-  const senses = await getSenses(reviewId)
-  return senses.filter((sense) => sense.approved && sense.existingSenseId === null)
-}
-
-export async function saveSense(reviewId: string, sense: SaveSense): Promise<{ sense: Sense; review: Review }> {
+export async function saveSense(reviewId: string, sense: SaveSense): Promise<Sense> {
   const path = `/api/reviews/${reviewId}/senses`
   const response = await request(sense.id ? `${path}/${sense.id}` : path, {
     method: sense.id ? 'PUT' : 'POST',
     body: JSON.stringify({
       gloss: sense.gloss,
       approved: sense.approved,
-      parentDraftSenseId: sense.parentDraftSenseId,
-      parentTezaursSenseId: sense.parentTezaursSenseId,
+      parentSenseId: sense.parentSenseId,
       flags: sense.flags,
     }),
   })
   return response.json()
 }
 
-export async function deleteSense(reviewId: string, senseId: string): Promise<Review> {
-  const response = await request(`/api/reviews/${reviewId}/senses/${senseId}`, { method: 'DELETE' })
-  return response.json()
-}
-
-export async function assignExampleSense(reviewId: string, exampleId: string, senseId: string | null): Promise<Example> {
-  const response = await request(`/api/reviews/${reviewId}/usage/examples/${exampleId}/sense`, {
-    method: 'PUT', body: JSON.stringify({ senseId }),
+export async function mergeSenses(reviewId: string, sourceSenseId: string, targetSenseId: string): Promise<Sense> {
+  const response = await request(`/api/reviews/${reviewId}/senses/${sourceSenseId}/merge`, {
+    method: 'POST', body: JSON.stringify({ targetSenseId }),
   })
   return response.json()
 }
 
-export async function getExamplesForCase(reviewId: string): Promise<Example[]> {
+export async function deleteSense(reviewId: string, senseId: string): Promise<void> {
+  await request(`/api/reviews/${reviewId}/senses/${senseId}`, { method: 'DELETE' })
+}
+
+export async function updateExample(reviewId: string, exampleId: string, senseId: string | null, approved: boolean): Promise<Example> {
+  const response = await request(`/api/reviews/${reviewId}/usage/examples/${exampleId}`, {
+    method: 'PUT', body: JSON.stringify({ senseId, approved }),
+  })
+  return response.json()
+}
+
+export async function getExamplesForReview(reviewId: string): Promise<Example[]> {
   const response = await request(`/api/reviews/${reviewId}/usage/examples`)
   return response.json()
 }
 
-export async function saveExamples(reviewId: string, examples: SaveExample[]): Promise<Example[]> {
-  const response = await request(`/api/reviews/${reviewId}/usage/examples/batch`, {
-    method: 'POST', body: JSON.stringify(examples),
+export async function saveExample(reviewId: string, example: SaveExample): Promise<Example> {
+  const response = await request(`/api/reviews/${reviewId}/usage/examples`, {
+    method: 'POST', body: JSON.stringify(example),
   })
   return response.json()
 }
@@ -312,16 +293,16 @@ export async function getCorpora(): Promise<CorpusOption[]> {
   return response.json()
 }
 
-export async function regroupSenses(reviewId: string, modelId: string): Promise<Sense[]> {
+export async function regroupSenses(reviewId: string, modelId: string, additionalInstructions: string): Promise<Sense[]> {
   const response = await request(`/api/reviews/${reviewId}/sense-research/regroup`, {
-    method: 'POST', body: JSON.stringify({ modelId }),
+    method: 'POST', body: JSON.stringify({ modelId, additionalInstructions }),
   })
   return response.json()
 }
 
-export async function generateSenseDefinitions(reviewId: string, groups: DefinitionInput[], modelId: string): Promise<GeneratedDefinition[]> {
+export async function generateSenseDefinitions(reviewId: string, modelId: string, additionalInstructions: string): Promise<Sense[]> {
   const response = await request(`/api/reviews/${reviewId}/sense-research/definitions`, {
-    method: 'POST', body: JSON.stringify({ groups, modelId }),
+    method: 'POST', body: JSON.stringify({ modelId, additionalInstructions }),
   })
   return response.json()
 }
@@ -329,4 +310,9 @@ export async function generateSenseDefinitions(reviewId: string, groups: Definit
 export async function getSenseModelOptions(): Promise<SenseModelOption[]> {
   const response = await request('/api/sense-models')
   return response.json()
+}
+
+export async function getModelPrompt(operation: ModelOperation): Promise<string> {
+  const response = await request(`/api/sense-models/prompts/${operation}`)
+  return response.text()
 }

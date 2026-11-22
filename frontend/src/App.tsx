@@ -2,11 +2,11 @@ import './App.css'
 import { createBrowserRouter } from 'react-router'
 import { RouterProvider } from 'react-router/dom'
 import { loadCurrentUser } from './auth/currentUserLoader'
-import { CaseLoading } from './components/review/CaseLoading'
-import { CaseErrorPage } from './pages/CaseErrorPage'
-import { CasePage } from './pages/CasePage'
+import { ReviewLoading } from './components/review/ReviewLoading'
+import { ReviewErrorPage } from './pages/ReviewErrorPage'
+import { ReviewPage } from './pages/ReviewPage'
 import { MainPage } from './pages/MainPage'
-import { loadCase, rejectUnknownCasePath } from './review/caseLoader'
+import { loadReview, rejectUnknownReviewPath } from './review/reviewLoader'
 
 const router = createBrowserRouter([
   {
@@ -17,17 +17,17 @@ const router = createBrowserRouter([
     HydrateFallback: () => null,
     children: [
       {
-        id: 'case',
+        id: 'review',
         path: ':publicId',
-        loader: loadCase,
-        Component: CasePage,
-        ErrorBoundary: CaseErrorPage,
-        HydrateFallback: CaseLoading,
+        loader: loadReview,
+        Component: ReviewPage,
+        ErrorBoundary: ReviewErrorPage,
+        HydrateFallback: ReviewLoading,
       },
       {
         path: '*',
-        loader: rejectUnknownCasePath,
-        ErrorBoundary: CaseErrorPage,
+        loader: rejectUnknownReviewPath,
+        ErrorBoundary: ReviewErrorPage,
       },
     ],
   },

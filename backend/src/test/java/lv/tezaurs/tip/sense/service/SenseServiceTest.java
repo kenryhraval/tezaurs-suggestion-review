@@ -15,7 +15,10 @@ import lv.tezaurs.tip.example.entity.Example;
 import lv.tezaurs.tip.example.entity.ExampleSource;
 import lv.tezaurs.tip.example.repository.ExampleRepository;
 import lv.tezaurs.tip.sense.dto.SenseGroup;
+import lv.tezaurs.tip.sense.dto.GeneratedDefinition;
 import lv.tezaurs.tip.review.entity.Review;
+import lv.tezaurs.tip.review.entity.ReviewSuggestion;
+import lv.tezaurs.tip.suggestion.entity.IncubatorSuggestion;
 import lv.tezaurs.tip.review.entity.ReviewStatus;
 import lv.tezaurs.tip.review.entity.ReviewType;
 import lv.tezaurs.tip.review.entity.UsageDecision;
@@ -45,6 +48,7 @@ class SenseServiceTest {
     void prepare() {
         review.setType(ReviewType.SENSE);
         review.setMatchedEntryId(42);
+        when(reviews.findById(review.getId())).thenReturn(Optional.of(review));
         when(reviews.findLockedById(review.getId())).thenReturn(Optional.of(review));
         when(senses.findAllByReviewIdAndTargetEntryIdOrderByOrderNoAscIdAsc(review.getId(), 42)).thenReturn(saved);
         when(senses.save(any(Sense.class))).thenAnswer(call -> {
@@ -52,6 +56,70 @@ class SenseServiceTest {
             if (!saved.contains(sense)) saved.add(sense);
             return sense;
         });
+    }
+
+    @Test
+    void generatedDefinitionsUpdateOnlyTextAndPreserveApprovalFlagsHierarchyAndExamples() {
+        Sense parent = sense("Original", true, null);
+        parent.setFlags(Map.of("Note", "Human flag"));
+        Sense child = sense("Child", false, null);
+        child.setParentSenseId(parent.getId());
+        Example example = example();
+        example.reassignTo(child);
+        example.setApproved(true);
+
+        service.saveGeneratedDefinitions(review.getId(), 42, List.of(
+                new GeneratedDefinition(parent.getId(), "New parent definition"),
+                new GeneratedDefinition(child.getId(), "New child definition")));
+
+        assertThat(parent.getGloss()).isEqualTo("New parent definition");
+        assertThat(parent.isApproved()).isTrue();
+        assertThat(parent.getFlags()).containsEntry("Note", "Human flag");
+        assertThat(child.getParentSenseId()).isEqualTo(parent.getId());
+        assertThat(child.getGloss()).isEqualTo("New child definition");
+        assertThat(example.getSense()).isSameAs(child);
+        assertThat(example.isApproved()).isTrue();
+    }
+
+    @Test
+    void validatesEveryGeneratedTargetBeforeChangingAnyDefinitions() {
+        Sense local = sense("Original", false, null);
+        Sense existing = sense("Dictionary", false, 300);
+
+        assertThatThrownBy(() -> service.saveGeneratedDefinitions(review.getId(), 42, List.of(
+                new GeneratedDefinition(local.getId(), "New"), new GeneratedDefinition(existing.getId(), "Forbidden"))))
+                .isInstanceOf(ConflictException.class);
+        assertThat(local.getGloss()).isEqualTo("Original");
+        assertThat(existing.getGloss()).isEqualTo("Dictionary");
+        assertThatThrownBy(() -> service.saveGeneratedDefinitions(review.getId(), 99, List.of()))
+                .isInstanceOf(ConflictException.class);
+    }
+
+    @Test
+    void createsDistinctSubmittedDefinitionsOnceWithoutOverwritingEdits() {
+        new ReviewSuggestion(new IncubatorSuggestion(2, "vārds", "Otra nozīme"), review);
+        new ReviewSuggestion(new IncubatorSuggestion(1, "vārds", " Pirmā nozīme "), review);
+        new ReviewSuggestion(new IncubatorSuggestion(3, "vārds", "Pirmā nozīme"), review);
+        new ReviewSuggestion(new IncubatorSuggestion(4, "vārds", " "), review);
+
+        service.initializeForSelection(review.getId(), false);
+
+        assertThat(saved).extracting(Sense::getGloss).containsExactly("Pirmā nozīme", "Otra nozīme");
+        assertThat(saved).allSatisfy(sense -> {
+            assertThat(sense.isApproved()).isFalse();
+            assertThat(sense.getExistingSenseId()).isNull();
+            assertThat(sense.getTargetEntryId()).isEqualTo(42);
+        });
+        saved.getFirst().setGloss("Redaktora labojums");
+        service.initializeForSelection(review.getId(), false);
+        assertThat(saved).extracting(Sense::getGloss).containsExactly("Redaktora labojums", "Otra nozīme");
+    }
+
+    @Test
+    void doesNotInventAnInitialDefinitionWhenNoneWasSubmitted() {
+        new ReviewSuggestion(new IncubatorSuggestion(1, "vārds", " "), review);
+        service.initializeForSelection(review.getId(), false);
+        assertThat(saved).isEmpty();
     }
 
     @Test
@@ -83,13 +151,26 @@ class SenseServiceTest {
     }
 
     @Test
+    void readingSensesDoesNotInitializeReferencesOrLockTheReview() {
+        assertThat(service.findAllForReview(review.getId())).isEmpty();
+
+        verify(reviews).findById(review.getId());
+        verify(reviews, never()).findLockedById(any());
+        verify(senses, never()).save(any());
+        verifyNoInteractions(tezaursSenses);
+    }
+
+    @Test
     void createsExistingReferenceCardsOnlyOnceAndProtectsTheirDictionaryContent() {
         TezaursSense existing = mock(TezaursSense.class);
         when(existing.getId()).thenReturn(300);
+        when(existing.getParentSenseId()).thenReturn(null);
         when(existing.getGloss()).thenReturn("Dictionary definition");
         when(tezaursSenses.findOrderedByEntryId(42)).thenReturn(List.of(existing));
 
+        service.initializeForSelection(review.getId(), true);
         var first = service.findAllForReview(review.getId());
+        service.initializeForSelection(review.getId(), true);
         var second = service.findAllForReview(review.getId());
 
         assertThat(first).singleElement().satisfies(sense -> {
@@ -114,12 +195,12 @@ class SenseServiceTest {
         Example existingMatch = example();
         moved.reassignTo(approved);
         ungrouped.reassignTo(old);
-        when(examples.findByReviewIdOrderByCreatedAtAscIdAsc(review.getId()))
+        when(examples.findForReview(eq(review.getId()), any()))
                 .thenReturn(List.of(moved, ungrouped, existingMatch));
 
         var result = service.addGroupedSenses(review.getId(), 42, List.of(
-                new SenseGroup("New AI meaning", null, List.of(moved.getId())),
-                new SenseGroup("Model wording must not replace dictionary text", 300, List.of(existingMatch.getId()))));
+                new SenseGroup("New AI meaning", null, List.of(moved.getId()), List.of()),
+                new SenseGroup("Model wording must not replace dictionary text", existing.getId(), List.of(existingMatch.getId()), List.of())));
 
         assertThat(result).hasSize(4);
         assertThat(approved.isApproved()).isTrue();
@@ -135,15 +216,104 @@ class SenseServiceTest {
     }
 
     @Test
+    void regroupingReusesLocalSenseIdsWithoutDuplicatingOrOverwritingHumanWork() {
+        Sense parent = sense("Human wording", true, null);
+        parent.setFlags(Map.of("Note", "Human flag"));
+        Sense child = sense("Human subsense", false, null);
+        child.setParentSenseId(parent.getId());
+        Example example = example();
+        when(examples.findForReview(eq(review.getId()), any())).thenReturn(List.of(example));
+
+        var result = service.addGroupedSenses(review.getId(), 42, List.of(
+                new SenseGroup("Model wording", parent.getId(), List.of(), List.of(
+                        new SenseGroup.Subsense("Model child wording", child.getId(), List.of(example.getId()))))));
+
+        assertThat(result).hasSize(2);
+        assertThat(parent.getGloss()).isEqualTo("Human wording");
+        assertThat(parent.isApproved()).isTrue();
+        assertThat(parent.getFlags()).containsEntry("Note", "Human flag");
+        assertThat(child.getGloss()).isEqualTo("Human subsense");
+        assertThat(child.getParentSenseId()).isEqualTo(parent.getId());
+        assertThat(example.getSense()).isSameAs(child);
+        verify(senses, never()).save(any());
+    }
+
+    @Test
+    void savesUnapprovedSubsensesUnderNewParentsWithoutRequiringParentExamples() {
+        Example example = example();
+        when(examples.findForReview(eq(review.getId()), any())).thenReturn(List.of(example));
+
+        var result = service.addGroupedSenses(review.getId(), 42, List.of(
+                new SenseGroup("Parent", null, List.of(), List.of(
+                        new SenseGroup.Subsense("Child", null, List.of(example.getId()))))));
+
+        assertThat(result).hasSize(2);
+        var parent = result.getFirst();
+        var child = result.getLast();
+        assertThat(parent.exampleIds()).isEmpty();
+        assertThat(child.parentSenseId()).isEqualTo(parent.id());
+        assertThat(child.exampleIds()).containsExactly(example.getId());
+        assertThat(result).allSatisfy(sense -> assertThat(sense.approved()).isFalse());
+    }
+
+    @Test
+    void savesNewSubsensesUnderExistingDictionaryRoots() {
+        Sense existing = sense("Dictionary root", false, 300);
+        when(examples.findForReview(eq(review.getId()), any())).thenReturn(List.of());
+
+        var result = service.addGroupedSenses(review.getId(), 42, List.of(
+                new SenseGroup("Model title", existing.getId(), List.of(), List.of(
+                        new SenseGroup.Subsense("New child", null, List.of())))));
+
+        assertThat(result).hasSize(2);
+        assertThat(existing.getGloss()).isEqualTo("Dictionary root");
+        assertThat(result.getLast().parentSenseId()).isEqualTo(existing.getId());
+    }
+
+    @Test
+    void includesExistingDictionaryParentsInTheResearchHierarchy() {
+        TezaursSense root = mock(TezaursSense.class);
+        when(root.getId()).thenReturn(300);
+        when(root.getParentSenseId()).thenReturn(null);
+        when(root.getGloss()).thenReturn("Parent");
+        TezaursSense child = mock(TezaursSense.class);
+        when(child.getId()).thenReturn(301);
+        when(child.getParentSenseId()).thenReturn(300);
+        when(child.getGloss()).thenReturn("Child");
+        when(tezaursSenses.findOrderedByEntryId(42)).thenReturn(List.of(root, child));
+
+        service.initializeForSelection(review.getId(), true);
+        var result = service.findAllForReview(review.getId());
+
+        assertThat(result.getLast().parentSenseId()).isEqualTo(result.getFirst().id());
+        assertThat(result.getFirst().parentSenseId()).isNull();
+    }
+
+    @Test
+    void regroupingCannotMoveAnExampleApprovedWhileTheModelWasRunning() {
+        Sense sense = sense("Human meaning", true, null);
+        Example example = example();
+        example.reassignTo(sense);
+        example.setApproved(true);
+        when(examples.findForReview(eq(review.getId()), any())).thenReturn(List.of(example));
+
+        assertThatThrownBy(() -> service.addGroupedSenses(review.getId(), 42, List.of(
+                new SenseGroup("AI meaning", null, List.of(example.getId()), List.of()))))
+                .isInstanceOf(ConflictException.class);
+        assertThat(example.getSense()).isSameAs(sense);
+        assertThat(example.isApproved()).isTrue();
+    }
+
+    @Test
     void regroupingValidatesAllExamplesBeforeMovingAnyAndRejectsOtherEntryBranches() {
         Sense original = sense("Original", true, null);
         Example example = example();
         example.reassignTo(original);
-        when(examples.findByReviewIdOrderByCreatedAtAscIdAsc(review.getId())).thenReturn(List.of(example));
+        when(examples.findForReview(eq(review.getId()), any())).thenReturn(List.of(example));
 
         assertThatThrownBy(() -> service.addGroupedSenses(review.getId(), 42, List.of(
-                new SenseGroup("First", null, List.of(example.getId())),
-                new SenseGroup("Invalid", null, List.of(UUID.randomUUID())))))
+                new SenseGroup("First", null, List.of(example.getId()), List.of()),
+                new SenseGroup("Invalid", null, List.of(UUID.randomUUID()), List.of()))))
                 .isInstanceOf(ConflictException.class);
         assertThat(example.getSense()).isSameAs(original);
         assertThat(saved).containsExactly(original);
@@ -151,7 +321,7 @@ class SenseServiceTest {
         assertThatThrownBy(() -> service.addGroupedSenses(review.getId(), 99, List.of()))
                 .isInstanceOf(ConflictException.class);
         assertThatThrownBy(() -> service.addGroupedSenses(review.getId(), 42, List.of(
-                new SenseGroup("First", null, List.of(example.getId(), example.getId())))))
+                new SenseGroup("First", null, List.of(example.getId(), example.getId()), List.of()))))
                 .isInstanceOf(ConflictException.class);
     }
 
@@ -159,7 +329,7 @@ class SenseServiceTest {
     void enforcesTwoLevelsAndPreventsSelfParentingOrMovingParentsUnderOtherSenses() {
         Sense root = sense("Root", true, null);
         Sense child = sense("Child", true, null);
-        child.setParentDraftSenseId(root.getId());
+        child.setParentSenseId(root.getId());
         Sense anotherRoot = sense("Other root", true, null);
 
         assertThatThrownBy(() -> service.create(review.getId(), request("Grandchild", child.getId(), null, false)))
@@ -174,8 +344,10 @@ class SenseServiceTest {
 
     @Test
     void existingParentsMustBeRootsAndApprovedChildrenNeedAnApprovedParent() {
-        when(tezaursSenses.existsByIdAndEntryIdAndParentSenseIdIsNull(7, 42)).thenReturn(true);
-        assertThat(service.create(review.getId(), request("Child", null, 7, true)).parentTezaursSenseId()).isEqualTo(7);
+        Sense dictionaryRoot = sense("Dictionary root", false, 7);
+        Sense dictionaryChild = sense("Dictionary child", false, 8);
+        dictionaryChild.setParentSenseId(dictionaryRoot.getId());
+        assertThat(service.create(review.getId(), request("Child", null, 7, true)).parentSenseId()).isEqualTo(dictionaryRoot.getId());
         assertThatThrownBy(() -> service.create(review.getId(), request("Grandchild", null, 8, true)))
                 .isInstanceOf(ConflictException.class);
         Sense unapproved = sense("Unapproved", false, null);
@@ -184,12 +356,73 @@ class SenseServiceTest {
     }
 
     @Test
+    void mergingKeepsTargetDataAndExamplesAndMovesSourceExamplesAndSubsenses() {
+        Sense source = sense("Discarded wording", true, null);
+        Sense target = sense("Target wording", true, null);
+        target.setFlags(Map.of("Piezīmes", "Target flags"));
+        Sense child = sense("Child wording", true, null);
+        child.setParentSenseId(source.getId());
+        Example moved = example();
+        moved.reassignTo(source);
+        moved.setApproved(true);
+        Example retained = example();
+        retained.reassignTo(target);
+        retained.setApproved(true);
+
+        var merged = service.merge(review.getId(), source.getId(), target.getId());
+
+        assertThat(merged.id()).isEqualTo(target.getId());
+        assertThat(merged.gloss()).isEqualTo("Target wording");
+        assertThat(merged.flags()).containsEntry("Piezīmes", "Target flags");
+        assertThat(merged.approved()).isTrue();
+        assertThat(merged.exampleIds()).containsExactlyInAnyOrder(moved.getId(), retained.getId());
+        assertThat(moved.isApproved()).isFalse();
+        assertThat(retained.isApproved()).isTrue();
+        assertThat(child.getParentSenseId()).isEqualTo(target.getId());
+        assertThat(child.isApproved()).isTrue();
+        verify(senses).delete(source);
+    }
+
+    @Test
+    void mergingProtectsExistingSensesReviewBoundariesAndTwoLevelStructure() {
+        Sense source = sense("Source", false, null);
+        Sense child = sense("Child", true, null);
+        child.setParentSenseId(source.getId());
+        Sense target = sense("Target", false, null);
+        Sense existing = sense("Dictionary wording", false, 300);
+
+        assertThatThrownBy(() -> service.merge(review.getId(), source.getId(), source.getId())).isInstanceOf(ConflictException.class);
+        assertThatThrownBy(() -> service.merge(review.getId(), source.getId(), UUID.randomUUID())).isInstanceOf(ConflictException.class);
+        assertThatThrownBy(() -> service.merge(review.getId(), existing.getId(), target.getId())).isInstanceOf(ConflictException.class);
+        assertThatThrownBy(() -> service.merge(review.getId(), source.getId(), child.getId())).isInstanceOf(ConflictException.class);
+        assertThatThrownBy(() -> service.merge(review.getId(), source.getId(), target.getId())).isInstanceOf(ConflictException.class);
+        assertThat(child.getParentSenseId()).isEqualTo(source.getId());
+        verify(senses, never()).delete(any());
+    }
+
+    @Test
+    void mergingIntoAnExistingRootPreservesDictionaryTextAndReparentsDraftChildren() {
+        Sense source = sense("Source", false, null);
+        Sense child = sense("Child", false, null);
+        child.setParentSenseId(source.getId());
+        Sense target = sense("Dictionary wording", false, 300);
+
+        service.merge(review.getId(), source.getId(), target.getId());
+
+        assertThat(child.getParentSenseId()).isEqualTo(target.getId());
+        assertThat(target.getGloss()).isEqualTo("Dictionary wording");
+        verify(tezaursSenses, never()).save(any());
+    }
+
+    @Test
     void deletingASenseReleasesExamplesButDoesNotDeleteThem() {
         Sense sense = sense("Meaning", false, null);
         Example example = example();
         example.reassignTo(sense);
+        example.setApproved(true);
         service.delete(review.getId(), sense.getId());
         assertThat(example.getSense()).isNull();
+        assertThat(example.isApproved()).isFalse();
         verify(senses).delete(sense);
         verify(examples, never()).delete(any());
     }
@@ -213,6 +446,7 @@ class SenseServiceTest {
         assertThatThrownBy(() -> service.create(review.getId(), request("Meaning", null, null, null))).isInstanceOf(ConflictException.class);
         assertThatThrownBy(() -> service.update(review.getId(), UUID.randomUUID(), request("Changed", null, null, true))).isInstanceOf(ConflictException.class);
         assertThatThrownBy(() -> service.delete(review.getId(), UUID.randomUUID())).isInstanceOf(ConflictException.class);
+        assertThatThrownBy(() -> service.merge(review.getId(), UUID.randomUUID(), UUID.randomUUID())).isInstanceOf(ConflictException.class);
         assertThatThrownBy(() -> service.addGroupedSenses(review.getId(), 42, List.of())).isInstanceOf(ConflictException.class);
         service.findAllForReview(review.getId());
         verify(senses, never()).save(any());
@@ -228,10 +462,13 @@ class SenseServiceTest {
 
     private Example example() {
         return new Example(review.getId(), new SaveExampleRequest(ExampleSource.EXTERNAL, null, null,
-                "vārds", "Example", "https://example.com", null, null), "reviewer");
+                "vārds", "Example", "https://example.com", null, null, null, null), "reviewer");
     }
 
-    private static SaveSenseRequest request(String gloss, UUID parentId, Integer existingParentId, Boolean approved) {
-        return new SaveSenseRequest(gloss, parentId, existingParentId, null, approved);
+    private SaveSenseRequest request(String gloss, UUID parentId, Integer existingParentId, Boolean approved) {
+        UUID resolvedParentId = existingParentId == null ? parentId : saved.stream()
+                .filter(sense -> existingParentId.equals(sense.getExistingSenseId()))
+                .map(Sense::getId).findFirst().orElse(UUID.randomUUID());
+        return new SaveSenseRequest(gloss, resolvedParentId, null, approved);
     }
 }

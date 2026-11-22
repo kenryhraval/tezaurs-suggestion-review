@@ -45,16 +45,17 @@ public class ModelService {
         private String apiKey = "";
     }
 
-    public <T> T requestStructuredResponse(String operation, String modelId, Object input, Class<T> responseType) {
+    public <T> T requestStructuredResponse(String operation, String modelId, String additionalInstructions, Object input, Class<T> responseType) {
         String selectedModelId = modelId == null || modelId.isBlank() ? defaultModel : modelId;
         Model selectedModel = requireConfiguredModel(selectedModelId);
-        Resource prompt = prompts.get(operation);
-        if (prompt == null) {
-            throw new ConflictException("MI uzvedne nav konfigurēta darbībai “" + operation + "”.");
-        }
+        String prompt = getPrompt(operation);
         String inputJson = json.writeValueAsString(input);
-        if (inputJson.length() > maxInputCharacters) {
-            throw new ConflictException("MI ievaddatos ir " + inputJson.length() + " rakstzīmes; atļauts līdz "
+        String userMessage = inputJson;
+        if (additionalInstructions != null && !additionalInstructions.isBlank()) {
+            userMessage = "Papildu norādījumi:\n" + additionalInstructions.trim() + "\n\nIevaddati:\n" + inputJson;
+        }
+        if (userMessage.length() > maxInputCharacters) {
+            throw new ConflictException("MI ievaddatos ir " + userMessage.length() + " rakstzīmes; atļauts līdz "
                     + maxInputCharacters + ". Samaziniet piemēru skaitu.");
         }
         String stage = "prepare request";
@@ -64,8 +65,8 @@ public class ModelService {
             Map<String, Object> body = new LinkedHashMap<>();
             body.put("model", selectedModel.getModel());
             body.put("messages", List.of(
-                    Map.of("role", "system", "content", prompt.getContentAsString(StandardCharsets.UTF_8)),
-                    Map.of("role", "user", "content", inputJson)));
+                    Map.of("role", "system", "content", prompt),
+                    Map.of("role", "user", "content", userMessage)));
             body.put("response_format", Map.of("type", "json_object"));
             HttpRequest.Builder request = HttpRequest.newBuilder()
                     .uri(URI.create(selectedModel.getBaseUrl().replaceAll("/+$", "") + "/chat/completions"))
@@ -104,6 +105,18 @@ public class ModelService {
             log.warn("AI request failed: operation={}, modelId={}, model={}, stage={}, httpStatus={}, finishReason={}, errorType={}",
                     operation, selectedModelId, selectedModel.getModel(), stage, httpStatus, finishReason,
                     exception.getClass().getSimpleName());
+            throw new SenseModelException(exception);
+        }
+    }
+
+    public String getPrompt(String operation) {
+        Resource prompt = prompts.get(operation);
+        if (prompt == null) {
+            throw new ConflictException("MI uzvedne nav konfigurēta darbībai “" + operation + "”.");
+        }
+        try {
+            return prompt.getContentAsString(StandardCharsets.UTF_8).trim();
+        } catch (IOException exception) {
             throw new SenseModelException(exception);
         }
     }

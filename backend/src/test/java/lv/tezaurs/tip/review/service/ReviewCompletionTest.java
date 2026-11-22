@@ -21,6 +21,7 @@ import lv.tezaurs.tip.review.repository.ReviewRepository;
 import lv.tezaurs.tip.review.repository.ReviewSuggestionRepository;
 import lv.tezaurs.tip.sense.entity.Sense;
 import lv.tezaurs.tip.sense.repository.SenseRepository;
+import lv.tezaurs.tip.sense.service.SenseService;
 import lv.tezaurs.tip.tezaurs.repository.TezaursEntryRepository;
 import org.junit.jupiter.api.Test;
 
@@ -29,7 +30,7 @@ class ReviewCompletionTest {
     private final EntryService entries = mock(EntryService.class);
     private final SenseRepository senses = mock(SenseRepository.class);
     private final ReviewService service = new ReviewService(reviews, mock(ReviewSuggestionRepository.class),
-            mock(TezaursEntryRepository.class), new CurrentUserService(), entries, senses);
+            mock(TezaursEntryRepository.class), new CurrentUserService(), entries, senses, mock(SenseService.class));
 
     @Test
     void requiresDictionaryCheckBeforeCompletion() {

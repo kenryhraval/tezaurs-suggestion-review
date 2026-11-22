@@ -1,3 +1,4 @@
+import { ExampleText } from '../shared/ExampleText'
 import type { Example } from '../../api/types'
 import type { ReactNode } from 'react'
 import { UsageSourceLink } from './UsageSourceLink'
@@ -14,7 +15,7 @@ export function SavedExample({ example, busy, onRemove, highlighted = false, chi
   return (
     <article className={highlighted ? 'usage-example marked-example' : 'usage-example'}>
       <div className="example-text">
-        <p>{children ?? example.citation}</p>
+        <p>{children ?? <ExampleText example={example} />}</p>
         {onRemove && <button type="button" className="icon-button remove-example" title="Noņemt atzīmi"
           aria-label="Noņemt atzīmi" disabled={busy} onClick={onRemove}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" aria-hidden="true">

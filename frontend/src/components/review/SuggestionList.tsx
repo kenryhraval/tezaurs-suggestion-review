@@ -1,6 +1,6 @@
 import { reviewTypeLabels, reviewStatusLabels } from '../../review/statuses'
 import type { ReviewType, ReviewListItem, ReviewSort, ReviewStatus } from '../../api/types'
-import { casePath } from '../../review/links'
+import { reviewPath } from '../../review/links'
 import { Link } from 'react-router'
 import { Pagination } from '../shared/Pagination'
 
@@ -78,8 +78,8 @@ export function SuggestionList({
             <option value="MOST_SUGGESTIONS">Visvairāk ieteikumu</option>
           )}
         </select>
-        <fieldset className="case-type-filters">
-          <legend className="sr-only">Izskatīšanas tips (neatzīmējot — visi)</legend>
+        <fieldset className="review-type-filters">
+          <legend className="sr-only">Perēkļa tips</legend>
           {reviewTypes.map((type) => (
             <label className="checkbox-label" key={type}>
               <input type="checkbox" checked={types.includes(type)}
@@ -104,10 +104,10 @@ export function SuggestionList({
                 <Link
                   className={item.id === selectedKey ? 'suggestion-select selected' : 'suggestion-select'}
                   aria-current={item.id === selectedKey ? 'page' : undefined}
-                  to={casePath(item.publicId)}
+                  to={reviewPath(item.publicId)}
                 >
                   <span>{item.reviewedTerm}</span>
-                  {item.status !== 'NEW' && (
+                  {status === null ? <small>{reviewStatusLabels[item.status]}</small> : item.status !== 'NEW' && (
                     <small>
                       {item.sourceCount}{' '}
                       {item.sourceCount === 1 ? 'ieteikums' : 'ieteikumi'}

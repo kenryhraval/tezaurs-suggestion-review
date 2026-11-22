@@ -57,6 +57,6 @@ class SenseCandidateLifecycleTest {
 
     private Example example(UUID reviewId) {
         return new Example(reviewId, new SaveExampleRequest(ExampleSource.EXTERNAL, null, null,
-                "vārds", "Piemērs", "https://example.com", null, null), "editor");
+                "vārds", "Piemērs", "https://example.com", null, null, null, null), "editor");
     }
 }

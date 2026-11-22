@@ -54,9 +54,12 @@ class CorpusServiceSelectionTest {
         review.setLastStatusChangedBy("editor");
         review.setType(ReviewType.ENTRY);
         review.setMatchedEntryId(null);
+        when(examples.findSelectedTokenNumbers(review.getId(), Corpus.LVK2022)).thenAnswer(call ->
+                new java.util.HashSet<>(examples.getExamplesForReview(review.getId()).stream()
+                        .map(ExampleResponse::tokenNumber).toList()));
         when(reviews.findById(review.getId())).thenReturn(Optional.of(review));
         for (int page = 1; page <= 3; page++) {
-            doReturn(page(page)).when(service).searchExamples("vārds", Corpus.LVK2022, page, true);
+            doReturn(page(page)).when(service).fetchCorpusPage(request(null), page);
         }
         doAnswer(call -> {
             int sampleSize = call.getArgument(1);
@@ -85,7 +88,7 @@ class CorpusServiceSelectionTest {
 
     private ExampleResponse saved(long token) {
         return ExampleResponse.from(new Example(review.getId(), new SaveExampleRequest(ExampleSource.CORPUS,
-                Corpus.LVK2022, token, "vārds", "Piemērs", "https://korpuss.lv", null, null), "editor"));
+                Corpus.LVK2022, token, "vārds", "Piemērs", "https://korpuss.lv", null, null, null, null), "editor"));
     }
 
     private SelectCorpusExamplesRequest request(Integer count) {
@@ -101,7 +104,7 @@ class CorpusServiceSelectionTest {
 
     @Test
     void searchesWithoutLoadingOrCheckingAnyReview() {
-        assertThat(service.searchExamples("vārds", Corpus.LVK2022, 2, true).page()).isEqualTo(2);
+        assertThat(service.fetchCorpusPage(request(null), 2).page()).isEqualTo(2);
         verifyNoInteractions(reviews);
     }
 
@@ -111,7 +114,7 @@ class CorpusServiceSelectionTest {
         service.selectAndSaveCorpusExamples(review.getId(), request(null), "auth");
         assertThat(savedSelection()).extracting(SaveExampleRequest::tokenNumber).containsExactly(2L, 3L, 4L, 5L);
         var order = inOrder(service, examples);
-        order.verify(service).searchExamples("vārds", Corpus.LVK2022, 3, true);
+        order.verify(service).fetchCorpusPage(request(null), 3);
         order.verify(examples).saveExamples(eq(review.getId()), anyList(), eq("auth"));
     }
 
@@ -191,7 +194,7 @@ class CorpusServiceSelectionTest {
     @Test
     void doesNotSavePartialSelectionsWhenACorpusPageFails() {
         doThrow(new CorpusUnavailableException(new RuntimeException())).when(service)
-                .searchExamples("vārds", Corpus.LVK2022, 2, true);
+                .fetchCorpusPage(request(null), 2);
         assertThatThrownBy(() -> service.selectAndSaveCorpusExamples(review.getId(), request(null), "auth"))
                 .isInstanceOf(CorpusUnavailableException.class);
         verify(examples, never()).saveExamples(any(), any(), any());
@@ -201,12 +204,12 @@ class CorpusServiceSelectionTest {
     void rejectsChangedResultsAndInvalidCitationsWithoutSaving() {
         var emptyPage = new CorpusSearchResponse(Corpus.LVK2022, "LVK2022", "vārds", 2, 2, 5,
                 "https://korpuss.lv", List.of());
-        doReturn(emptyPage).when(service).searchExamples("vārds", Corpus.LVK2022, 2, true);
+        doReturn(emptyPage).when(service).fetchCorpusPage(request(null), 2);
         assertThatThrownBy(() -> service.selectAndSaveCorpusExamples(review.getId(), request(null), "auth"))
                 .isInstanceOf(ConflictException.class).hasMessageContaining("mainījušies");
         var invalidExample = new CorpusSearchResponse.Example(1, "", "", "", "", "", "Avots", null);
         doReturn(new CorpusSearchResponse(
-                Corpus.LVK2022, "LVK2022", "vārds", 1, 2, 1, "https://korpuss.lv", List.of(invalidExample))).when(service).searchExamples("vārds", Corpus.LVK2022, 1, true);
+                Corpus.LVK2022, "LVK2022", "vārds", 1, 2, 1, "https://korpuss.lv", List.of(invalidExample))).when(service).fetchCorpusPage(request(null), 1);
         assertThatThrownBy(() -> service.selectAndSaveCorpusExamples(review.getId(), request(null), "auth"))
                 .isInstanceOf(ConflictException.class).hasMessageContaining("nepilnīgus");
         verify(examples, never()).saveExamples(any(), any(), any());
@@ -215,7 +218,7 @@ class CorpusServiceSelectionTest {
     @Test
     void handlesEmptySearchesWithoutSavingExamples() {
         doReturn(new CorpusSearchResponse(
-                Corpus.LVK2022, "LVK2022", "vārds", 1, 2, 0, "https://korpuss.lv", List.of())).when(service).searchExamples("vārds", Corpus.LVK2022, 1, true);
+                Corpus.LVK2022, "LVK2022", "vārds", 1, 2, 0, "https://korpuss.lv", List.of())).when(service).fetchCorpusPage(request(null), 1);
         service.selectAndSaveCorpusExamples(review.getId(), request(null), "auth");
         assertThat(savedSelection()).isEmpty();
     }

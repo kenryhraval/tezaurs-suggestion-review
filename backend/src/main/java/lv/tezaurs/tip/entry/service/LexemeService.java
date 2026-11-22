@@ -64,8 +64,7 @@ public class LexemeService {
         Entry entry = requireEntry(review);
         Lexeme lexeme = requireLexeme(entry.getId(), lexemeId);
 
-        validateReferences(request);
-        flagService.validate("L", request.flags());
+        validate(request);
 
         List<Lexeme> lexemes = findLexemes(entry);
         if (!request.primary() && lexeme.isPrimary()) {

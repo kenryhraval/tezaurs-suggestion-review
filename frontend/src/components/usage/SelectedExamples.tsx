@@ -5,11 +5,12 @@ import { Dialog } from '../shared/Dialog'
 
 type Props = {
   examples: Example[]
+  label?: string
   busy: boolean
   onRemove?: (id: string) => void
 }
 
-export function SelectedExamples({ examples, busy, onRemove }: Props) {
+export function SelectedExamples({ examples, busy, onRemove, label = 'Atzīmētie piemēri' }: Props) {
   const [open, setOpen] = useState(false)
   if (examples.length === 0 && !open) {
     return null
@@ -29,15 +30,15 @@ export function SelectedExamples({ examples, busy, onRemove }: Props) {
   return (
     <section className="selected-examples">
       <button className="selected-examples-toggle" type="button" disabled={busy} onClick={() => setOpen(true)}>
-        Atzīmētie piemēri ({examples.length})
+        {label} ({examples.length})
       </button>
-      {open && <Dialog title={`Atzīmētie piemēri (${examples.length})`} busy={busy} wide
+      {open && <Dialog title={`${label} (${examples.length})`} busy={busy} wide
         onCancel={() => setOpen(false)}>
         {examples.length > 0 ? <>
           <p className="muted">{sourceSummary.join(' · ')}</p>
           <div className="selected-examples-list" role="region" aria-label="Atzīmētie piemēri" tabIndex={0}>
             {examples.map((item) => <SavedExample key={item.id} example={item} busy={busy}
-              onRemove={onRemove && !item.inDraft ? () => onRemove(item.id) : undefined} />)}
+              onRemove={onRemove && !item.approved ? () => onRemove(item.id) : undefined} />)}
           </div>
         </> : <p className="muted">Nav atzīmētu piemēru.</p>}
         <div className="modal-footer">

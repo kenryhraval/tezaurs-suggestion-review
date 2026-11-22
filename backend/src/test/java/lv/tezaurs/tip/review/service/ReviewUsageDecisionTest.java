@@ -25,6 +25,7 @@ import lv.tezaurs.tip.example.entity.ExampleSource;
 import lv.tezaurs.tip.example.repository.ExampleRepository;
 import lv.tezaurs.tip.example.service.ExampleService;
 import lv.tezaurs.tip.sense.repository.SenseRepository;
+import lv.tezaurs.tip.sense.service.SenseService;
 import lv.tezaurs.tip.tezaurs.repository.TezaursEntryRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,7 +39,7 @@ class ReviewUsageDecisionTest {
     private final ExampleService examples = new ExampleService(reviews, exampleRepository, new CurrentUserService(), mock(SenseRepository.class));
     private final ReviewService service = new ReviewService(reviews, mock(ReviewSuggestionRepository.class),
             mock(TezaursEntryRepository.class), new CurrentUserService(),
-            drafts, mock(SenseRepository.class));
+            drafts, mock(SenseRepository.class), mock(SenseService.class));
     private Review review;
 
     @BeforeEach
@@ -142,7 +143,7 @@ class ReviewUsageDecisionTest {
                 ? UsageDecision.NOT_CONFIRMED : UsageDecision.INVENTED;
         var request = external("https://example.com");
         Example saved = new Example(review.getId(), request, "reviewer");
-        when(exampleRepository.findByReviewIdOrderByCreatedAtAscIdAsc(review.getId())).thenReturn(List.of(saved));
+        when(exampleRepository.findForReview(eq(review.getId()), any())).thenReturn(List.of(saved));
         service.recordUsageDecision(review.getId(), new UsageDecisionRequest(previousDecision, "Saglabāts vērtējums"),
                 "Basic dXNlcjpwYXNz");
 
@@ -170,6 +171,6 @@ class ReviewUsageDecisionTest {
     }
 
     private static SaveExampleRequest external(String url) {
-        return new SaveExampleRequest(ExampleSource.EXTERNAL, null, null, "vārds", "Citāts", url, null, null);
+        return new SaveExampleRequest(ExampleSource.EXTERNAL, null, null, "vārds", "Citāts", url, null, null, null, null);
     }
 }

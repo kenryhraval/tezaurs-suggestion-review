@@ -1,6 +1,6 @@
 import { isRouteErrorResponse, Link, useRouteError } from 'react-router'
 
-export function CaseErrorPage() {
+export function ReviewErrorPage() {
   const routeError = useRouteError()
   let errorMessage = 'Neizdevās atvērt perēkli.'
 

@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Navigate, Outlet, useLocation, useRouteLoaderData, useNavigation } from 'react-router'
 import { getReviews } from '../api/client'
-import type { CasePageContext } from './CasePage'
-import { CaseLoading } from '../components/review/CaseLoading'
+import type { ReviewPageContext } from './ReviewPage'
+import { ReviewLoading } from '../components/review/ReviewLoading'
 import { SuggestionList } from '../components/review/SuggestionList'
 import { AppHeader } from '../components/layout/AppHeader'
 import type { ReviewType, Review, ReviewPageResponse, ReviewSort, ReviewStatus } from '../api/types'
-import { casePath } from '../review/links'
+import { reviewPath } from '../review/links'
 
 const PAGE_SIZE = 20
 
@@ -28,7 +28,7 @@ const EMPTY_QUEUE: ReviewPageResponse = { items: [], page: 0, totalPages: 0, tot
 const DEFAULT_FILTERS: QueueFilters = { status: null, types: [], sort: 'NEWEST', query: '', page: 0 }
 
 export function MainPage() {
-  const selectedReview = useRouteLoaderData<Review>('case')
+  const selectedReview = useRouteLoaderData<Review>('review')
   const location = useLocation()
   const navigation = useNavigation()
   const [queueFilters, setQueueFilters] = useState<QueueFilters>(DEFAULT_FILTERS)
@@ -100,13 +100,13 @@ export function MainPage() {
     setReloadCount((current) => current + 1)
   }
 
-  function renderCaseContent() {
+  function renderReviewContent() {
     if (navigation.state === 'loading') {
-      return <CaseLoading />
+      return <ReviewLoading />
     }
 
     if (location.pathname !== '/') {
-      const context: CasePageContext = {
+      const context: ReviewPageContext = {
         onReviewUpdated: reloadQueue,
       }
       return <Outlet context={context} />
@@ -118,7 +118,7 @@ export function MainPage() {
 
     const firstItem = items[0]
     if (firstItem) {
-      return <Navigate to={casePath(firstItem.publicId)} replace />
+      return <Navigate to={reviewPath(firstItem.publicId)} replace />
     }
 
     return <section className="details"><p>Atlasē nav ieteikumu.</p></section>
@@ -135,7 +135,7 @@ export function MainPage() {
           onFilterStatusChange={changeFilterStatus} onTypesChange={changeTypes}
           onSortChange={changeSort} onPageChange={changePage} />
 
-        {renderCaseContent()}
+        {renderReviewContent()}
       </div>
     </main>
   )

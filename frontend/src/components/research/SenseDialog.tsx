@@ -1,39 +1,62 @@
-import { useState } from 'react'
+import { useId, useState, type KeyboardEvent } from 'react'
 import type { Example, Sense } from '../../api/types'
 import { Dialog } from '../shared/Dialog'
 import { ConfirmationDialog } from '../shared/ConfirmationDialog'
-import { UsageSourceLink } from '../usage/UsageSourceLink'
+import { SenseExamples } from './SenseExamples'
+import { ExampleEditDialog } from './ExampleEditDialog'
 
 type Props = {
-  mode: 'create' | 'sense' | 'unassigned'
   sense: Sense | null
-  senses: Sense[]
+  initialTab: 'sense' | 'examples'
   examples: Example[]
-  initialGloss: string
+  senses: Sense[]
   loading: boolean
-  canGenerate: boolean
-  onSave: (gloss: string, approved: boolean) => Promise<void>
+  editable: boolean
+  onSave: (gloss: string, approved: boolean, parentSenseId: string | null) => Promise<void>
   onDelete: () => Promise<void>
-  onTransfer: (exampleId: string, senseId: string | null) => Promise<void>
-  onGenerate: (description: string) => Promise<string>
+  onMerge: (targetSenseId: string) => Promise<void>
+  onUpdateExample: (exampleId: string, senseId: string | null, approved: boolean) => Promise<void>
   onClose: () => void
 }
 
-export function SenseDialog({ mode, sense, senses, examples, initialGloss, loading,
-  canGenerate, onSave, onDelete, onTransfer, onGenerate, onClose }: Props) {
-  const [gloss, setGloss] = useState(sense?.gloss ?? initialGloss)
+export function SenseDialog({ sense, senses, examples, initialTab, loading, editable,
+  onSave, onDelete, onMerge, onUpdateExample, onClose }: Props) {
+  const [tab, setTab] = useState(initialTab)
+  const tabsId = useId()
+  const [editingExample, setEditingExample] = useState<Example | null>(null)
+  const showingUnassignedExamples = sense === null && initialTab === 'examples'
+  const [gloss, setGloss] = useState(sense?.gloss ?? '')
+  const [parentSenseId, setParentSenseId] = useState(sense?.parentSenseId ?? '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [confirmingDeletion, setConfirmingDeletion] = useState(false)
-  const existing = sense?.existingSenseId !== null && sense?.existingSenseId !== undefined
+  const [mergeTargetId, setMergeTargetId] = useState<string | null>(null)
+  const existing = sense !== null && sense.existingSenseId !== null
   const busy = saving || loading
-  const hasChildren = sense !== null && senses.some((item) => item.parentDraftSenseId === sense.id)
+  const mergeTargets = senses.filter((item) => item.id !== sense?.id)
+  const mergeTarget = mergeTargets.find((item) => item.id === mergeTargetId)
+  const parentOptions = senses.filter((item) => item.id !== sense?.id
+    && item.parentSenseId === null)
   let title = 'Nozīme'
-  if (mode === 'create') title = 'Pievienot nozīmi'
-  if (mode === 'unassigned') title = 'Nepiesaistītie piemēri'
+  if (!sense) title = showingUnassignedExamples ? 'Nepiesaistītie piemēri' : 'Pievienot nozīmi'
   if (existing) title = 'Esoša nozīme Tēzaurā'
 
-  async function perform(action: () => Promise<void>) {
+  function changeTabWithKeyboard(event: KeyboardEvent<HTMLButtonElement>) {
+    let nextTab: 'sense' | 'examples'
+    if (event.key === 'ArrowLeft' || event.key === 'Home') {
+      nextTab = 'sense'
+    } else if (event.key === 'ArrowRight' || event.key === 'End') {
+      nextTab = 'examples'
+    } else {
+      return
+    }
+    event.preventDefault()
+    setTab(nextTab)
+    document.getElementById(`${tabsId}-${nextTab}`)?.focus()
+  }
+
+  async function saveChange(action: () => Promise<void>) {
+    if (busy) return
     setSaving(true)
     setError('')
     try {
@@ -45,65 +68,104 @@ export function SenseDialog({ mode, sense, senses, examples, initialGloss, loadi
     }
   }
 
-  async function save(approved: boolean) {
+  async function saveSenseDetails() {
     if (!gloss.trim()) {
       setError('Norādiet skaidrojumu.')
       return
     }
-    await onSave(gloss.trim(), approved)
+    await onSave(gloss.trim(), sense?.approved ?? false, parentSenseId || null)
     setGloss(gloss.trim())
   }
 
-  function senseLabel(item: Sense) {
-    let prefix = ''
-    if (item.existingSenseId !== null) prefix = 'Tēzaurā: '
-    else if (item.approved) prefix = 'Apstiprināta: '
-    return prefix + item.gloss
+  function saveExampleApproval(example: Example, approved: boolean) {
+    return saveChange(() => onUpdateExample(example.id, example.senseId, approved))
   }
 
-  return <Dialog title={title} busy={busy} wide onCancel={onClose}>
-    {mode !== 'unassigned' && <label className="sense-dialog-gloss">
-      Skaidrojums
-      <textarea className="form-control form-control-sm" rows={4} maxLength={10000} autoFocus
-        readOnly={existing} disabled={busy} value={gloss} onChange={(event) => setGloss(event.target.value)} />
-    </label>}
-    {sense?.approved && !existing && <p className="muted">Apstiprināta — redzama labojumu melnrakstā.</p>}
-    {mode !== 'create' && <div className="sense-dialog-examples">
-      {examples.length === 0 && <p className="muted">Piemēri nav piesaistīti.</p>}
-      {examples.map((example) => <article className="usage-evidence" key={example.id}>
-        <p>{example.citation}</p>
-        <div className="sense-example-actions">
-          <UsageSourceLink label={example.sourceLabel} url={example.sourceUrl ?? example.url}
-            originalSource={example.sourceUrl !== null} />
-          <select className="custom-select custom-select-sm" aria-label="Piemēra nozīme" disabled={busy}
-            value={example.senseId ?? ''}
-            onChange={(event) => perform(() => onTransfer(example.id, event.target.value || null))}>
-            <option value="">Nav piesaistīts</option>
-            {senses.map((item) => <option key={item.id} value={item.id}>{senseLabel(item)}</option>)}
-          </select>
-        </div>
-      </article>)}
+  function deleteSense() {
+    return saveChange(async () => {
+      await onDelete()
+      onClose()
+    })
+  }
+
+  function mergeSense() {
+    if (!mergeTarget) return
+    return saveChange(async () => {
+      await onMerge(mergeTarget.id)
+      onClose()
+    })
+  }
+
+  async function moveExample(senseId: string | null, approved: boolean) {
+    if (!editingExample) return
+    await onUpdateExample(editingExample.id, senseId, approved)
+    setEditingExample(null)
+  }
+
+  return <Dialog title={title} busy={busy} wide={sense !== null || showingUnassignedExamples} onCancel={onClose}>
+    {sense && <div className="sense-dialog-tabs" role="tablist" aria-label="Nozīmes dati">
+      <button type="button" role="tab" id={`${tabsId}-sense`} aria-controls={`${tabsId}-sense-panel`}
+        aria-selected={tab === 'sense'} tabIndex={tab === 'sense' ? 0 : -1} disabled={busy}
+        onClick={() => setTab('sense')} onKeyDown={changeTabWithKeyboard}>Nozīme</button>
+      <button type="button" role="tab" id={`${tabsId}-examples`} aria-controls={`${tabsId}-examples-panel`}
+        aria-selected={tab === 'examples'} tabIndex={tab === 'examples' ? 0 : -1} disabled={busy}
+        onClick={() => setTab('examples')} onKeyDown={changeTabWithKeyboard}>Piemēri ({examples.length})</button>
     </div>}
-    {error && !confirmingDeletion && <p className="error" role="alert">{error}</p>}
+    {!showingUnassignedExamples && <div id={`${tabsId}-sense-panel`} role={sense ? 'tabpanel' : undefined}
+      aria-labelledby={sense ? `${tabsId}-sense` : undefined} hidden={tab !== 'sense'}>
+      <label className="sense-dialog-gloss">
+        Skaidrojums
+        <textarea className="form-control form-control-sm" rows={4} maxLength={10000} autoFocus={initialTab === 'sense'}
+          readOnly={existing || !editable} disabled={busy} value={gloss} onChange={(event) => setGloss(event.target.value)} />
+      </label>
+      {!existing && (parentOptions.length > 0 || parentSenseId) && <label>
+        Virsnozīme
+        <select className="custom-select custom-select-sm" value={parentSenseId} disabled={busy || !editable}
+          onChange={(event) => setParentSenseId(event.target.value)}>
+          <option value="">Nav – patstāvīga nozīme</option>
+          {parentOptions.map((parent) => <option key={parent.id} value={parent.id}>
+            {parent.existingSenseId !== null ? 'Tēzaurā: ' : ''}{parent.gloss}
+          </option>)}
+        </select>
+      </label>}
+      {sense && !existing && <div className="sense-additional-fields">
+        <label>
+          Apvienot ar citu nozīmi
+          <select className="custom-select custom-select-sm" value={mergeTargetId ?? ''}
+            disabled={busy || !editable || mergeTargets.length === 0}
+            onChange={(event) => { setError(''); setMergeTargetId(event.target.value) }}>
+            <option value="" disabled>Izvēlieties nozīmi</option>
+            {mergeTargets.map((target) => <option key={target.id} value={target.id}>
+              {target.existingSenseId !== null ? 'Tēzaurā: ' : ''}{target.gloss}
+            </option>)}
+          </select>
+        </label>
+      </div>}
+    </div>}
+    {(sense || showingUnassignedExamples) && <div id={`${tabsId}-examples-panel`} role={sense ? 'tabpanel' : undefined}
+      aria-labelledby={sense ? `${tabsId}-examples` : undefined} hidden={tab !== 'examples'}>
+      <SenseExamples examples={examples} busy={busy} editable={editable} canApprove={sense !== null && !existing}
+        onApprovalChange={saveExampleApproval}
+        onEdit={setEditingExample} />
+    </div>}
+    {error && !confirmingDeletion && !mergeTarget && <p className="error" role="alert">{error}</p>}
     <div className="modal-footer">
-      {sense && !existing && <button type="button" className="btn btn-sm btn-light border text-danger"
-        disabled={busy || hasChildren} onClick={() => setConfirmingDeletion(true)}>Dzēst</button>}
-      {sense && !existing && canGenerate && <button type="button" className="btn btn-sm btn-outline-secondary"
-        disabled={busy || examples.length === 0}
-        onClick={() => perform(async () => setGloss(await onGenerate(gloss)))}>Piedāvāt skaidrojumu ar MI</button>}
+      {tab === 'sense' && sense && !existing && <button className="btn btn-sm btn-light border text-danger"
+        type="button" disabled={busy || !editable}
+        onClick={() => { setError(''); setConfirmingDeletion(true) }}>Dzēst</button>}
       <button type="button" className="btn btn-sm btn-secondary" disabled={busy} onClick={onClose}>Aizvērt</button>
-      {mode !== 'unassigned' && !existing && <>
-        {sense && <button type="button" className="btn btn-sm btn-outline-secondary" disabled={busy}
-          onClick={() => perform(() => save(!sense.approved))}>
-          {sense.approved ? 'Atcelt apstiprinājumu' : 'Apstiprināt'}
-        </button>}
-        <button type="button" className="btn btn-sm btn-primary" disabled={busy}
-          onClick={() => perform(() => save(sense?.approved ?? false))}>Saglabāt</button>
-      </>}
+      {tab === 'sense' && !existing && !showingUnassignedExamples && <button type="button" className="btn btn-sm btn-primary" disabled={busy || !editable}
+        onClick={() => saveChange(saveSenseDetails)}>Saglabāt</button>}
     </div>
     {confirmingDeletion && <ConfirmationDialog busy={saving} error={error}
-      message="Nozīme tiks dzēsta. Tās piemēri saglabāsies kā nepiesaistīti."
-      onConfirm={() => perform(async () => { await onDelete(); onClose() })}
+      message="Nozīme tiks dzēsta. Tās piemēri saglabāsies kā nepiesaistīti, un to apstiprinājumi tiks atcelti."
+      onConfirm={deleteSense}
       onCancel={() => { setConfirmingDeletion(false); setError('') }} />}
+    {mergeTarget && <ConfirmationDialog title="Apvienot nozīmes" busy={saving} error={error}
+      message={`Šī nozīme tiks apvienota ar nozīmi “${mergeTarget.gloss}” un dzēsta. Piemēri un apakšnozīmes tiks pārvietoti; pārvietotie piemēri būs jāapstiprina no jauna. Mērķa skaidrojums, pazīmes un apstiprinājums paliks nemainīti.`}
+      onConfirm={mergeSense}
+      onCancel={() => { setMergeTargetId(null); setError('') }} />}
+    {editingExample && <ExampleEditDialog example={editingExample} senses={senses}
+      onSave={moveExample} onClose={() => setEditingExample(null)} />}
   </Dialog>
 }

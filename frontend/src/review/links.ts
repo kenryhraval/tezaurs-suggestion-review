@@ -1,4 +1,4 @@
-export function casePath(publicId: string) {
+export function reviewPath(publicId: string) {
   return '/' + publicId
 }
 

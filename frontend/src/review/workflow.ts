@@ -2,51 +2,48 @@ import type { Review } from '../api/types'
 
 export function getReviewWorkflow(review: Review) {
   const status = review.status
-  const isInProgress = status === 'IN_PROGRESS'
-  const onlyIntakeIsVisible = status === 'NEW' || status === 'READY_FOR_REVIEW' || status === 'GARBAGE'
-  const isClosed = status === 'COMPLETED' || status === 'ALREADY_EXISTS'
+  const editable = status === 'IN_PROGRESS'
+  const hasKnownType = review.type !== 'UNKNOWN'
   const entryIsMissing = review.type === 'ENTRY'
   const usageIsConfirmed = review.usageDecision === 'USED'
-  const needsSenseDraft = review.type === 'SENSE'
-
-  const showReviewSections = !onlyIntakeIsVisible
-  const needsTezaursAnswer = review.type === 'UNKNOWN'
-  const canShowNewEntryDraft = entryIsMissing && usageIsConfirmed
-  const showDraft = showReviewSections && status !== 'ALREADY_EXISTS'
-    && (needsSenseDraft || canShowNewEntryDraft)
+  const intakeOnly = status === 'NEW' || status === 'GARBAGE'
+    || (status === 'READY_FOR_REVIEW' && !hasKnownType)
+  const showWork = !intakeOnly
+  const readyForDrafting = review.type === 'SENSE' || (entryIsMissing && usageIsConfirmed)
+  const showDraftSections = showWork && (readyForDrafting || (!editable && hasKnownType))
 
   const sectionResetKey = [review.id, status, review.type, review.matchedEntryId,
     review.usageDecision].join(':')
 
   return {
     status,
+    editable,
     sectionResetKey,
     intake: {
-      defaultOpen: status === 'NEW' || status === 'READY_FOR_REVIEW',
-      readOnly: isClosed,
+      defaultOpen: status === 'NEW' || (status === 'READY_FOR_REVIEW' && !hasKnownType),
+      readOnly: status === 'COMPLETED' || status === 'ALREADY_EXISTS',
+      complete: hasKnownType || (status !== 'NEW' && status !== 'READY_FOR_REVIEW' && status !== 'GARBAGE'),
     },
     tezaurs: {
-      visible: showReviewSections,
-      defaultOpen: isInProgress && needsTezaursAnswer,
-      readOnly: !isInProgress,
+      visible: showWork,
+      defaultOpen: editable && !hasKnownType,
     },
     usage: {
-      visible: showReviewSections && (entryIsMissing || needsSenseDraft) && status !== 'ALREADY_EXISTS',
-      defaultOpen: isInProgress && ((entryIsMissing && !usageIsConfirmed) || needsSenseDraft),
-      readOnly: !isInProgress,
+      visible: showWork && hasKnownType,
+      defaultOpen: editable && ((entryIsMissing && !usageIsConfirmed) || review.type === 'SENSE'),
+    },
+    research: {
+      visible: showDraftSections,
+      defaultOpen: editable,
     },
     draft: {
-      visible: showDraft,
-      defaultOpen: isInProgress,
-      readOnly: !isInProgress,
+      visible: showDraftSections,
+      defaultOpen: editable,
       newEntry: entryIsMissing,
       complete: status === 'NEEDS_EXPERT' || status === 'COMPLETED',
     },
-    research: {
-      visible: isInProgress && review.type !== 'UNKNOWN',
-    },
     completion: {
-      visible: status !== 'NEEDS_EXPERT' && showDraft,
+      visible: editable && readyForDrafting,
     },
   }
 }

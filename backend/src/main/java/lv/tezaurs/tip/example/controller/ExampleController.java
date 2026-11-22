@@ -1,16 +1,13 @@
 package lv.tezaurs.tip.example.controller;
 
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotEmpty;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lv.tezaurs.tip.corpus.dto.Corpus;
 import lv.tezaurs.tip.corpus.service.CorpusService;
 import lv.tezaurs.tip.example.dto.ExampleResponse;
-import lv.tezaurs.tip.example.dto.AssignSenseRequest;
+import lv.tezaurs.tip.example.dto.UpdateExampleRequest;
 import lv.tezaurs.tip.example.dto.SaveExampleRequest;
 import lv.tezaurs.tip.example.dto.SelectCorpusExamplesRequest;
 import lv.tezaurs.tip.example.service.ExampleService;
@@ -46,10 +43,10 @@ public class ExampleController {
         return exampleService.saveExample(reviewId, request, authorization);
     }
 
-    @PutMapping("/examples/{exampleId}/sense")
-    ExampleResponse assignSense(@PathVariable UUID reviewId, @PathVariable UUID exampleId,
-            @RequestBody AssignSenseRequest request) {
-        return exampleService.assignSense(reviewId, exampleId, request.senseId());
+    @PutMapping("/examples/{exampleId}")
+    ExampleResponse updateExample(@PathVariable UUID reviewId, @PathVariable UUID exampleId,
+            @Valid @RequestBody UpdateExampleRequest request) {
+        return exampleService.updateExample(reviewId, exampleId, request);
     }
 
     @DeleteMapping("/examples/{exampleId}")
@@ -60,14 +57,7 @@ public class ExampleController {
 
     @DeleteMapping("/examples")
     List<ExampleResponse> deleteCorpusExamples(@PathVariable UUID reviewId, @RequestParam Corpus corpus) {
-        return exampleService.deleteCorpusExamplesOutsideDraft(reviewId, corpus);
-    }
-
-    @PostMapping("/examples/batch")
-    List<ExampleResponse> saveExamples(@PathVariable UUID reviewId,
-            @Valid @RequestBody @NotEmpty @Size(max = 100) List<@NotNull @Valid SaveExampleRequest> requests,
-            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization) {
-        return exampleService.saveExamples(reviewId, requests, authorization);
+        return exampleService.deleteUnapprovedCorpusExamples(reviewId, corpus);
     }
 
     @PostMapping("/examples/select")

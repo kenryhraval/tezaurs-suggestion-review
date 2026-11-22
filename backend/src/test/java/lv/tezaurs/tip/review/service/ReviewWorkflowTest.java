@@ -27,6 +27,7 @@ import lv.tezaurs.tip.common.error.ConflictException;
 import lv.tezaurs.tip.entry.service.EntryService;
 import lv.tezaurs.tip.sense.entity.Sense;
 import lv.tezaurs.tip.sense.repository.SenseRepository;
+import lv.tezaurs.tip.sense.service.SenseService;
 import lv.tezaurs.tip.tezaurs.repository.TezaursEntryRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -40,7 +41,7 @@ class ReviewWorkflowTest {
     private final EntryService entries = mock(EntryService.class);
     private final SenseRepository senses = mock(SenseRepository.class);
     private final ReviewService service = new ReviewService(reviews, mock(ReviewSuggestionRepository.class),
-            tezaursEntries, new CurrentUserService(), entries, senses);
+            tezaursEntries, new CurrentUserService(), entries, senses, mock(SenseService.class));
 
     private void registerReview(Review review) {
         when(reviews.findById(review.getId())).thenReturn(Optional.of(review));

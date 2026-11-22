@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 class SenseTest {
     private Example example(UUID reviewId, String citation) {
         return new Example(reviewId, new SaveExampleRequest(ExampleSource.EXTERNAL, null, null,
-                "vārds", citation, "https://example.com", null, null), "editor");
+                "vārds", citation, "https://example.com", null, null, null, null), "editor");
     }
 
     @Test

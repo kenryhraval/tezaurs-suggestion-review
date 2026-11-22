@@ -7,7 +7,7 @@ type Action = {
 }
 
 type ActionsProps = {
-  kind: 'entry' | 'lexeme' | 'sense'
+  kind: 'entry' | 'lexeme'
   label: string
   onEdit?: () => void
   readOnly?: boolean
@@ -15,7 +15,7 @@ type ActionsProps = {
 }
 
 function EntityActions({ kind, label, onEdit, items, readOnly = false }: ActionsProps) {
-  const buttonVariants = { entry: 'primary', lexeme: 'warning', sense: 'success' }
+  const buttonVariants = { entry: 'primary', lexeme: 'warning' }
   const buttonClassName = readOnly ? 'btn btn-sm btn-secondary' : `btn btn-sm btn-${buttonVariants[kind]}`
   const [open, setOpen] = useState(false)
   const container = useRef<HTMLSpanElement>(null)
@@ -74,13 +74,11 @@ type EntryProps = {
   onEdit?: () => void
   readOnly?: boolean
   onAddLexeme?: () => void
-  onAddSense?: () => void
 }
 
-export function EntryActions({ onEdit, onAddLexeme, onAddSense, readOnly }: EntryProps) {
+export function EntryActions({ onEdit, onAddLexeme, readOnly }: EntryProps) {
   return <EntityActions kind="entry" label="šķirkli" onEdit={onEdit} readOnly={readOnly} items={[
     { label: 'Pievienot leksēmu', onClick: onAddLexeme },
-    { label: 'Pievienot nozīmi', onClick: onAddSense },
   ]} />
 }
 
@@ -94,27 +92,4 @@ export function LexemeActions({ onEdit, onDelete, readOnly }: LexemeProps) {
   return <EntityActions kind="lexeme" label="leksēmu" onEdit={onEdit} readOnly={readOnly} items={[
     { label: 'Dzēst leksēmu', onClick: onDelete },
   ]} />
-}
-
-type SenseProps = {
-  subsense: boolean
-  onEdit?: () => void
-  readOnly?: boolean
-  onAddSubsense?: () => void
-  onMove?: () => void
-  onPromote?: () => void
-  onDelete?: () => void
-}
-
-export function SenseActions({ subsense, onEdit, onAddSubsense, onMove, onPromote, onDelete, readOnly }: SenseProps) {
-  const items: Action[] = subsense ? [
-    { label: 'Pārvietot apakšnozīmi zem citas nozīmes', onClick: onMove },
-    { label: 'Pārvietot apakšnozīmi par patstāvīgu nozīmi', onClick: onPromote },
-    { label: 'Dzēst apakšnozīmi', onClick: onDelete },
-  ] : [
-    { label: 'Pievienot apakšnozīmi', onClick: onAddSubsense },
-    { label: 'Pārvietot nozīmi zem citas nozīmes', onClick: onMove },
-    { label: 'Dzēst nozīmi', onClick: onDelete },
-  ]
-  return <EntityActions kind="sense" label={subsense ? 'apakšnozīmi' : 'nozīmi'} onEdit={onEdit} readOnly={readOnly} items={items} />
 }

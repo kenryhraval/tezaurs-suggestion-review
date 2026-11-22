@@ -39,13 +39,13 @@ Feature: Editing drafts
       {"heading":"jaunvārds","type":"WORD","notes":"Precizēts šķirklis","flags":{}}
       """
     Then the response status is 200
-    And the response field "/draft/notes" equals "Precizēts šķirklis"
+    And the response field "/notes" equals "Precizēts šķirklis"
     When I PUT "/api/reviews/{caseId}/entry/lexemes/{lexemeId}" with:
       """
       {"lemma":"jaunvārds","primary":true,"roleId":1,"pronunciations":[],"flags":{"Piezīmes":"Precizēta leksēma"}}
       """
     Then the response status is 200
-    And the response field "/lexeme/flags/Piezīmes" equals "Precizēta leksēma"
+    And the response field "/flags/Piezīmes" equals "Precizēta leksēma"
     When I POST "/api/reviews/{caseId}/senses" with:
       """
       {"approved":true,"gloss":"Jauna definīcija.","flags":{}}
@@ -86,8 +86,7 @@ Feature: Editing drafts
       {"approved":true,"gloss":"Pievienotā nozīme.","flags":{}}
       """
     Then the response status is 200
-    And the response field "/sense/parentTezaursSenseId" is null
-    And the response field "/sense/parentDraftSenseId" is null
+    And the response field "/parentSenseId" is null
     When I POST "/api/reviews/{caseId}/status" with:
       """
       {"status":"COMPLETED"}
@@ -137,4 +136,4 @@ Feature: Editing drafts
     Then the response status is 200
     When I request "/api/reviews/{caseId}/senses"
     Then the response status is 200
-    And the response field "/0/gloss" equals "Jaunā šķirkļa nozīme."
+    And the response field "/1/gloss" equals "Jaunā šķirkļa nozīme."

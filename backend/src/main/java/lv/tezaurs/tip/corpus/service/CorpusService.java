@@ -9,7 +9,6 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -77,14 +76,7 @@ public class CorpusService {
     }
 
     private Set<Long> findSelectedTokenNumbers(UUID reviewId, Corpus corpus) {
-        Set<Long> selectedTokenNumbers = new HashSet<>();
-        for (ExampleResponse savedExample : exampleService.getExamplesForReview(reviewId)) {
-            if (savedExample.corpus() == corpus) {
-                selectedTokenNumbers.add(savedExample.tokenNumber());
-            }
-        }
-
-        return selectedTokenNumbers;
+        return exampleService.findSelectedTokenNumbers(reviewId, corpus);
     }
 
     private List<SaveExampleRequest> fetchAllUnselectedExamples(SelectCorpusExamplesRequest request,
@@ -138,13 +130,16 @@ public class CorpusService {
                 request.corpus().apiUrl, sampleSize);
     }
 
-    private CorpusSearchResponse fetchCorpusPage(SelectCorpusExamplesRequest request, int pageNumber) {
-        return searchExamples(request.query(), request.corpus(), pageNumber, request.exactOnly());
+    CorpusSearchResponse fetchCorpusPage(SelectCorpusExamplesRequest request, int pageNumber) {
+        return requestCorpusPage(request.query(), request.corpus(), pageNumber, request.exactOnly(),
+                request.corpus().apiUrl, null, SAMPLE_PAGE_SIZE);
     }
 
     private SaveExampleRequest createExampleRequest(CorpusSearchResponse corpusPage, CorpusSearchResponse.Example corpusExample) {
         return new SaveExampleRequest(ExampleSource.CORPUS, corpusPage.corpus(), corpusExample.tokenNumber(),
-                corpusPage.query(), corpusExample.citation(), corpusPage.url(), corpusExample.reference(), null);
+                corpusPage.query(), corpusExample.citation(), corpusPage.url(), corpusExample.reference(), null,
+                corpusExample.left().stripLeading().length(),
+                corpusExample.left().stripLeading().length() + corpusExample.match().length());
     }
 
     private void validateExamplesBeforeSaving(List<SaveExampleRequest> examplesToSave) {
@@ -169,8 +164,13 @@ public class CorpusService {
 
     CorpusSearchResponse requestCorpusPage(String query, Corpus corpus, int page, boolean exactOnly,
             String corpusApiUrl, Integer sampleSize) {
-        String term = query.trim();
         int pageSize = sampleSize == null ? PAGE_SIZE : Math.min(sampleSize, SAMPLE_PAGE_SIZE);
+        return requestCorpusPage(query, corpus, page, exactOnly, corpusApiUrl, sampleSize, pageSize);
+    }
+
+    private CorpusSearchResponse requestCorpusPage(String query, Corpus corpus, int page, boolean exactOnly,
+            String corpusApiUrl, Integer sampleSize, int pageSize) {
+        String term = query.trim();
         UriComponentsBuilder requestUrlBuilder = UriComponentsBuilder.fromUriString(corpusApiUrl + "/view")
                 .queryParam("corpname", corpus.corpusId)
                 .queryParam("q", buildCorpusQuery(term, corpus, exactOnly))

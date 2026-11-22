@@ -5,11 +5,11 @@ import type { DuplicateReviewCandidate, Review } from '../../api/types'
 import { ConfirmationDialog } from '../shared/ConfirmationDialog'
 
 type Props = {
-  currentCase: Review
+  currentReview: Review
   onSelect: (reviewId: string) => Promise<void>
 }
 
-export function DuplicateCaseCombobox({ currentCase, onSelect }: Props) {
+export function DuplicateReviewCombobox({ currentReview, onSelect }: Props) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [candidates, setCandidates] = useState<DuplicateReviewCandidate[]>([])
@@ -25,9 +25,9 @@ export function DuplicateCaseCombobox({ currentCase, onSelect }: Props) {
     }
 
     let requestIsOutdated = false
-    async function searchDuplicateCases() {
+    async function searchDuplicateReviews() {
       try {
-        const loaded = await getDuplicateReviewCandidates(term, currentCase.id)
+        const loaded = await getDuplicateReviewCandidates(term, currentReview.id)
         if (!requestIsOutdated) {
           setCandidates(loaded)
         }
@@ -44,19 +44,19 @@ export function DuplicateCaseCombobox({ currentCase, onSelect }: Props) {
       }
     }
 
-    const timeout = window.setTimeout(searchDuplicateCases, 300)
+    const timeout = window.setTimeout(searchDuplicateReviews, 300)
 
     return () => {
       requestIsOutdated = true
       window.clearTimeout(timeout)
     }
-  }, [open, query, currentCase.id])
+  }, [open, query, currentReview.id])
 
   function openDropdown() {
-    setQuery(currentCase.reviewedTerm)
+    setQuery(currentReview.reviewedTerm)
     setCandidates([])
     setError('')
-    setSearching(currentCase.reviewedTerm.trim().length >= 2)
+    setSearching(currentReview.reviewedTerm.trim().length >= 2)
     setOpen(true)
   }
 
@@ -79,7 +79,7 @@ export function DuplicateCaseCombobox({ currentCase, onSelect }: Props) {
     }
   }
 
-  function keepCaseSeparate() {
+  function keepReviewSeparate() {
     closeDropdown()
     setError('')
   }
@@ -175,7 +175,7 @@ export function DuplicateCaseCombobox({ currentCase, onSelect }: Props) {
                 </span>
               </button>
             ))}
-            <button type="button" onClick={keepCaseSeparate}>Jauns perēklis</button>
+            <button type="button" onClick={keepReviewSeparate}>Jauns perēklis</button>
           </div>
         </div>
       )}

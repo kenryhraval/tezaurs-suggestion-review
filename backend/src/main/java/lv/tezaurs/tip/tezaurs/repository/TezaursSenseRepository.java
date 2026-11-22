@@ -7,8 +7,6 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface TezaursSenseRepository extends JpaRepository<TezaursSense, Integer> {
-    boolean existsByIdAndEntryIdAndParentSenseIdIsNull(Integer id, Integer entryId);
-
     @Query("""
             SELECT sense
             FROM TezaursSense sense

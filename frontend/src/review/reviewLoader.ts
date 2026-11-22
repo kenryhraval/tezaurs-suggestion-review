@@ -1,15 +1,15 @@
 import { replace, type LoaderFunctionArgs } from 'react-router'
 import { getReviewByPublicId } from '../api/client'
-import { casePath, parsePublicId } from './links'
+import { reviewPath, parsePublicId } from './links'
 
-export async function loadCase({ request, params }: LoaderFunctionArgs) {
+export async function loadReview({ request, params }: LoaderFunctionArgs) {
   const publicId = parsePublicId(params.publicId)
   if (publicId === null) {
     throw new Response('Nederīga perēkļa saite.', { status: 400 })
   }
 
   const requestedPath = new URL(request.url).pathname
-  const canonicalPath = casePath(publicId)
+  const canonicalPath = reviewPath(publicId)
   if (requestedPath !== canonicalPath) {
     return replace(canonicalPath)
   }
@@ -17,6 +17,6 @@ export async function loadCase({ request, params }: LoaderFunctionArgs) {
   return getReviewByPublicId(publicId, request.signal)
 }
 
-export function rejectUnknownCasePath() {
+export function rejectUnknownReviewPath() {
   throw new Response('Nederīga perēkļa saite.', { status: 404 })
 }

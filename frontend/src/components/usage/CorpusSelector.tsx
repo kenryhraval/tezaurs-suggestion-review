@@ -3,12 +3,12 @@ import { useLayoutEffect, useRef } from 'react'
 type CorpusChoice = {
   id: string
   label: string
-  total: number
+  total: number | null
+  error: string
 }
 
 type Props = {
   choices: CorpusChoice[]
-  selectedId: string | null
   disabled?: boolean
   onSelect: (id: string) => void
 }
@@ -28,7 +28,7 @@ function rowsNeeded(buttonWidths: number[], availableWidth: number, gap: number)
   return rows
 }
 
-export function CorpusSelector({ choices, selectedId, disabled = false, onSelect }: Props) {
+export function CorpusSelector({ choices, disabled = false, onSelect }: Props) {
   const viewportRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLUListElement>(null)
 
@@ -78,15 +78,17 @@ export function CorpusSelector({ choices, selectedId, disabled = false, onSelect
       observer.observe(item)
     }
     return () => observer.disconnect()
-  }, [choices, selectedId])
+  }, [choices])
 
   return (
     <div className="corpus-selector-scroll" ref={viewportRef} role="region" aria-label="Korpusu izvēle" tabIndex={0}>
       <ul className="corpus-badges" ref={listRef} aria-label="Korpusu meklēšanas rezultāti">
         {choices.map((corpus) => (
           <li key={corpus.id}>
-            <button type="button" disabled={disabled} aria-pressed={corpus.id === selectedId} onClick={() => onSelect(corpus.id)}>
-              {corpus.label}<span>{corpus.total}</span>
+            <button type="button" disabled={disabled} aria-haspopup="dialog"
+              title={corpus.error || (corpus.total === null ? 'Meklē...' : `${corpus.total} atrasti šajā meklēšanā`)}
+              onClick={() => onSelect(corpus.id)}>
+              {corpus.label}<span>{corpus.total ?? (corpus.error ? '!' : '…')}</span>
             </button>
           </li>
         ))}

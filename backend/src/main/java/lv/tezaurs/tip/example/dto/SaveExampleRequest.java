@@ -15,5 +15,7 @@ public record SaveExampleRequest(
         @NotBlank @Size(max = 10000) String citation,
         @NotBlank @Size(max = 4000) String url,
         @Size(max = 4000) String reference,
-        @Size(max = 4000) String note) {
+        @Size(max = 4000) String note,
+        @PositiveOrZero Integer matchStart,
+        @PositiveOrZero Integer matchEnd) {
 }

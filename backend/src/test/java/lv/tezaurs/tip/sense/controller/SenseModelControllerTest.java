@@ -18,12 +18,13 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 class SenseModelControllerTest {
     private final SenseClusteringService clustering = mock(SenseClusteringService.class);
+    private final SenseDefinitionService definitions = mock(SenseDefinitionService.class);
     private final UUID reviewId = UUID.randomUUID();
     private MockMvc mvc;
 
     @BeforeEach
     void prepare() {
-        mvc = MockMvcBuilders.standaloneSetup(new SenseModelController(clustering, mock(SenseDefinitionService.class), new CurrentUserService()))
+        mvc = MockMvcBuilders.standaloneSetup(new SenseModelController(clustering, definitions, new CurrentUserService()))
                 .setControllerAdvice(new ApiExceptionHandler()).build();
     }
 
@@ -43,5 +44,15 @@ class SenseModelControllerTest {
                 .contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isBadRequest());
         verifyNoInteractions(clustering);
+    }
+    @Test
+    void definitionGenerationLoadsAllSensesAndExamplesOnTheBackend() throws Exception {
+        when(definitions.generateSenseDefinitions(eq(reviewId), any())).thenReturn(List.of());
+        mvc.perform(post("/api/reviews/{id}/sense-research/definitions", reviewId)
+                .header("Authorization", "Basic ZWRpdG9yOnBhc3M=").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"modelId\":\"chosen-model\",\"additionalInstructions\":\"Īsi skaidrojumi\"}"))
+                .andExpect(status().isOk());
+        verify(definitions).generateSenseDefinitions(eq(reviewId), argThat(request ->
+                request.modelId().equals("chosen-model") && request.additionalInstructions().equals("Īsi skaidrojumi")));
     }
 }

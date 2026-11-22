@@ -2,6 +2,7 @@ package lv.tezaurs.tip.example.controller;
 
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import java.util.List;
@@ -10,6 +11,7 @@ import lv.tezaurs.tip.common.error.ApiExceptionHandler;
 import lv.tezaurs.tip.corpus.dto.Corpus;
 import lv.tezaurs.tip.corpus.service.CorpusService;
 import lv.tezaurs.tip.example.dto.SelectCorpusExamplesRequest;
+import lv.tezaurs.tip.example.dto.UpdateExampleRequest;
 import lv.tezaurs.tip.example.service.ExampleService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,14 +20,31 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 class ExampleControllerTest {
+    private final ExampleService examples = mock(ExampleService.class);
     private final CorpusService selection = mock(CorpusService.class);
     private final UUID reviewId = UUID.randomUUID();
     private MockMvc mvc;
 
     @BeforeEach
     void prepare() {
-        mvc = MockMvcBuilders.standaloneSetup(new ExampleController(mock(ExampleService.class), selection))
+        mvc = MockMvcBuilders.standaloneSetup(new ExampleController(examples, selection))
                 .setControllerAdvice(new ApiExceptionHandler()).build();
+    }
+
+    @Test
+    void updatesExampleApprovalAndRequiresAnExplicitDecision() throws Exception {
+        UUID exampleId = UUID.randomUUID();
+        UUID senseId = UUID.randomUUID();
+        mvc.perform(put("/api/reviews/{id}/usage/examples/{exampleId}", reviewId, exampleId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"senseId\":\"" + senseId + "\",\"approved\":true}"))
+                .andExpect(status().isOk());
+        verify(examples).updateExample(reviewId, exampleId, new UpdateExampleRequest(senseId, true));
+        clearInvocations(examples);
+        mvc.perform(put("/api/reviews/{id}/usage/examples/{exampleId}", reviewId, exampleId)
+                .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(examples);
     }
 
     @Test

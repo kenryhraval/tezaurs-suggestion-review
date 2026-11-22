@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ChangeEvent, type FocusEvent, type KeyboardEvent, type SyntheticEvent } from 'react'
-import { getTezaursCandidates, getTezaursEntry } from '../../api/client'
+import { getTezaursCandidates } from '../../api/client'
 import type { TezaursEntryCandidate, ReviewType, ReviewStatus, SaveReviewType } from '../../api/types'
 import { ConfirmationDialog } from '../shared/ConfirmationDialog'
 import { TezaursEntryLink } from './TezaursEntryLink'
@@ -10,6 +10,8 @@ type Props = {
   reviewType: ReviewType
   reviewStatus: ReviewStatus
   matchedEntryId: number | null
+  matchedEntry: TezaursEntryCandidate | null
+  entryLoading: boolean
   readOnly: boolean
   defaultOpen: boolean
   onSave: (selection: SaveReviewType) => Promise<void>
@@ -29,12 +31,14 @@ export function TezaursCheckForm({
   reviewType,
   reviewStatus,
   matchedEntryId,
+  matchedEntry,
+  entryLoading,
   readOnly,
   defaultOpen,
   onSave,
 }: Props) {
   const [candidates, setCandidates] = useState<TezaursEntryCandidate[]>([])
-  const [loading, setLoading] = useState(matchedEntryId !== null)
+  const loading = entryLoading && matchedEntryId !== null
   const [serverError, setServerError] = useState('')
   const [selection, setSelection] = useState(() => initialSelection(reviewType, matchedEntryId))
   const [customSelection, setCustomSelection] = useState<TezaursEntryCandidate | null>(null)
@@ -54,9 +58,8 @@ export function TezaursCheckForm({
   }
 
   let selectedCandidate = candidates.find((candidate) => candidate.id === selectedEntryId)
-  if (!selectedCandidate && customSelection?.id === selectedEntryId) {
-    selectedCandidate = customSelection
-  }
+  if (!selectedCandidate && customSelection?.id === selectedEntryId) selectedCandidate = customSelection
+  if (!selectedCandidate && matchedEntry?.id === selectedEntryId) selectedCandidate = matchedEntry
 
   const searchTerm = query.trim()
   let displayedCandidates = candidates
@@ -70,39 +73,6 @@ export function TezaursCheckForm({
   const hasChanges = !selectionMatchesSaved
   const canCollapse = readOnly || (confirmed && selectionMatchesSaved)
   const expanded = expandedByUser || !canCollapse
-
-  useEffect(() => {
-    let requestIsOutdated = false
-    const selectedId = matchedEntryId
-
-    if (selectedId === null) {
-      return
-    }
-
-    async function loadSelectedEntry(entryId: number) {
-      try {
-        const loaded = await getTezaursEntry(entryId)
-        if (!requestIsOutdated) {
-          setCustomSelection(loaded)
-        }
-      } catch (cause) {
-        if (!requestIsOutdated) {
-          setServerError(cause instanceof Error
-            ? cause.message
-            : 'Neizdevās pārbaudīt Tēzauru.')
-        }
-      } finally {
-        if (!requestIsOutdated) {
-          setLoading(false)
-        }
-      }
-    }
-
-    loadSelectedEntry(selectedId)
-    return () => {
-      requestIsOutdated = true
-    }
-  }, [matchedEntryId])
 
   useEffect(() => {
     const term = query.trim()

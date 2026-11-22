@@ -81,8 +81,7 @@ CREATE TABLE senses (
     id UUID PRIMARY KEY,
     case_id UUID NOT NULL REFERENCES cases (id) ON DELETE CASCADE,
     target_entry_id INTEGER,
-    parent_draft_sense_id UUID REFERENCES senses (id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED,
-    parent_tezaurs_sense_id INTEGER,
+    parent_sense_id UUID REFERENCES senses (id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED,
     gloss TEXT NOT NULL,
     approved BOOLEAN NOT NULL DEFAULT FALSE,
     existing_sense_id INTEGER,
@@ -90,10 +89,7 @@ CREATE TABLE senses (
     flags JSONB NOT NULL DEFAULT '{}'::jsonb,
     created_at TIMESTAMPTZ NOT NULL,
     updated_at TIMESTAMPTZ NOT NULL,
-    CONSTRAINT ck_review_senses_gloss_not_blank CHECK (btrim(gloss) <> ''),
-    CONSTRAINT ck_review_senses_one_parent CHECK (
-        parent_draft_sense_id IS NULL OR parent_tezaurs_sense_id IS NULL
-    )
+    CONSTRAINT ck_review_senses_gloss_not_blank CHECK (btrim(gloss) <> '')
 );
 
 CREATE INDEX ix_review_senses_case
@@ -103,11 +99,14 @@ CREATE TABLE examples (
     id UUID PRIMARY KEY,
     case_id UUID NOT NULL REFERENCES cases (id) ON DELETE CASCADE,
     sense_id UUID REFERENCES senses (id) ON DELETE SET NULL,
+    approved BOOLEAN NOT NULL DEFAULT FALSE,
     source VARCHAR(16) NOT NULL CHECK (source IN ('CORPUS', 'EXTERNAL')),
     corpus VARCHAR(32),
     token_number BIGINT CHECK (token_number >= 0),
     search_query VARCHAR(255) NOT NULL,
     citation TEXT NOT NULL,
+    match_start INTEGER,
+    match_end INTEGER,
     url TEXT NOT NULL,
     reference TEXT,
     note TEXT,

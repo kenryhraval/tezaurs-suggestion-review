@@ -10,15 +10,14 @@ public record SenseResponse(
         String gloss,
         boolean approved,
         Integer existingSenseId,
-        UUID parentDraftSenseId,
-        Integer parentTezaursSenseId,
+        UUID parentSenseId,
         int orderNo,
         Map<String, Object> flags,
         List<UUID> exampleIds) {
 
     public static SenseResponse from(Sense sense) {
         return new SenseResponse(sense.getId(), sense.getGloss(), sense.isApproved(), sense.getExistingSenseId(),
-                sense.getParentDraftSenseId(), sense.getParentTezaursSenseId(),
+                sense.getParentSenseId(),
                 sense.getOrderNo(), sense.getFlags(),
                 sense.getExamples().stream().map(example -> example.getId()).sorted().toList());
     }

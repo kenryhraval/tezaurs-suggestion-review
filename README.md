@@ -6,14 +6,12 @@ Darba vide lietotāju ieteikumu izvērtēšanai un šķirkļu vai nozīmju melnr
 ![Frontend](https://img.shields.io/badge/Frontend-React%20%2F%20TypeScript-3178C6)
 ![PostgreSQL](https://img.shields.io/badge/Datub%C4%81ze-PostgreSQL-4169E1)
 
-## Iestatīšana
+## Palaišana
 
-Izveidojiet `.env` pēc [.env.example](.env.example) parauga, aizpildiet atbilstoši videi. Iekopējiet videi atbilstošo compose failu.
+Izveidojiet un aizpildiet `.env` pēc [parauga](.env.example). Iekopējiet videi atbilstošo compose failu. Lietotne sagaida eksistējošas `dict` un `incubator` izmantotajā datubāzē. Lietotnes migrācija tām līdzās izveido `review` shēmu. **Lokālajai videi un atsevišķam serverim nepieciešamas datu kopijas**, kuras pieejamas [tēzaurs.lv repozitorijā](https://github.com/LUMII-AILab/Tezaurs_platform). Pirms palaišanas lejuplādējiet `.pgsql.gz` failus un iekš `.env` norādiet to ceļus.
 
-> [!NOTE]
-> Lietotne sagaida eksistējošas `dict` un `incubator` izmantotajā datubāzē. Lietotnes migrācija tām līdzās izveido `review` shēmu. **Lokālajai videi un atsevišķam serverim nepieciešamas datu kopijas**, kuras pieejamas [tēzaurs.lv platformas repozitorijā](https://github.com/LUMII-AILab/Tezaurs_platform). Pirms palaišanas lejuplādējiet `.pgsql.gz` failus un iekš `.env` norādiet to ceļus.
-
-## Lokālā vide
+<details>
+<summary>Lokālā vide</summary>
 
 Compose fails palaiž datubāzi. Lietotni palaiž atsevišķi ar Maven un Vite.
 
@@ -29,9 +27,6 @@ Turpmākās komandas izpildiet repozitorija direktorijā:
 docker compose -f compose.local.yml up -d
 ```
 
-<details>
-<summary>Backend un frontend palaišana</summary>
-
 Atsevišķos termināļos:
 
 ```bash
@@ -41,10 +36,10 @@ set -a && source .env && set +a && ./backend/mvnw -f backend/pom.xml spring-boot
 ```bash
 npm --prefix frontend ci && npm --prefix frontend run dev
 ```
-
 </details>
 
-## Testēšanas vide
+<details>
+<summary>Testēšanas vide</summary>
 
 Izvietošanai personīgā serverī. Compose fails palaiž backend, frontend, datubāzi un proxy. Pirms palaišanas iekopējiet [Caddyfile](Caddyfile).
 
@@ -52,12 +47,16 @@ Izvietošanai personīgā serverī. Compose fails palaiž backend, frontend, dat
 docker compose -f compose.standalone.deploy.yml up -d --pull always
 ```
 
-## Produkcijas vide
+</details>
+
+<details>
+<summary>Produkcijas vide</summary>
 
 Izvietošanai esošajā tēzaurs.lv infrastruktūrā. Compose palaiž backend un frontend konteinerus. Izmanto eksistējošo datubāzi un proxy.
 
 ```bash
 docker compose -f compose.production.deploy.yml up -d --pull always
 ```
+</details>
 
 API dokumentācija: `/swagger-ui.html`.

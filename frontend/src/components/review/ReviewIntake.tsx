@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { Review, ReviewStatus } from '../../api/types'
 import { reviewStatusLabels, reviewStatusTransitions } from '../../review/statuses'
 import { ConfirmationDialog } from '../shared/ConfirmationDialog'
-import { DuplicateCaseCombobox } from './DuplicateCaseCombobox'
+import { DuplicateReviewCombobox } from './DuplicateReviewCombobox'
 
 const intakeChoices: ReviewStatus[] = ['GARBAGE', 'READY_FOR_REVIEW']
 
@@ -11,13 +11,14 @@ type Props = {
   expanded: boolean
   onExpandedChange: (expanded: boolean) => void
   readOnly: boolean
+  complete: boolean
   onStatusChange: (status: ReviewStatus) => Promise<Review>
   review: Review | null
-  onDuplicate: (sourceCaseId: string, targetCaseId: string) => Promise<void>
+  onDuplicate: (sourceReviewId: string, targetReviewId: string) => Promise<void>
 }
 
 export function ReviewIntake({ status, onStatusChange, review, onDuplicate,
-  expanded: expandedByUser, onExpandedChange, readOnly }: Props) {
+  expanded: expandedByUser, onExpandedChange, readOnly, complete }: Props) {
   const [confirmingTrash, setConfirmingTrash] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -27,8 +28,7 @@ export function ReviewIntake({ status, onStatusChange, review, onDuplicate,
   } else if (status !== 'NEW') {
     selectedStatus = 'READY_FOR_REVIEW'
   }
-  const caseSelected = review !== null && status !== 'NEW' && status !== 'GARBAGE' && status !== 'READY_FOR_REVIEW'
-  const canCollapse = readOnly || caseSelected || status === 'GARBAGE'
+  const canCollapse = readOnly || complete || status === 'GARBAGE'
   const expanded = expandedByUser || !canCollapse
 
   function choose(nextStatus: ReviewStatus) {
@@ -61,7 +61,7 @@ export function ReviewIntake({ status, onStatusChange, review, onDuplicate,
   return (
     <section className={`initial-review review-section${expanded ? ' is-open' : ''}`}>
       <details open={expanded} onToggle={(event) => onExpandedChange(event.currentTarget.open)}>
-        <summary className={(caseSelected || status === 'GARBAGE') && !expanded ? 'section-title confirmed' : 'section-title'}
+        <summary className={(complete || status === 'GARBAGE') && !expanded ? 'section-title confirmed' : 'section-title'}
           aria-disabled={!canCollapse} onClick={(event) => {
             if (!canCollapse) event.preventDefault()
           }}>
@@ -78,16 +78,16 @@ export function ReviewIntake({ status, onStatusChange, review, onDuplicate,
               </button>
             ))}
           </div>
-          {selectedStatus === 'READY_FOR_REVIEW' && review && (
-            <div className="meaning-existence-check">
-              <p><strong>Vai ieteikums attiecas uz esošu perēkli, vai jāsāk jauns?</strong></p>
-              <DuplicateCaseCombobox
-                currentCase={review}
-                onSelect={(targetId) => onDuplicate(review.id, targetId)}
-              />
-            </div>
-          )}
         </fieldset>
+        {selectedStatus === 'READY_FOR_REVIEW' && review && (
+          <div className="meaning-existence-check">
+            <p><strong>Vai ieteikums attiecas uz esošu perēkli, vai jāsāk jauns?</strong></p>
+            <DuplicateReviewCombobox
+              currentReview={review}
+              onSelect={(targetId) => onDuplicate(review.id, targetId)}
+            />
+          </div>
+        )}
       </details>
       {error && !confirmingTrash && <p className="error" role="alert">{error}</p>}
       {confirmingTrash && (

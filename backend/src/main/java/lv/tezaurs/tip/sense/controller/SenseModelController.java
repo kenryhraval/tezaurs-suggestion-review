@@ -8,7 +8,6 @@ import lombok.RequiredArgsConstructor;
 import lv.tezaurs.tip.auth.service.CurrentUserService;
 import lv.tezaurs.tip.sense.dto.ClusterSensesRequest;
 import lv.tezaurs.tip.sense.dto.GenerateDefinitionsRequest;
-import lv.tezaurs.tip.sense.dto.GeneratedDefinition;
 import lv.tezaurs.tip.sense.service.SenseClusteringService;
 import lv.tezaurs.tip.sense.service.SenseDefinitionService;
 import org.springframework.http.HttpHeaders;
@@ -35,7 +34,7 @@ public class SenseModelController {
     }
 
     @PostMapping("/definitions")
-    List<GeneratedDefinition> generateSenseDefinitions(@PathVariable UUID reviewId, @Valid @RequestBody GenerateDefinitionsRequest request,
+    List<SenseResponse> generateSenseDefinitions(@PathVariable UUID reviewId, @Valid @RequestBody GenerateDefinitionsRequest request,
             @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization) {
         currentUserService.requireUsername(authorization);
         return definitionService.generateSenseDefinitions(reviewId, request);
