@@ -9,6 +9,7 @@ type CorpusChoice = {
 type Props = {
   choices: CorpusChoice[]
   selectedId: string | null
+  disabled?: boolean
   onSelect: (id: string) => void
 }
 
@@ -27,7 +28,7 @@ function rowsNeeded(buttonWidths: number[], availableWidth: number, gap: number)
   return rows
 }
 
-export function CorpusSelector({ choices, selectedId, onSelect }: Props) {
+export function CorpusSelector({ choices, selectedId, disabled = false, onSelect }: Props) {
   const viewportRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLUListElement>(null)
 
@@ -84,7 +85,7 @@ export function CorpusSelector({ choices, selectedId, onSelect }: Props) {
       <ul className="corpus-badges" ref={listRef} aria-label="Korpusu meklēšanas rezultāti">
         {choices.map((corpus) => (
           <li key={corpus.id}>
-            <button type="button" aria-pressed={corpus.id === selectedId} onClick={() => onSelect(corpus.id)}>
+            <button type="button" disabled={disabled} aria-pressed={corpus.id === selectedId} onClick={() => onSelect(corpus.id)}>
               {corpus.label}<span>{corpus.total}</span>
             </button>
           </li>

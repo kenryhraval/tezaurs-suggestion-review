@@ -1,5 +1,5 @@
-import { caseTypeLabels, reviewStatusLabels } from '../../review/statuses'
-import type { CaseType, ReviewListItem, ReviewSort, ReviewStatus } from '../../api/types'
+import { reviewTypeLabels, reviewStatusLabels } from '../../review/statuses'
+import type { ReviewType, ReviewListItem, ReviewSort, ReviewStatus } from '../../api/types'
 import { casePath } from '../../review/links'
 import { Link } from 'react-router'
 import { Pagination } from '../shared/Pagination'
@@ -15,12 +15,12 @@ const statuses: ReviewStatus[] = [
   'COMPLETED',
   'GARBAGE',
 ]
-const caseTypes: CaseType[] = ['ENTRY', 'SENSE']
+const reviewTypes: ReviewType[] = ['ENTRY', 'SENSE']
 
 type Props = {
   items: ReviewListItem[]
   status: ReviewStatus | null
-  types: CaseType[]
+  types: ReviewType[]
   sort: ReviewSort
   selectedKey: string | null
   loading: boolean
@@ -28,7 +28,7 @@ type Props = {
   totalPages: number
   totalItems: number
   onFilterStatusChange: (status: ReviewStatus | null) => void
-  onTypesChange: (types: CaseType[]) => void
+  onTypesChange: (types: ReviewType[]) => void
   onSortChange: (sort: ReviewSort) => void
   onPageChange: (page: number) => void
 }
@@ -48,7 +48,7 @@ export function SuggestionList({
   onSortChange,
   onPageChange,
 }: Props) {
-  function toggleType(type: CaseType, checked: boolean) {
+  function toggleType(type: ReviewType, checked: boolean) {
     if (checked) {
       onTypesChange([...types, type])
     } else {
@@ -59,7 +59,7 @@ export function SuggestionList({
   return (
     <aside aria-label="Ieteikumu saraksts">
       <div className="suggestion-filters">
-        <select className="custom-select custom-select-sm" aria-label="Statuss"
+        <select className="custom-select custom-select-sm" aria-label="Stāvoklis"
           onChange={(event) => onFilterStatusChange(event.target.value === '' ? null : event.target.value as ReviewStatus)}
           value={status ?? ''}
         >
@@ -80,11 +80,11 @@ export function SuggestionList({
         </select>
         <fieldset className="case-type-filters">
           <legend className="sr-only">Izskatīšanas tips (neatzīmējot — visi)</legend>
-          {caseTypes.map((type) => (
+          {reviewTypes.map((type) => (
             <label className="checkbox-label" key={type}>
               <input type="checkbox" checked={types.includes(type)}
                 onChange={(event) => toggleType(type, event.target.checked)} />
-              {caseTypeLabels[type]}
+              {reviewTypeLabels[type]}
             </label>
           ))}
         </fieldset>

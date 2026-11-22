@@ -1,18 +1,19 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { getCorpora, searchCorpus } from '../../api/client'
-import type { CorpusOption, CorpusExample, CorpusSearchResult, SaveUsageEvidence, UsageEvidence } from '../../api/types'
-import { SavedUsageEvidence } from './SavedUsageEvidence'
+import type { CorpusOption, CorpusExample, CorpusSearchResult, SaveExample, SelectCorpusExamples, Example } from '../../api/types'
+import { SavedExample } from './SavedExample'
 import { UsageSourceLink } from './UsageSourceLink'
 import { Pagination } from '../shared/Pagination'
 import { CorpusSelector } from './CorpusSelector'
 
 type Props = {
-  reviewId: string
   term: string
-  evidence: UsageEvidence[]
+  examples: Example[]
   saving: boolean
-  onSave: (evidence: SaveUsageEvidence) => Promise<void>
+  onSave: (examples: SaveExample[]) => Promise<boolean>
+  onSelectCorpus: (selection: SelectCorpusExamples) => Promise<void>
   onRemove: (id: string) => void
+  onRemoveCorpus: (corpus: string) => Promise<void>
   onAddSource: () => void
 }
 
@@ -31,9 +32,9 @@ function createCorpusSearchState(corpus: CorpusOption): CorpusSearchState {
     error: '', requestId: 0, requestedPage: 1 }
 }
 
-async function loadCorpusPage(reviewId: string, query: string, corpusSearch: CorpusSearchState, page: number) {
+async function loadCorpusPage(query: string, corpusSearch: CorpusSearchState, page: number, exactOnly: boolean) {
   try {
-    const result = await searchCorpus(reviewId, query, corpusSearch.id, page)
+    const result = await searchCorpus(query, corpusSearch.id, page, exactOnly)
     return { ...corpusSearch, loading: false, result, error: '', requestedPage: page }
   } catch (cause) {
     const error = cause instanceof Error ? cause.message : 'Neizdevās meklēt korpusā.'
@@ -42,8 +43,8 @@ async function loadCorpusPage(reviewId: string, query: string, corpusSearch: Cor
 }
 
 async function searchCorpora(
-  reviewId: string,
   query: string,
+  exactOnly: boolean,
   corpusSearches: CorpusSearchState[],
   shouldContinueSearching: () => boolean,
   onResult: (corpusSearch: CorpusSearchState) => void,
@@ -55,7 +56,7 @@ async function searchCorpora(
     while (shouldContinueSearching() && nextCorpusIndex < corpusSearches.length) {
       const corpusSearch = corpusSearches[nextCorpusIndex]
       nextCorpusIndex += 1
-      const result = await loadCorpusPage(reviewId, query, corpusSearch, 1)
+      const result = await loadCorpusPage(query, corpusSearch, 1, exactOnly)
       if (!shouldContinueSearching()) {
         return
       }
@@ -74,18 +75,29 @@ function compareMatchCounts(first: CorpusSearchState, second: CorpusSearchState)
   return secondCount - firstCount
 }
 
-export function CorpusSearch({ reviewId, term, evidence, saving, onSave, onRemove, onAddSource }: Props) {
+function createExampleRequest(result: CorpusSearchResult, example: CorpusExample): SaveExample {
+  return { source: 'CORPUS', corpus: result.corpus, tokenNumber: example.tokenNumber,
+    query: result.query, citation: example.citation, url: result.url,
+    reference: example.reference || null, note: null }
+}
+
+export function CorpusSearch({ term, examples, saving, onSave, onSelectCorpus, onRemove, onRemoveCorpus, onAddSource }: Props) {
   const [corpusSearches, setCorpusSearches] = useState<CorpusSearchState[]>([])
   const [searching, setSearching] = useState(true)
   const [error, setError] = useState('')
   const [retry, setRetry] = useState(0)
   const [searchInput, setSearchInput] = useState(term)
   const [query, setQuery] = useState(term)
+  const [exactOnly, setExactOnly] = useState(false)
   const [selectedCorpusId, setSelectedCorpusId] = useState<string | null>(null)
+  const [requestedSampleSize, setRequestedSampleSize] = useState(50)
   const nextPageRequestId = useRef(0)
   const resultsRef = useRef<HTMLDivElement>(null)
   const selectedCorpusSearch = corpusSearches.find((corpusSearch) => corpusSearch.id === selectedCorpusId)
   const selectedCorpusResult = selectedCorpusSearch?.result
+  const sampleSize = Math.min(requestedSampleSize, selectedCorpusResult?.total ?? 0)
+  const selectedCount = examples.filter((item) => item.corpus === selectedCorpusId).length
+  const removableCount = examples.filter((item) => item.corpus === selectedCorpusId && !item.inDraft).length
 
   useEffect(() => {
     let searchIsOutdated = false
@@ -97,7 +109,7 @@ export function CorpusSearch({ reviewId, term, evidence, saving, onSave, onRemov
         }
         const pendingCorpora = corpora.map(createCorpusSearchState)
         setCorpusSearches(pendingCorpora)
-        const completedCorpora = await searchCorpora(reviewId, query, pendingCorpora, () => !searchIsOutdated, updateCorpusSearch)
+        const completedCorpora = await searchCorpora(query, exactOnly, pendingCorpora, () => !searchIsOutdated, updateCorpusSearch)
         if (searchIsOutdated) {
           return
         }
@@ -121,7 +133,7 @@ export function CorpusSearch({ reviewId, term, evidence, saving, onSave, onRemov
     return () => {
       searchIsOutdated = true
     }
-  }, [reviewId, query, retry])
+  }, [query, exactOnly, retry])
 
   useEffect(() => {
     if (resultsRef.current) {
@@ -138,7 +150,7 @@ export function CorpusSearch({ reviewId, term, evidence, saving, onSave, onRemov
     const requestId = nextPageRequestId.current
     const loadingCorpusSearch = { ...corpusSearch, loading: true, error: '', requestId }
     updateCorpusSearch(loadingCorpusSearch)
-    const updatedCorpusSearch = await loadCorpusPage(reviewId, query, loadingCorpusSearch, page)
+    const updatedCorpusSearch = await loadCorpusPage(query, loadingCorpusSearch, page, exactOnly)
     setCorpusSearches((current) => current.map((item) => {
       const isCurrentRequest = item.id === corpusSearch.id && item.requestId === requestId
       return isCurrentRequest ? updatedCorpusSearch : item
@@ -146,6 +158,7 @@ export function CorpusSearch({ reviewId, term, evidence, saving, onSave, onRemov
   }
 
   function startSearch(nextQuery: string) {
+    if (saving) return
     setCorpusSearches([])
     setError('')
     setSearching(true)
@@ -164,9 +177,7 @@ export function CorpusSearch({ reviewId, term, evidence, saving, onSave, onRemov
   }
 
   async function saveCorpusExample(result: CorpusSearchResult, example: CorpusExample) {
-    await onSave({ source: 'CORPUS', corpus: result.corpus, tokenNumber: example.tokenNumber,
-      query: result.query, citation: example.citation, url: result.url,
-      reference: example.reference || null, note: null })
+    await onSave([createExampleRequest(result, example)])
   }
 
   const corpusMatches = corpusSearches.filter((corpusSearch) => corpusSearch.result && corpusSearch.result.total > 0)
@@ -186,27 +197,65 @@ export function CorpusSearch({ reviewId, term, evidence, saving, onSave, onRemov
           Meklējiet lietojumu{corpusSearches.length > 0 ? ` ${corpusSearches.length} korpusos` : ' korpusos'}.
         </p>
         <div className="corpus-search-field">
-          <input className="form-control form-control-sm" aria-label="Meklēt korpusos" value={searchInput} required maxLength={255}
+          <input className="form-control form-control-sm" aria-label="Meklēt korpusos" value={searchInput} required maxLength={255} disabled={saving}
             onChange={(event) => setSearchInput(event.target.value)} />
-          <button className="icon-button" type="submit" aria-label="Meklēt korpusos">
+          <button className="icon-button" type="submit" aria-label="Meklēt korpusos" disabled={saving}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
               <circle cx="10" cy="10" r="6" />
               <path d="m15 15 6 6" />
             </svg>
           </button>
         </div>
+        <label className="corpus-exact-match">
+          <input type="checkbox" checked={exactOnly} disabled={saving}
+            onChange={(event) => {
+              setExactOnly(event.target.checked)
+              startSearch(searchInput.trim() || query)
+            }} />
+          Tikai precīzas sakritības
+        </label>
       </form>
       {searching && corpusMatches.length > 0 && <p className="muted">Meklēšana turpinās...</p>}
       {!searching && searchFailed && corpusMatches.length > 0 && (
         <p className="muted">Daļa korpusu nebija pieejami.</p>
       )}
       {error && <p className="error" role="alert">{error}</p>}
-      {(error || searchFailed) && <button className="btn btn-sm btn-outline-secondary" type="button" disabled={searching}
+      {(error || searchFailed) && <button className="btn btn-sm btn-outline-secondary" type="button" disabled={searching || saving}
         onClick={() => startSearch(query)}>Atkārtot meklēšanu</button>}
       {corpusMatches.length > 0 ? <CorpusSelector
         choices={corpusMatches.map((corpus) => ({ id: corpus.id, label: corpus.label, total: corpus.result?.total ?? 0 }))}
-        selectedId={selectedCorpusId} onSelect={setSelectedCorpusId} />
+        selectedId={selectedCorpusId} disabled={saving} onSelect={setSelectedCorpusId} />
         : !error && <p className="muted">{emptyResultsMessage}</p>}
+      {selectedCorpusSearch && selectedCorpusResult && <div className="corpus-selection">
+        <div className="corpus-selection-summary">
+          <span>Atzīmēti šajā korpusā: <strong>{selectedCount}</strong></span>
+        </div>
+        {selectedCorpusResult.total > 0 && <div className="corpus-selection-actions">
+          <div className="input-group input-group-sm corpus-sample-input">
+            <input className="form-control" type="number" min={1} max={selectedCorpusResult.total}
+              aria-label="Nejauši pievienojamo piemēru skaits" value={sampleSize} disabled={saving}
+              onChange={(event) => setRequestedSampleSize(Number(event.target.value))} />
+            <div className="input-group-append">
+              <button className="btn btn-primary" type="button"
+                disabled={saving || selectedCorpusSearch.loading || !!selectedCorpusSearch.error || !Number.isInteger(sampleSize) || sampleSize < 1}
+                onClick={() => onSelectCorpus({ corpus: selectedCorpusResult.corpus, query, exactOnly, count: sampleSize })}>
+                Pievienot nejaušus
+              </button>
+            </div>
+          </div>
+          <div className="d-flex">
+            <button className="btn btn-sm btn-outline-secondary" type="button"
+              disabled={saving || selectedCorpusSearch.loading || !!selectedCorpusSearch.error}
+              onClick={() => onSelectCorpus({ corpus: selectedCorpusResult.corpus, query, exactOnly, count: null })}>
+              Pievienot visus
+            </button>
+            <button className="btn btn-sm btn-outline-secondary ml-2" type="button" disabled={saving || removableCount === 0}
+              title="Noņemt piemērus, kas nav piesaistīti melnraksta nozīmēm"
+              onClick={() => onRemoveCorpus(selectedCorpusResult.corpus)}>Noņemt atlasi</button>
+          </div>
+          {saving && <small role="status">Saglabā...</small>}
+        </div>}
+      </div>}
       {selectedCorpusSearch && <div className="corpus-results" ref={resultsRef}
         role="region" aria-label={`${selectedCorpusSearch.label}: piemēri`} tabIndex={0}>
         {selectedCorpusSearch.loading && <p className="muted">Gaida rezultātus...</p>}
@@ -216,14 +265,14 @@ export function CorpusSearch({ reviewId, term, evidence, saving, onSave, onRemov
         {selectedCorpusResult && <>
           {selectedCorpusResult.examples.length === 0 && <p className="muted">Šajā meklēšanā piemēri netika atrasti.</p>}
           {selectedCorpusResult.examples.map((example) => {
-            const saved = evidence.find((item) => item.corpus === selectedCorpusResult.corpus && item.tokenNumber === example.tokenNumber)
+            const saved = examples.find((item) => item.corpus === selectedCorpusResult.corpus && item.tokenNumber === example.tokenNumber)
             const exampleText = <>{example.left}<strong>{example.match}</strong>{example.right}</>
             if (saved) {
-              return <SavedUsageEvidence key={`${selectedCorpusResult.corpus}:${example.tokenNumber}`} evidence={saved} busy={saving || selectedCorpusSearch.loading} highlighted
-              onRemove={() => onRemove(saved.id)}>{exampleText}</SavedUsageEvidence>
+              return <SavedExample key={`${selectedCorpusResult.corpus}:${example.tokenNumber}`} example={saved} busy={saving || selectedCorpusSearch.loading} highlighted
+              onRemove={saved.inDraft ? undefined : () => onRemove(saved.id)}>{exampleText}</SavedExample>
             }
-            return <article className="usage-evidence" key={`${selectedCorpusResult.corpus}:${example.tokenNumber}`}>
-              <div className="evidence-text">
+            return <article className="usage-example" key={`${selectedCorpusResult.corpus}:${example.tokenNumber}`}>
+              <div className="example-text">
                 <p>{exampleText}</p>
                 <button className="icon-button" title="Atzīmēt piemēru" aria-label="Atzīmēt piemēru"
                   disabled={saving || selectedCorpusSearch.loading} type="button" onClick={() => saveCorpusExample(selectedCorpusResult, example)}>
@@ -245,7 +294,7 @@ export function CorpusSearch({ reviewId, term, evidence, saving, onSave, onRemov
         {selectedCorpusSearch && selectedCorpusResult && <Pagination
           page={selectedCorpusResult.page - 1}
           totalPages={Math.ceil(selectedCorpusResult.total / selectedCorpusResult.pageSize)}
-          disabled={selectedCorpusSearch.loading} label={`${selectedCorpusSearch.label}: lapošana`}
+          disabled={selectedCorpusSearch.loading || saving} label={`${selectedCorpusSearch.label}: lapošana`}
           onPageChange={(page) => loadCorpusPageNumber(selectedCorpusSearch, page + 1)} />}
       </div>
     </div>

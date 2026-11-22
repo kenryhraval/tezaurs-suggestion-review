@@ -1,16 +1,16 @@
 import { UsageCheck } from '../usage/UsageCheck'
 import { Fragment, useState, type ReactNode } from 'react'
 import {
-  correctReviewTerm,
+  updateCaseTitle,
   detachSuggestion,
-  saveCaseType,
+  saveReviewType,
   saveUsageDecision,
 } from '../../api/client'
 import type {
   Review,
   ReviewSource,
   ReviewStatus,
-  SaveCaseType,
+  SaveReviewType,
   UsageDecision,
 } from '../../api/types'
 import { getReviewWorkflow } from '../../review/workflow'
@@ -22,6 +22,7 @@ import { SenseDraftForm } from '../draft/SenseDraftForm'
 import { SuggestionSourcesTable } from './SuggestionSourcesTable'
 import { ReviewCompletion } from './ReviewCompletion'
 import { ReviewHeader } from './ReviewHeader'
+import { SenseResearchSection } from '../research/SenseResearchSection'
 
 type Props = {
   initialReview: Review
@@ -35,6 +36,8 @@ export function ReviewDetails({ initialReview, username, onStatusChange, onDupli
   const [intakeOpen, setIntakeOpen] = useState<boolean | null>(null)
   const [changingAssignment, setChangingAssignment] = useState(false)
   const [review, setReview] = useState(initialReview)
+  const [examplesRevision, setExamplesRevision] = useState(0)
+  const [draftRevision, setDraftRevision] = useState(0)
   const workflow = getReviewWorkflow(review)
   const status = workflow.status
 
@@ -59,18 +62,18 @@ export function ReviewDetails({ initialReview, username, onStatusChange, onDupli
     }
   }
 
-  async function correctTitle(title: string) {
-    const updated = await correctReviewTerm(review.id, title)
+  async function updateTitle(title: string) {
+    const updated = await updateCaseTitle(review.id, title)
     applyReviewUpdate(updated)
   }
 
-  async function handleDetach(sourceId: number) {
-    const updated = await detachSuggestion(review.id, sourceId)
+  async function handleDetach(suggestionId: number) {
+    const updated = await detachSuggestion(review.id, suggestionId)
     applyReviewUpdate(updated)
   }
 
-  async function handleCaseTypeChange(selection: SaveCaseType) {
-    const updatedReview = await saveCaseType(review.id, selection)
+  async function handleReviewTypeChange(selection: SaveReviewType) {
+    const updatedReview = await saveReviewType(review.id, selection)
     applyReviewUpdate(updatedReview)
   }
 
@@ -85,7 +88,7 @@ export function ReviewDetails({ initialReview, username, onStatusChange, onDupli
     if (workflow.draft.newEntry) {
       return (
         <EntryDraftForm reviewId={review.id} editable={!workflow.draft.readOnly}
-          canCollapse={workflow.draft.readOnly || review.canComplete} complete={workflow.draft.complete}
+          complete={workflow.draft.complete}
           onReviewUpdated={applyReviewUpdate} onAddSense={onAddSense} defaultOpen={workflow.draft.defaultOpen}>
           {senses}
         </EntryDraftForm>
@@ -94,7 +97,7 @@ export function ReviewDetails({ initialReview, username, onStatusChange, onDupli
     if (review.matchedEntryId !== null) {
       return (
         <ExistingEntryReference entryId={review.matchedEntryId} onAddSense={onAddSense}
-          defaultOpen={workflow.draft.defaultOpen} canCollapse={workflow.draft.readOnly || review.canComplete}
+          defaultOpen={workflow.draft.defaultOpen}
           complete={workflow.draft.complete}>
           {senses}
         </ExistingEntryReference>
@@ -107,7 +110,7 @@ export function ReviewDetails({ initialReview, username, onStatusChange, onDupli
     <article className="details">
       <ReviewHeader review={review} username={username}
         changingAssignment={changingAssignment} onStatusChange={changeAssignment}
-        onTitleChange={correctTitle} />
+        onTitleChange={updateTitle} />
 
       {sources.length > 0 && (
         <SuggestionSourcesTable sources={sources} onDetach={handleDetach} />
@@ -120,24 +123,36 @@ export function ReviewDetails({ initialReview, username, onStatusChange, onDupli
           readOnly={workflow.intake.readOnly} />
 
         {workflow.tezaurs.visible && (
-          <TezaursCheckForm reviewId={review.id} reviewedTerm={review.reviewedTerm} caseType={review.type} reviewStatus={status}
+          <TezaursCheckForm reviewedTerm={review.reviewedTerm} reviewType={review.type} reviewStatus={status}
             matchedEntryId={review.matchedEntryId}
             readOnly={workflow.tezaurs.readOnly} defaultOpen={workflow.tezaurs.defaultOpen}
-            onSave={handleCaseTypeChange} />
+            onSave={handleReviewTypeChange} />
         )}
 
         {workflow.usage.visible && (
           <UsageCheck review={review} onSaveDecision={handleUsageDecision}
+            onExamplesChange={() => setExamplesRevision((current) => current + 1)}
             defaultOpen={workflow.usage.defaultOpen} readOnly={workflow.usage.readOnly} />
         )}
 
+        {workflow.research.visible && (
+          <SenseResearchSection review={review} examplesRevision={examplesRevision}
+            onSensesChanged={() => {
+              setDraftRevision((current) => current + 1)
+              setExamplesRevision((current) => current + 1)
+            }} />
+        )}
+
         {workflow.draft.visible && (
-          <SenseDraftForm initialGloss={initialGloss} matchedEntryId={review.matchedEntryId}
-            onReviewUpdated={applyReviewUpdate} reviewId={review.id}
+          <SenseDraftForm key={draftRevision} initialGloss={initialGloss} matchedEntryId={review.matchedEntryId}
+            onReviewUpdated={(updatedReview) => {
+              applyReviewUpdate(updatedReview)
+              setExamplesRevision((current) => current + 1)
+            }} reviewId={review.id}
             editable={!workflow.draft.readOnly} renderEntry={renderEntry} />
         )}
         {workflow.completion.visible && (
-          <ReviewCompletion status={status} canComplete={review.canComplete} busy={changingAssignment}
+          <ReviewCompletion status={status} busy={changingAssignment}
             onStatusChange={changeStatus} />
         )}
       </Fragment>

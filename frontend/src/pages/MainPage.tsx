@@ -5,14 +5,14 @@ import type { CasePageContext } from './CasePage'
 import { CaseLoading } from '../components/review/CaseLoading'
 import { SuggestionList } from '../components/review/SuggestionList'
 import { AppHeader } from '../components/layout/AppHeader'
-import type { CaseType, Review, ReviewPageResponse, ReviewSort, ReviewStatus } from '../api/types'
+import type { ReviewType, Review, ReviewPageResponse, ReviewSort, ReviewStatus } from '../api/types'
 import { casePath } from '../review/links'
 
 const PAGE_SIZE = 20
 
 type QueueFilters = {
   status: ReviewStatus | null
-  types: CaseType[]
+  types: ReviewType[]
   sort: ReviewSort
   query: string
   page: number
@@ -80,7 +80,7 @@ export function MainPage() {
     setQueueFilters((current) => ({ ...current, sort, page: 0 }))
   }
 
-  function changeTypes(types: CaseType[]) {
+  function changeTypes(types: ReviewType[]) {
     setQueueFilters((current) => ({ ...current, types, page: 0 }))
   }
 

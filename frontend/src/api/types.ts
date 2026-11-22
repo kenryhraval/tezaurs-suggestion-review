@@ -15,19 +15,13 @@ export type ReviewStatus =
 
 export type ReviewSort = 'NEWEST' | 'OLDEST' | 'MOST_SUGGESTIONS'
 
-export type CaseType = 'UNKNOWN' | 'ENTRY' | 'SENSE'
+export type ReviewType = 'UNKNOWN' | 'ENTRY' | 'SENSE'
 
-export type SaveCaseType = {
-  type: CaseType
+export type SaveReviewType = {
+  type: ReviewType
   matchedEntryId: number | null
   meaningAlreadyExists?: boolean
 }
-
-export type CompletionBlockReason =
-  | 'TEZAURS_CHECK_REQUIRED'
-  | 'USAGE_CHECK_REQUIRED'
-  | 'ENTRY_DRAFT_REQUIRED'
-  | 'SENSE_DRAFT_REQUIRED'
 
 export type ReviewListItem = {
   id: string
@@ -51,14 +45,12 @@ export type Review = {
   reviewedTerm: string
   status: ReviewStatus
   lastStatusChangedBy: string | null
-  type: CaseType
+  type: ReviewType
   matchedEntryId: number | null
-  usageDecision: UsageDecision
+  usageDecision: UsageDecision | null
   usageNote: string | null
   usageDecidedBy: string | null
   usageDecidedAt: string | null
-  canComplete: boolean
-  completionBlockReason: CompletionBlockReason | null
   createdAt: string
   sources: ReviewSource[]
 }
@@ -110,14 +102,15 @@ export type LexemeDraft = {
   stem3: string | null
   pronunciations: string[]
   flags: FlagMap
-  structuralRestrictions: Record<string, unknown> | null
 }
+
+export type EntryType = 'WORD' | 'MULTIWORD_EXPRESSION' | 'WORD_PART'
 
 export type EntryDraft = {
   id: string
   heading: string
   humanKey: string
-  typeId: number
+  type: EntryType
   etymology: string | null
   normativeComment: string | null
   scientificName: string | null
@@ -137,12 +130,11 @@ export type SaveLexemeDraft = {
   stem3: string | null
   pronunciations: string[]
   flags: FlagMap
-  structuralRestrictions: Record<string, unknown> | null
 }
 
 export type SaveEntryDraft = {
   heading: string
-  typeId: number
+  type: EntryType
   etymology: string | null
   normativeComment: string | null
   scientificName: string | null
@@ -151,23 +143,25 @@ export type SaveEntryDraft = {
   flags: FlagMap
 }
 
-export type SenseDraft = {
+export type Sense = {
+  approved: boolean
+  existingSenseId: number | null
+  exampleIds: string[]
   id: string
   gloss: string
   parentDraftSenseId: string | null
   parentTezaursSenseId: number | null
   orderNo: number
   flags: FlagMap
-  structuralRestrictions: Record<string, unknown> | null
 }
 
-export type SaveSenseDraft = {
+export type SaveSense = {
   id?: string
   gloss: string
-  parentDraftSenseId: string | null
-  parentTezaursSenseId: number | null
-  flags: FlagMap
-  structuralRestrictions: Record<string, unknown> | null
+  approved?: boolean
+  parentDraftSenseId?: string | null
+  parentTezaursSenseId?: number | null
+  flags?: FlagMap
 }
 
 export type TezaursOption = {
@@ -195,24 +189,15 @@ export type TezaursFlagDefinition = {
   values: string[]
 }
 
-export type RestrictionFrequency = {
-  id: number
-  code: string
-  label: string | null
-}
-
 export type TezaursFormOptions = {
-  entryTypes: TezaursOption[]
   lexemeRoles: TezaursOption[]
   paradigms: TezaursParadigm[]
   flags: TezaursFlagDefinition[]
-  restrictionTypes: TezaursOption[]
-  restrictionFrequencies: RestrictionFrequency[]
 }
 
-export type UsageDecision = 'NOT_CHECKED' | 'USED' | 'NOT_CONFIRMED' | 'INVENTED'
+export type UsageDecision = 'USED' | 'NOT_CONFIRMED' | 'INVENTED'
 
-export type SaveUsageEvidence = {
+export type SaveExample = {
   source: 'CORPUS' | 'EXTERNAL'
   corpus: string | null
   tokenNumber: number | null
@@ -223,13 +208,22 @@ export type SaveUsageEvidence = {
   note: string | null
 }
 
-export type UsageEvidence = SaveUsageEvidence & {
+export type Example = SaveExample & {
+  senseId: string | null
+  inDraft: boolean
   corpusLabel: string | null
   sourceLabel: string
   sourceUrl: string | null
   id: string
   createdBy: string | null
   createdAt: string
+}
+
+export type SelectCorpusExamples = {
+  corpus: string
+  query: string
+  exactOnly: boolean
+  count: number | null
 }
 
 export type CorpusExample = {
@@ -257,4 +251,21 @@ export type CorpusSearchResult = {
 export type CorpusOption = {
   id: string
   label: string
+}
+
+export type DefinitionInput = {
+  id: string
+  description: string
+  exampleIds: string[]
+}
+
+export type GeneratedDefinition = {
+  senseId: string
+  definition: string
+}
+
+export type SenseModelOption = {
+  id: string
+  label: string
+  defaultModel: boolean
 }

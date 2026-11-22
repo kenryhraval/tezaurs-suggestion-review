@@ -1,6 +1,6 @@
-import type { CaseType, ReviewStatus } from '../api/types'
+import type { ReviewType, ReviewStatus } from '../api/types'
 
-export const caseTypeLabels: Record<CaseType, string> = {
+export const reviewTypeLabels: Record<ReviewType, string> = {
   UNKNOWN: 'Nav noteikts',
   ENTRY: 'Šķirklis',
   SENSE: 'Nozīme',
@@ -32,7 +32,7 @@ export const reviewStatusTransitions: Record<ReviewStatus, ReviewStatus[]> = {
     'GARBAGE',
   ],
   INVENTED: ['IN_PROGRESS', 'GARBAGE'],
-  ALREADY_EXISTS: [],
+  ALREADY_EXISTS: ['IN_PROGRESS'],
   INSUFFICIENT_DATA: ['IN_PROGRESS', 'GARBAGE'],
   NEEDS_EXPERT: ['IN_PROGRESS'],
   COMPLETED: [],

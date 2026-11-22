@@ -1,7 +1,6 @@
 TRUNCATE review.cases, incubator.suggestions, dict.entries, dict.lexemes, dict.senses,
     dict.examples, dict.entry_types, dict.lexeme_roles, dict.paradigms,
-    dict.grammar_flags, dict.grammar_flag_values, dict.grammar_restriction_types,
-    dict.grammar_restriction_frequencies, dict.sources, dict.source_links CASCADE;
+    dict.grammar_flags, dict.grammar_flag_values, dict.sources, dict.source_links CASCADE;
 
 INSERT INTO dict.entry_types (id, name, description) VALUES (1, 'word', 'Vārds');
 INSERT INTO dict.lexeme_roles (id, name, description) VALUES (1, 'main', 'Pamatleksēma');

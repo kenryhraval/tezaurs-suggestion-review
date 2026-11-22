@@ -10,6 +10,7 @@ import {
 } from '../../api/client'
 import type {
   EntryDraft,
+  EntryType,
   FlagMap,
   LexemeDraft,
   Review,
@@ -18,7 +19,6 @@ import type {
   TezaursFormOptions,
 } from '../../api/types'
 import { FlagEditor } from './FlagEditor'
-import { RestrictionEditor } from './RestrictionEditor'
 import { EditDialog } from '../shared/EditDialog'
 import { EntryHeading } from '../tezaurs/EntryHeading'
 import { EntryActions, LexemeActions } from '../tezaurs/TezaursActions'
@@ -29,7 +29,6 @@ type Props = {
   onReviewUpdated: (review: Review) => void
   children?: ReactNode
   defaultOpen: boolean
-  canCollapse: boolean
   complete: boolean
   editable: boolean
   onAddSense?: () => void
@@ -47,7 +46,6 @@ function newLexeme(term: string, roleId: number, primary: boolean): LexemeDraft 
     stem3: null,
     pronunciations: [],
     flags: {},
-    structuralRestrictions: null,
   }
 }
 
@@ -62,11 +60,10 @@ function lexemeRequest(lexeme: LexemeDraft): SaveLexemeDraft {
     stem3: lexeme.stem3,
     pronunciations: lexeme.pronunciations,
     flags: lexeme.flags,
-    structuralRestrictions: lexeme.structuralRestrictions,
   }
 }
 
-export function EntryDraftForm({ reviewId, onReviewUpdated, children, editable, onAddSense, defaultOpen, canCollapse, complete }: Props) {
+export function EntryDraftForm({ reviewId, onReviewUpdated, children, editable, onAddSense, defaultOpen, complete }: Props) {
   const [expanded, setExpanded] = useState(defaultOpen)
   const [draft, setDraft] = useState<EntryDraft | null>(null)
   const [options, setOptions] = useState<TezaursFormOptions | null>(null)
@@ -268,7 +265,7 @@ export function EntryDraftForm({ reviewId, onReviewUpdated, children, editable, 
     }
     const entryRequest: SaveEntryDraft = {
       heading: String(formData.get('heading')),
-      typeId: Number(formData.get('typeId')),
+      type: formData.get('type') as EntryType,
       etymology: optionalFormValue('etymology'),
       normativeComment: optionalFormValue('normativeComment'),
       scientificName: optionalFormValue('scientificName'),
@@ -335,11 +332,9 @@ export function EntryDraftForm({ reviewId, onReviewUpdated, children, editable, 
 
   function renderSection(content: ReactNode) {
     return (
-      <details open={expanded || !canCollapse} onToggle={(event) => setExpanded(event.currentTarget.open)}
+      <details open={expanded} onToggle={(event) => setExpanded(event.currentTarget.open)}
         className="entry-draft-section existing-entry review-section">
-        <summary className={!expanded && complete ? 'section-title confirmed' : 'section-title'} aria-disabled={!canCollapse} onClick={(event) => {
-          if (!canCollapse) event.preventDefault()
-        }}>4. Labojumu melnraksts</summary>
+        <summary className={!expanded && complete ? 'section-title confirmed' : 'section-title'}>5. Labojumu melnraksts</summary>
         {content}
       </details>
     )
@@ -352,7 +347,6 @@ export function EntryDraftForm({ reviewId, onReviewUpdated, children, editable, 
     return <p className="error">{error || 'Šķirkļa forma nav pieejama.'}</p>
   }
 
-  const entryTypeId = draft.typeId
   const savedLexemes = lexemes.filter((lexeme) => lexeme.id !== null)
   const primaryLexemeId = savedLexemes.find((lexeme) => lexeme.primary)?.id ?? ''
 
@@ -396,10 +390,10 @@ export function EntryDraftForm({ reviewId, onReviewUpdated, children, editable, 
             </label>
             <label>
               Šķirkļa tips
-              <select className="custom-select custom-select-sm" defaultValue={entryTypeId} name="typeId">
-                {options.entryTypes.map((option) => (
-                  <option key={option.id} value={option.id}>{option.label || option.code}</option>
-                ))}
+              <select className="custom-select custom-select-sm" defaultValue={draft.type} name="type">
+                <option value="WORD">Vārds</option>
+                <option value="MULTIWORD_EXPRESSION">Stabils vārdu savienojums</option>
+                <option value="WORD_PART">Vārda daļa</option>
               </select>
             </label>
             <FlagEditor definitions={options.flags} flags={entryFlags} onChange={setEntryFlags} scope="E" />
@@ -526,16 +520,7 @@ export function EntryDraftForm({ reviewId, onReviewUpdated, children, editable, 
                   onChange={(flags) => replaceLexeme(index, { ...lexeme, flags })}
                   scope="L"
                 />
-                <RestrictionEditor
-                  definitions={options.flags}
-                  frequencies={options.restrictionFrequencies}
-                  onChange={(structuralRestrictions) => replaceLexeme(index, {
-                    ...lexeme,
-                    structuralRestrictions,
-                  })}
-                  restriction={lexeme.structuralRestrictions}
-                  types={options.restrictionTypes}
-                />
+
               </EditDialog>
             )}
           </Fragment>

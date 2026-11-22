@@ -1,14 +1,13 @@
-import type { SaveSenseDraft, TezaursFormOptions, TezaursSense } from '../../api/types'
+import type { SaveSense, TezaursFormOptions, TezaursSense } from '../../api/types'
 import { FlagEditor } from './FlagEditor'
-import { RestrictionEditor } from './RestrictionEditor'
 
 type Props = {
-  sense: SaveSenseDraft
+  sense: SaveSense
   options: TezaursFormOptions
   existingSenses: TezaursSense[]
-  draftSenses: SaveSenseDraft[]
+  draftSenses: SaveSense[]
   onlyParent?: boolean
-  onChange: (sense: SaveSenseDraft) => void
+  onChange: (sense: SaveSense) => void
   onParentChange: (value: string) => void
 }
 
@@ -19,6 +18,11 @@ export function SenseFields({ sense, options, existingSenses, draftSenses, onlyP
   } else if (sense.parentTezaursSenseId) {
     parentValue = `tezaurs:${sense.parentTezaursSenseId}`
   }
+  const existingParents = existingSenses.filter((item) => item.parentSenseId === null)
+  const draftParents = draftSenses.filter((item) => item.id && item.id !== sense.id
+    && item.parentDraftSenseId === null && item.parentTezaursSenseId === null)
+  const hasChildren = sense.id !== undefined && draftSenses.some((item) => item.parentDraftSenseId === sense.id)
+
   return (
     <>
       {!onlyParent && <label>
@@ -34,17 +38,17 @@ export function SenseFields({ sense, options, existingSenses, draftSenses, onlyP
           value={sense.gloss}
         />
       </label>}
-      {(existingSenses.length > 0 || draftSenses.some((item) => item.id && item.id !== sense.id)) && (
+      {(!hasChildren && (existingParents.length > 0 || draftParents.length > 0)) && (
         <label>
           Virsnozīme
           <select className="custom-select custom-select-sm" value={parentValue} onChange={(event) => onParentChange(event.target.value)}>
             <option value="">Nav</option>
-            {existingSenses.map((item) => (
+            {existingParents.map((item) => (
               <option key={`tezaurs-${item.id}`} value={`tezaurs:${item.id}`}>
                 Esošā: {item.gloss || item.id}
               </option>
             ))}
-            {draftSenses.filter((item) => item.id && item.id !== sense.id).map((item) => (
+            {draftParents.map((item) => (
               <option key={`draft-${item.id}`} value={`draft:${item.id}`}>
                 Melnraksta: {item.gloss}
               </option>
@@ -52,24 +56,14 @@ export function SenseFields({ sense, options, existingSenses, draftSenses, onlyP
           </select>
         </label>
       )}
-      {!onlyParent && <>
+      {!onlyParent && (
         <FlagEditor
           definitions={options.flags}
-          flags={sense.flags}
+          flags={sense.flags ?? {}}
           onChange={(flags) => onChange({ ...sense, flags })}
           scope="S"
         />
-        <RestrictionEditor
-          definitions={options.flags}
-          frequencies={options.restrictionFrequencies}
-          onChange={(structuralRestrictions) => onChange({
-            ...sense,
-            structuralRestrictions,
-          })}
-          restriction={sense.structuralRestrictions}
-          types={options.restrictionTypes}
-        />
-      </>}
+      )}
     </>
   )
 }

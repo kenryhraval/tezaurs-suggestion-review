@@ -26,7 +26,6 @@ public class TestEnvironment {
     private static final List<String> LEGACY_TABLES = List.of(
             "dict.entries", "dict.lexemes", "dict.senses", "dict.examples", "dict.entry_types",
             "dict.lexeme_roles", "dict.paradigms", "dict.grammar_flags", "dict.grammar_flag_values",
-            "dict.grammar_restriction_types", "dict.grammar_restriction_frequencies",
             "dict.sources", "dict.source_links", "incubator.suggestions");
     private static final PostgreSQLContainer database = new PostgreSQLContainer("postgres:18-alpine")
             .withDatabaseName("integration_tests")

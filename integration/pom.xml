@@ -78,7 +78,7 @@
                 <configuration>
                     <failIfNoTests>true</failIfNoTests>
                     <systemPropertyVariables>
-                        <backend.jar>${project.basedir}/../backend/target/suggestions-0.0.1-SNAPSHOT.jar</backend.jar>
+                        <backend.jar>${project.basedir}/../backend/target/tip-0.0.1-SNAPSHOT.jar</backend.jar>
                     </systemPropertyVariables>
                 </configuration>
             </plugin>

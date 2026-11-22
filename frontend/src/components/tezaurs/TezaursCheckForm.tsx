@@ -1,34 +1,32 @@
 import { useEffect, useRef, useState, type ChangeEvent, type FocusEvent, type KeyboardEvent, type SyntheticEvent } from 'react'
 import { getTezaursCandidates, getTezaursEntry } from '../../api/client'
-import type { TezaursEntryCandidate, CaseType, ReviewStatus, SaveCaseType } from '../../api/types'
+import type { TezaursEntryCandidate, ReviewType, ReviewStatus, SaveReviewType } from '../../api/types'
 import { ConfirmationDialog } from '../shared/ConfirmationDialog'
 import { TezaursEntryLink } from './TezaursEntryLink'
 import { TezaursSensePreview } from './TezaursSensePreview'
 
 type Props = {
-  reviewId: string
   reviewedTerm: string
-  caseType: CaseType
+  reviewType: ReviewType
   reviewStatus: ReviewStatus
   matchedEntryId: number | null
   readOnly: boolean
   defaultOpen: boolean
-  onSave: (selection: SaveCaseType) => Promise<void>
+  onSave: (selection: SaveReviewType) => Promise<void>
 }
 
 const NOT_FOUND = 'not-found'
 
-function initialSelection(caseType: CaseType, matchedEntryId: number | null) {
-  if (caseType === 'ENTRY') {
+function initialSelection(reviewType: ReviewType, matchedEntryId: number | null) {
+  if (reviewType === 'ENTRY') {
     return NOT_FOUND
   }
   return matchedEntryId === null ? '' : String(matchedEntryId)
 }
 
 export function TezaursCheckForm({
-  reviewId,
   reviewedTerm,
-  caseType,
+  reviewType,
   reviewStatus,
   matchedEntryId,
   readOnly,
@@ -38,13 +36,13 @@ export function TezaursCheckForm({
   const [candidates, setCandidates] = useState<TezaursEntryCandidate[]>([])
   const [loading, setLoading] = useState(matchedEntryId !== null)
   const [serverError, setServerError] = useState('')
-  const [selection, setSelection] = useState(() => initialSelection(caseType, matchedEntryId))
+  const [selection, setSelection] = useState(() => initialSelection(reviewType, matchedEntryId))
   const [customSelection, setCustomSelection] = useState<TezaursEntryCandidate | null>(null)
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [query, setQuery] = useState(reviewedTerm)
   const [searching, setSearching] = useState(false)
   const [searchError, setSearchError] = useState('')
-  const savedMeaningExists = caseType === 'SENSE' ? reviewStatus === 'ALREADY_EXISTS' : null
+  const savedMeaningExists = reviewType === 'SENSE' ? reviewStatus === 'ALREADY_EXISTS' : null
   const [selectedMeaningExists, setSelectedMeaningExists] = useState<boolean | null>(savedMeaningExists)
   const [saving, setSaving] = useState(false)
   const [confirmation, setConfirmation] = useState(false)
@@ -66,9 +64,9 @@ export function TezaursCheckForm({
   if (selectedCandidate && !selectionIsInResults && searchTerm === reviewedTerm.trim()) {
     displayedCandidates = [selectedCandidate, ...candidates]
   }
-  const confirmed = caseType !== 'UNKNOWN'
-  const selectionMatchesSaved = (caseType === 'ENTRY' && selection === NOT_FOUND)
-    || (caseType === 'SENSE' && selectedEntryId === matchedEntryId && selectedMeaningExists === savedMeaningExists)
+  const confirmed = reviewType !== 'UNKNOWN'
+  const selectionMatchesSaved = (reviewType === 'ENTRY' && selection === NOT_FOUND)
+    || (reviewType === 'SENSE' && selectedEntryId === matchedEntryId && selectedMeaningExists === savedMeaningExists)
   const hasChanges = !selectionMatchesSaved
   const canCollapse = readOnly || (confirmed && selectionMatchesSaved)
   const expanded = expandedByUser || !canCollapse
@@ -115,7 +113,7 @@ export function TezaursCheckForm({
     let requestIsOutdated = false
     async function searchEntries() {
       try {
-        const loaded = await getTezaursCandidates(reviewId, term)
+        const loaded = await getTezaursCandidates(term)
         if (!requestIsOutdated) {
           setCandidates(loaded)
         }
@@ -139,7 +137,7 @@ export function TezaursCheckForm({
       requestIsOutdated = true
       window.clearTimeout(timeout)
     }
-  }, [dropdownOpen, query, reviewId, reviewedTerm])
+  }, [dropdownOpen, query, reviewedTerm])
 
   useEffect(() => {
     if (!dropdownOpen) {
@@ -220,7 +218,7 @@ export function TezaursCheckForm({
 
   function chooseNotFound() {
     closeDropdown()
-    if (caseType === 'ENTRY' && selection === NOT_FOUND) {
+    if (reviewType === 'ENTRY' && selection === NOT_FOUND) {
       return
     }
     saveSelection({ type: 'ENTRY', matchedEntryId: null })
@@ -228,7 +226,7 @@ export function TezaursCheckForm({
 
   function chooseMeaning(meaningExists: boolean) {
     if (!meaningExists) {
-      if (caseType === 'SENSE' && selectedEntryId === matchedEntryId && savedMeaningExists === false) {
+      if (reviewType === 'SENSE' && selectedEntryId === matchedEntryId && savedMeaningExists === false) {
         return
       }
       saveSelection({ type: 'SENSE', matchedEntryId: selectedEntryId })
@@ -238,7 +236,7 @@ export function TezaursCheckForm({
     setConfirmation(true)
   }
 
-  async function saveSelection(request: SaveCaseType) {
+  async function saveSelection(request: SaveReviewType) {
     if (saving) {
       return
     }
@@ -264,7 +262,7 @@ export function TezaursCheckForm({
     saveSelection({ type: 'SENSE', matchedEntryId: selectedEntryId, meaningAlreadyExists: true })
   }
 
-  let confirmationMessage = 'Apstiprinot izskatīšana tiks slēgta ar statusu “Jau ir”. Esošos labojumus veiciet Tēzaurā.'
+  let confirmationMessage = 'Perēklis pāries stāvoklī “Jau ir”. Esošos labojumus veiciet Tēzaurā.'
   if (confirmation && selectedEntryId !== matchedEntryId) {
     confirmationMessage += ' Iepriekšējie melnraksti paliks saglabāti pie iepriekšējās šķirkļa izvēles.'
   }

@@ -97,22 +97,9 @@ CREATE TABLE dict.grammar_flag_values (
 
 ALTER TABLE dict.grammar_flag_values ADD PRIMARY KEY (id);
 
-CREATE TABLE dict.grammar_restriction_frequencies (
-    id integer NOT NULL,
-    name text,
-    caption text,
-    compare_value integer
-);
 
-ALTER TABLE dict.grammar_restriction_frequencies ADD PRIMARY KEY (id);
 
-CREATE TABLE dict.grammar_restriction_types (
-    id integer NOT NULL,
-    name text,
-    caption text
-);
 
-ALTER TABLE dict.grammar_restriction_types ADD PRIMARY KEY (id);
 
 CREATE TABLE dict.lexemes (
     id integer NOT NULL,

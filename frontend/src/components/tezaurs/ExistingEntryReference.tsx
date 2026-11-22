@@ -5,13 +5,12 @@ import { TezaursEntryLink } from './TezaursEntryLink'
 type Props = {
   entryId: number
   defaultOpen: boolean
-  canCollapse: boolean
   complete: boolean
   children: ReactNode
   onAddSense?: () => void
 }
 
-export function ExistingEntryReference({ entryId, children, onAddSense, defaultOpen, canCollapse, complete }: Props) {
+export function ExistingEntryReference({ entryId, children, onAddSense, defaultOpen, complete }: Props) {
   const [expanded, setExpanded] = useState(defaultOpen)
   const [entry, setEntry] = useState<{ heading: string; humanKey: string } | null>(null)
   const [error, setError] = useState('')
@@ -35,12 +34,9 @@ export function ExistingEntryReference({ entryId, children, onAddSense, defaultO
   }, [entryId])
 
   return (
-    <details open={expanded || !canCollapse} onToggle={(event) => setExpanded(event.currentTarget.open)}
+    <details open={expanded} onToggle={(event) => setExpanded(event.currentTarget.open)}
       className="entry-draft-section review-section">
-      <summary className={!expanded && complete ? 'section-title confirmed' : 'section-title'}
-        aria-disabled={!canCollapse} onClick={(event) => {
-          if (!canCollapse) event.preventDefault()
-        }}>4. Labojumu melnraksts</summary>
+      <summary className={!expanded && complete ? 'section-title confirmed' : 'section-title'}>5. Labojumu melnraksts</summary>
       {error && <p className="error">{error}</p>}
       <div className="draft-heading">
         {entry && <span className="existing-record">

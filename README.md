@@ -1,30 +1,63 @@
 # Tēzaura ieteikumu perēklis
 
-Darba vide _Tēzaura_ lietotāju ieteikumu izskatīšanai: pirmapstrāde, dublikātu
-apvienošana, pārbaude Tēzaurā, lietojuma izpēte korpusos un šķirkļu vai nozīmju
-melnrakstu sagatavošana. Katram perēklim ir sava kopīgojama saite.
+Darba vide lietotāju ieteikumu izvērtēšanai un šķirkļu vai nozīmju melnrakstu sagatavošanai. Apvieno dublikātu apstrādi, lietojuma izpēti korpusos un MI atbalstu piemēru grupēšanā un definīciju veidošanā.
 
-Aizmugures sistēma veidota ar Java un Spring Boot, bet lietotāja saskarne – ar React un TypeScript.
-Dati glabājas PostgreSQL. 
+![Backend](https://img.shields.io/badge/Backend-Java%20%2F%20Spring%20Boot-6DB33F)
+![Frontend](https://img.shields.io/badge/Frontend-React%20%2F%20TypeScript-3178C6)
+![PostgreSQL](https://img.shields.io/badge/Datub%C4%81ze-PostgreSQL-4169E1)
 
-## Palaišana
+## Iestatīšana
+
+Izveidojiet `.env` pēc [.env.example](.env.example) parauga, aizpildiet atbilstoši videi. Iekopējiet videi atbilstošo compose failu.
+
+> [!NOTE]
+> Lietotne sagaida eksistējošas `dict` un `incubator` izmantotajā datubāzē. Lietotnes migrācija tām līdzās izveido `review` shēmu. **Lokālajai videi un atsevišķam serverim nepieciešamas datu kopijas**, kuras pieejamas [tēzaurs.lv platformas repozitorijā](https://github.com/LUMII-AILab/Tezaurs_platform). Pirms palaišanas lejuplādējiet `.pgsql.gz` failus un iekš `.env` norādiet to ceļus.
+
+## Lokālā vide
+
+Compose fails palaiž datubāzi. Lietotni palaiž atsevišķi ar Maven un Vite.
+
+Noklonējiet repozitoriju un atveriet tā direktoriju:
 
 ```bash
-docker pull ghcr.io/kenryhraval/tezaurs-suggestion-review-backend:latest
-docker pull ghcr.io/kenryhraval/tezaurs-suggestion-review-frontend:latest
+git clone https://github.com/kenryhraval/tezaurs-suggestion-review.git
 ```
 
-Lietotne paredz, ka vienā PostgreSQL datubāzē atrodas _Tēzaura_ `dict` un
-`incubator` shēmas. Datubāzes struktūra pieejama
-[_Tēzaura_ platformas repozitorijā](https://github.com/LUMII-AILab/Tezaurs_platform).
-`review` shēmu izveido lietotnes migrācija.
+Turpmākās komandas izpildiet repozitorija direktorijā:
 
-Servera puses konteineram jānorāda vides mainīgie `DATABASE_URL`
-(JDBC savienojuma adrese), `DATABASE_USERNAME` un `DATABASE_PASSWORD`.
-Servera puse klausās portā 8080, lietotāja saskarne – portā 80.
-Saskarnes konteiners pārsūta API pieprasījumus uz `backend:8080`, tāpēc abiem
-konteineriem jāatrodas kopīgā tīklā un servera pusei jābūt sasniedzamai ar nosaukumu `backend`.
+```bash
+docker compose -f compose.local.yml up -d
+```
 
-Autentifikāciju nodrošina izvietošanas vides reversais starpniekserveris,
-kas pārsūta `Authorization` galveni; lietotne pati paroles nepārbauda.
-API dokumentācija pieejama ceļā `/swagger-ui.html`.
+<details>
+<summary>Backend un frontend palaišana</summary>
+
+Atsevišķos termināļos:
+
+```bash
+set -a && source .env && set +a && ./backend/mvnw -f backend/pom.xml spring-boot:run
+```
+
+```bash
+npm --prefix frontend ci && npm --prefix frontend run dev
+```
+
+</details>
+
+## Testēšanas vide
+
+Izvietošanai personīgā serverī. Compose fails palaiž backend, frontend, datubāzi un proxy. Pirms palaišanas iekopējiet [Caddyfile](Caddyfile).
+
+```bash
+docker compose -f compose.standalone.deploy.yml up -d --pull always
+```
+
+## Produkcijas vide
+
+Izvietošanai esošajā tēzaurs.lv infrastruktūrā. Compose palaiž backend un frontend konteinerus. Izmanto eksistējošo datubāzi un proxy.
+
+```bash
+docker compose -f compose.production.deploy.yml up -d --pull always
+```
+
+API dokumentācija: `/swagger-ui.html`.

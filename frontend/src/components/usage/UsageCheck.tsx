@@ -1,28 +1,28 @@
 import { useEffect, useState, type FormEvent, type SyntheticEvent } from 'react'
-import { deleteUsageEvidence, getUsageEvidence, saveUsageEvidence } from '../../api/client'
-import type { Review, SaveUsageEvidence, UsageDecision, UsageEvidence } from '../../api/types'
+import { deleteCorpusExamples, deleteExample, getExamplesForCase, saveExamples, selectCorpusExamples } from '../../api/client'
+import type { Review, SaveExample, SelectCorpusExamples, UsageDecision, Example } from '../../api/types'
 import { ConfirmationDialog } from '../shared/ConfirmationDialog'
 import { CorpusSearch } from './CorpusSearch'
 import { EditDialog } from '../shared/EditDialog'
-import { SelectedUsageEvidence } from './SelectedUsageEvidence'
+import { SelectedExamples } from './SelectedExamples'
 
 type Props = {
   review: Review
   defaultOpen: boolean
   readOnly: boolean
   onSaveDecision: (decision: UsageDecision) => Promise<void>
+  onExamplesChange: () => void
 }
 
 const decisionLabels: Record<UsageDecision, string> = {
-  NOT_CHECKED: 'Nav izvēlēts',
   USED: 'Lietojums atzīts',
   NOT_CONFIRMED: 'Trūkst datu',
   INVENTED: 'Izdomāts vārds',
 }
 
-export function UsageCheck({ review, onSaveDecision, defaultOpen, readOnly }: Props) {
+export function UsageCheck({ review, onSaveDecision, onExamplesChange, defaultOpen, readOnly }: Props) {
   const [expandedByUser, setExpanded] = useState(defaultOpen)
-  const [evidence, setEvidence] = useState<UsageEvidence[]>([])
+  const [examples, setExamples] = useState<Example[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -32,17 +32,19 @@ export function UsageCheck({ review, onSaveDecision, defaultOpen, readOnly }: Pr
   const [pendingDecision, setPendingDecision] = useState<UsageDecision | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const editable = !readOnly
-  const decided = review.usageDecision !== 'NOT_CHECKED'
-  const canCollapse = readOnly || decided
+  const needsUsageDecision = review.type === 'ENTRY'
+  const usageDecision = review.usageDecision ?? null
+  const decided = needsUsageDecision ? usageDecision !== null : examples.length > 0
+  const canCollapse = readOnly || !needsUsageDecision || decided
   const expanded = expandedByUser || !canCollapse
 
   useEffect(() => {
     let requestIsOutdated = false
-    async function loadSavedEvidence() {
+    async function loadSavedExamples() {
       try {
-        const loaded = await getUsageEvidence(review.id)
+        const loaded = await getExamplesForCase(review.id)
         if (!requestIsOutdated) {
-          setEvidence(loaded)
+          setExamples(loaded)
         }
       } catch (cause) {
         if (!requestIsOutdated) {
@@ -55,23 +57,23 @@ export function UsageCheck({ review, onSaveDecision, defaultOpen, readOnly }: Pr
       }
     }
 
-    loadSavedEvidence()
+    loadSavedExamples()
     return () => {
       requestIsOutdated = true
     }
   }, [review.id])
 
-  async function addEvidence(request: SaveUsageEvidence) {
+  async function addExamples(requests: SaveExample[]) {
     setSaving(true)
     setError('')
     try {
-      const saved = await saveUsageEvidence(review.id, request)
-      setEvidence((current) => {
-        if (current.some((item) => item.id === saved.id)) {
-          return current
-        }
-        return [...current, saved]
+      const saved = await saveExamples(review.id, requests)
+      setExamples((current) => {
+        const byId = new Map(current.map((item) => [item.id, item]))
+        saved.forEach((item) => byId.set(item.id, item))
+        return [...byId.values()]
       })
+      onExamplesChange()
       return true
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Neizdevās saglabāt atradumu.')
@@ -81,11 +83,11 @@ export function UsageCheck({ review, onSaveDecision, defaultOpen, readOnly }: Pr
     }
   }
 
-  async function addExternalEvidence(event: FormEvent<HTMLFormElement>) {
+  async function addExternalExample(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const form = event.currentTarget
     const data = new FormData(form)
-    const saved = await addEvidence({
+    const saved = await addExamples([{
       source: 'EXTERNAL',
       corpus: null,
       tokenNumber: null,
@@ -94,14 +96,28 @@ export function UsageCheck({ review, onSaveDecision, defaultOpen, readOnly }: Pr
       url: String(data.get('url')),
       reference: null,
       note: null,
-    })
+    }])
     if (saved) {
       setAddingSource(false)
     }
   }
 
+  async function handleCorpusSelection(selection: SelectCorpusExamples) {
+    setSaving(true)
+    setError('')
+    try {
+      const saved = await selectCorpusExamples(review.id, selection)
+      setExamples(saved)
+      onExamplesChange()
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Neizdevās atlasīt korpusa piemērus.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   async function saveDecision(decision: UsageDecision) {
-    if (readOnly || saving || loading || decision === 'NOT_CHECKED') {
+    if (readOnly || saving || loading) {
       return
     }
     setSaving(true)
@@ -127,18 +143,33 @@ export function UsageCheck({ review, onSaveDecision, defaultOpen, readOnly }: Pr
     }
   }
 
-  async function removeEvidence() {
+  async function removeExample() {
     if (!deletingId) {
       return
     }
     setSaving(true)
     setError('')
     try {
-      await deleteUsageEvidence(review.id, deletingId)
-      setEvidence((current) => current.filter((item) => item.id !== deletingId))
+      await deleteExample(review.id, deletingId)
+      setExamples((current) => current.filter((item) => item.id !== deletingId))
+      onExamplesChange()
       setDeletingId(null)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Neizdevās noņemt atradumu.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function removeCorpusExamples(corpus: string) {
+    setSaving(true)
+    setError('')
+    try {
+      const remaining = await deleteCorpusExamples(review.id, corpus)
+      setExamples(remaining)
+      onExamplesChange()
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Neizdevās noņemt korpusa piemērus.')
     } finally {
       setSaving(false)
     }
@@ -152,7 +183,7 @@ export function UsageCheck({ review, onSaveDecision, defaultOpen, readOnly }: Pr
     }
   }
 
-  function requestEvidenceRemoval(id: string) {
+  function requestExampleRemoval(id: string) {
     setError('')
     setDeletingId(id)
   }
@@ -167,10 +198,6 @@ export function UsageCheck({ review, onSaveDecision, defaultOpen, readOnly }: Pr
     setError('')
   }
 
-  async function saveCorpusEvidence(request: SaveUsageEvidence) {
-    await addEvidence(request)
-  }
-
   return (
     <section className={`usage-check review-section${expanded ? ' is-open' : ''}`}>
       <details open={expanded} onToggle={toggleSection}>
@@ -178,22 +205,23 @@ export function UsageCheck({ review, onSaveDecision, defaultOpen, readOnly }: Pr
           aria-disabled={!canCollapse} onClick={(event) => {
             if (!canCollapse) event.preventDefault()
           }}>
-          3. Lietojuma pārbaude
+          3. {needsUsageDecision ? 'Lietojuma pārbaude' : 'Piemēru atlase'}
         </summary>
-        {editable && searchStarted && <CorpusSearch reviewId={review.id} term={review.reviewedTerm}
-            evidence={evidence} saving={saving || loading} onSave={saveCorpusEvidence}
-            onRemove={requestEvidenceRemoval}
+        {editable && searchStarted && <CorpusSearch term={review.reviewedTerm}
+            examples={examples} saving={saving || loading} onSave={addExamples} onSelectCorpus={handleCorpusSelection}
+            onRemove={requestExampleRemoval} onRemoveCorpus={removeCorpusExamples}
             onAddSource={openSourceForm} />}
         {error && !addingSource && !deletingId && !pendingDecision && (
           <p className="error" role="alert">{error}</p>
         )}
         {loading && <p className="muted">Ielādē saglabātos atradumus...</p>}
-        {readOnly && !loading && !error && evidence.length === 0 && (
+        {readOnly && !loading && !error && examples.length === 0 && (
           <p className="muted">Nav atzīmētu piemēru.</p>
         )}
-        <SelectedUsageEvidence evidence={evidence} busy={saving}
-          onRemove={editable ? requestEvidenceRemoval : undefined} />
+        <SelectedExamples examples={examples} busy={saving}
+          onRemove={editable ? requestExampleRemoval : undefined} />
         {readOnly && review.usageNote && <p>{review.usageNote}</p>}
+        {needsUsageDecision && <>
         <p><strong>Vai atzīstat, ka vārdu lieto?</strong></p>
         <div className="tezaurs-dropdown" onBlur={(event) => {
           if (!event.currentTarget.contains(event.relatedTarget)) {
@@ -206,19 +234,20 @@ export function UsageCheck({ review, onSaveDecision, defaultOpen, readOnly }: Pr
             <button className="tezaurs-dropdown-toggle" type="button" aria-expanded={decisionDropdownOpen}
               aria-label="Lietojuma izvērtējums" disabled={readOnly || saving || loading}
               onClick={() => setDecisionDropdownOpen(!decisionDropdownOpen)}>
-              <span className="tezaurs-option-label">{decisionLabels[review.usageDecision]}</span>
+              <span className="tezaurs-option-label">{usageDecision === null ? 'Nav izvēlēts' : decisionLabels[usageDecision]}</span>
               <span aria-hidden="true">▾</span>
             </button>
           </div>
           {decisionDropdownOpen && <div className="tezaurs-dropdown-menu">
             <div className="tezaurs-dropdown-options">
-              <button type="button" disabled>{decisionLabels.NOT_CHECKED}</button>
+              <button type="button" disabled>Nav izvēlēts</button>
               <button type="button" onClick={() => chooseDecision('USED')}>{decisionLabels.USED}</button>
               <button type="button" onClick={() => chooseDecision('NOT_CONFIRMED')}>{decisionLabels.NOT_CONFIRMED}</button>
               <button type="button" onClick={() => chooseDecision('INVENTED')}>{decisionLabels.INVENTED}</button>
             </div>
           </div>}
         </div>
+        </>}
       </details>
       {pendingDecision && <ConfirmationDialog busy={saving} error={error}
         message={pendingDecision === 'NOT_CONFIRMED'
@@ -230,13 +259,13 @@ export function UsageCheck({ review, onSaveDecision, defaultOpen, readOnly }: Pr
           setError('')
         }} />}
       {addingSource && <EditDialog title="Pievienot citu avotu" busy={saving} error={error} wide={false}
-        onSubmit={(event) => addExternalEvidence(event)}
+        onSubmit={(event) => addExternalExample(event)}
         onCancel={closeSourceForm}>
         <label>Avota saite<input className="form-control form-control-sm" autoFocus name="url" type="url" required maxLength={4000} disabled={saving} /></label>
         <label>Citāts<textarea className="form-control form-control-sm" name="citation" required maxLength={10000} rows={3} disabled={saving} /></label>
       </EditDialog>}
       {deletingId && <ConfirmationDialog busy={saving} error={error}
-        message="Noņemt šo atradumu no izskatīšanas?" onConfirm={() => removeEvidence()}
+        message="Noņemt šo atradumu no izskatīšanas?" onConfirm={() => removeExample()}
         onCancel={() => {
           setDeletingId(null)
           setError('')

@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import type { Review } from '../../api/types'
-import { caseTypeLabels, reviewStatusLabels, reviewStatusTransitions } from '../../review/statuses'
+import { reviewTypeLabels, reviewStatusLabels, reviewStatusTransitions } from '../../review/statuses'
 import { ConfirmationDialog } from '../shared/ConfirmationDialog'
 import { EditButton } from '../shared/EditButton'
 
@@ -83,7 +83,7 @@ export function ReviewHeader({
       <div className="review-heading">
         <span className="muted">{reviewStatusLabels[status]}</span>
         {review.type !== 'UNKNOWN' && (
-          <span className="muted">[{caseTypeLabels[review.type]}]</span>
+          <span className="muted">[{reviewTypeLabels[review.type]}]</span>
         )}
         <h2 className="suggestion-title">{review.reviewedTerm}</h2>
         {reviewInProgress && (

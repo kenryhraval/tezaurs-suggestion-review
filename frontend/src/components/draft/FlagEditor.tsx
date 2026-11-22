@@ -1,7 +1,7 @@
 import type { FlagMap, FlagValue, TezaursFlagDefinition } from '../../api/types'
 
 type Props = {
-  scope: 'E' | 'L' | 'R' | 'S'
+  scope: 'E' | 'L' | 'S'
   definitions: TezaursFlagDefinition[]
   flags: FlagMap
   onChange: (value: FlagMap) => void

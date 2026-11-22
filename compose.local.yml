@@ -1,0 +1,41 @@
+services:
+  postgres:
+    image: postgres:18-alpine
+    shm_size: 256mb
+    environment:
+      POSTGRES_DB: tezaurs_suggestions
+      POSTGRES_USER: tezaurs
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:?Set DATABASE_PASSWORD in .env}
+    ports:
+      - "5432:5432"
+    volumes:
+      - tezaurs-postgres:/var/lib/postgresql
+      - type: bind
+        source: ${TEZAURS_DICT_DUMP:-./import/tezaurs_2026_03-public.pgsql.gz}
+        target: /docker-entrypoint-initdb.d/10-dict.sql.gz
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${TEZAURS_SUGGESTIONS_DUMP:-./import/suggestions-2026-09-04.pgsql.gz}
+        target: /docker-entrypoint-initdb.d/30-suggestions.sql.gz
+        read_only: true
+        bind:
+          create_host_path: false
+    configs:
+      - source: create-incubator-schema
+        target: /docker-entrypoint-initdb.d/20-create-incubator.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U tezaurs -d tezaurs_suggestions"]
+      start_period: 30m
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  tezaurs-postgres:
+
+configs:
+  create-incubator-schema:
+    content: |
+      CREATE SCHEMA IF NOT EXISTS incubator;

@@ -157,7 +157,7 @@ public class ApiSteps {
             post("/api/reviews/{caseId}/type",
                     "{\"type\":\"SENSE\",\"matchedEntryId\":100}");
             responseStatusIs(200);
-            put("/api/reviews/{caseId}/sense-drafts", "{\"senses\":[{\"gloss\":\"Jauna nozīme\",\"flags\":{}}]}");
+            post("/api/reviews/{caseId}/senses", "{\"gloss\":\"Jauna nozīme\",\"approved\":true}");
             responseStatusIs(200);
             post("/api/reviews/{caseId}/status", "{\"status\":\"COMPLETED\"}");
         } else if (!status.equals(initialStatus)) {

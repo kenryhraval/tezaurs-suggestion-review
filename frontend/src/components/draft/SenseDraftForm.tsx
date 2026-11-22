@@ -3,18 +3,22 @@ import {
   getSenseDrafts,
   getTezaursSenses,
   getTezaursFormOptions,
-  saveSenseDrafts,
+  saveSense,
+  deleteSense,
+  getExamplesForCase,
 } from '../../api/client'
 import type {
   Review,
-  SaveSenseDraft,
+  SaveSense,
   TezaursFormOptions,
   TezaursSense,
+  Example,
 } from '../../api/types'
 import { EditDialog } from '../shared/EditDialog'
 import { SenseActions } from '../tezaurs/TezaursActions'
 import { ConfirmationDialog } from '../shared/ConfirmationDialog'
 import { SenseFields } from './SenseFields'
+import { SelectedExamples } from '../usage/SelectedExamples'
 
 type Props = {
   reviewId: string
@@ -27,13 +31,14 @@ type Props = {
 
 type SenseEditAction = 'edit' | 'move' | 'promote'
 
-function newSense(gloss: string): SaveSenseDraft {
+type EditableSense = SaveSense & { exampleIds?: string[] }
+
+function newSense(gloss: string): EditableSense {
   return {
     gloss,
     parentDraftSenseId: null,
     parentTezaursSenseId: null,
     flags: {},
-    structuralRestrictions: null,
   }
 }
 
@@ -45,16 +50,17 @@ export function SenseDraftForm({
   onReviewUpdated,
   renderEntry,
 }: Props) {
-  const [senses, setSenses] = useState<SaveSenseDraft[]>([])
+  const [senses, setSenses] = useState<EditableSense[]>([])
   const [existingSenses, setExistingSenses] = useState<TezaursSense[]>([])
   const [options, setOptions] = useState<TezaursFormOptions | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [savedSenses, setSavedSenses] = useState<SaveSenseDraft[]>([])
+  const [savedSenses, setSavedSenses] = useState<EditableSense[]>([])
   const [editingIndex, setEditingIndex] = useState<number | null>(null)
   const [error, setError] = useState('')
   const [editingParent, setEditingParent] = useState(false)
   const [deletingIndex, setDeletingIndex] = useState<number | null>(null)
+  const [examples, setExamples] = useState<Example[]>([])
 
   useEffect(() => {
     let requestIsOutdated = false
@@ -64,10 +70,11 @@ export function SenseDraftForm({
 
     async function loadSenseForm() {
       try {
-        const [loadedSenses, loadedOptions, loadedExistingSenses] = await Promise.all([
+        const [loadedSenses, loadedOptions, loadedExistingSenses, loadedExamples] = await Promise.all([
           getSenseDrafts(reviewId),
           getTezaursFormOptions(),
           parentSensesRequest,
+          getExamplesForCase(reviewId),
         ])
         if (requestIsOutdated) {
           return
@@ -77,6 +84,7 @@ export function SenseDraftForm({
         setSavedSenses(loadedSenses)
         setOptions(loadedOptions)
         setExistingSenses(loadedExistingSenses)
+        setExamples(loadedExamples)
       } catch (cause) {
         if (!requestIsOutdated) {
           setError(cause instanceof Error ? cause.message : 'Neizdevās ielādēt nozīmju formu.')
@@ -95,7 +103,7 @@ export function SenseDraftForm({
     }
   }, [matchedEntryId, reviewId])
 
-  function replaceSense(index: number, updatedSense: SaveSenseDraft) {
+  function replaceSense(index: number, updatedSense: EditableSense) {
     setSenses((currentSenses) => {
       const updatedSenses = [...currentSenses]
       updatedSenses[index] = updatedSense
@@ -149,13 +157,16 @@ export function SenseDraftForm({
     }
   }
 
-  async function saveSenses(nextSenses = senses) {
+  async function saveEditedSense() {
+    if (editingIndex === null) return false
+    const editedSense = senses[editingIndex]
     setSaving(true)
     setError('')
     try {
-      const response = await saveSenseDrafts(reviewId, nextSenses)
-      setSenses(response.senses)
-      setSavedSenses(response.senses)
+      const response = await saveSense(reviewId, { ...editedSense, approved: true })
+      const updatedSenses = senses.map((sense, index) => index === editingIndex ? response.sense : sense)
+      setSenses(updatedSenses)
+      setSavedSenses(updatedSenses)
       setEditingIndex(null)
       onReviewUpdated(response.review)
       return true
@@ -182,10 +193,21 @@ export function SenseDraftForm({
     if (deletingIndex === null) {
       return
     }
-    const remainingSenses = senses.filter((_, index) => index !== deletingIndex)
-    const saved = await saveSenses(remainingSenses)
-    if (saved) {
+    const senseId = senses[deletingIndex].id
+    if (!senseId) return
+    setSaving(true)
+    setError('')
+    try {
+      const review = await deleteSense(reviewId, senseId)
+      const remainingSenses = savedSenses.filter((sense) => sense.id !== senseId)
+      setSenses(remainingSenses)
+      setSavedSenses(remainingSenses)
       setDeletingIndex(null)
+      onReviewUpdated(review)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Neizdevās dzēst nozīmi.')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -208,13 +230,14 @@ export function SenseDraftForm({
       const position = existingSiblingCount + siblingIndex + 1
       const number = prefix ? `${prefix}.${position}` : String(position)
       const hasChildren = senses.some((child) => child.parentDraftSenseId === sense.id)
-      const canDelete = editable && senses.length > 1 && !hasChildren
+      const canDelete = editable && !hasChildren
+      const isSubsense = parentId !== null || sense.parentTezaursSenseId !== null
       return (
         <div className="draft-sense" key={sense.id}>
           <SenseActions subsense={parentId !== null || sense.parentTezaursSenseId !== null} readOnly={!editable}
             onEdit={() => editSense(index, 'edit')}
-            onAddSubsense={editable ? () => addSense(sense.id) : undefined}
-            onMove={editable && (existingSenses.length > 0 || savedSensesForDisplay.length > 1)
+            onAddSubsense={editable && !isSubsense ? () => addSense(sense.id) : undefined}
+            onMove={editable && !hasChildren && (existingSenses.length > 0 || savedSensesForDisplay.length > 1)
               ? () => editSense(index, 'move') : undefined}
             onPromote={editable && (parentId !== null || sense.parentTezaursSenseId !== null)
               ? () => editSense(index, 'promote') : undefined}
@@ -223,7 +246,8 @@ export function SenseDraftForm({
               setDeletingIndex(index)
             } : undefined} />
           <strong>{number}.</strong>{' '}{sense.gloss || 'Skaidrojums nav norādīts.'}
-          {renderSenses(sense.id ?? null, null, number)}
+          <SelectedExamples examples={examples.filter((example) => sense.exampleIds?.includes(example.id))} busy={saving} />
+          {!isSubsense && renderSenses(sense.id ?? null, null, number)}
         </div>
       )
     })
@@ -237,8 +261,13 @@ export function SenseDraftForm({
     return sense.parentSenseId === null ? String(position) : `${existingSenseNumber(sense.parentSenseId)}.${position}`
   }
 
-  const existingParentIds = [...new Set(savedSensesForDisplay
-    .map((sense) => sense.parentTezaursSenseId).filter((id) => id !== null))]
+  const existingParentIds: number[] = []
+  for (const sense of savedSensesForDisplay) {
+    const parentId = sense.parentTezaursSenseId
+    if (typeof parentId === 'number' && !existingParentIds.includes(parentId)) {
+      existingParentIds.push(parentId)
+    }
+  }
 
   const content = (
     <section aria-label="Nozīmes">
@@ -255,7 +284,7 @@ export function SenseDraftForm({
           <div key={sense.id ?? index}>
             {editingIndex === index && (
               <EditDialog title={editable ? editorTitle : "Nozīmes dati"} busy={saving} readOnly={!editable}
-                error={error} onCancel={cancelSenseEdit} onSubmit={() => saveSenses()}>
+                error={error} onCancel={cancelSenseEdit} onSubmit={() => saveEditedSense()}>
                 <SenseFields sense={sense} options={options} existingSenses={existingSenses}
                   draftSenses={senses} onlyParent={editingParent}
                   onChange={(updatedSense) => replaceSense(index, updatedSense)}

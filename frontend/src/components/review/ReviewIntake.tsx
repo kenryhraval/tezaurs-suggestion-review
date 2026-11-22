@@ -52,7 +52,7 @@ export function ReviewIntake({ status, onStatusChange, review, onDuplicate,
       await onStatusChange(nextStatus)
       setConfirmingTrash(false)
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Neizdevās mainīt statusu.')
+      setError(cause instanceof Error ? cause.message : 'Neizdevās mainīt stāvokli.')
     } finally {
       setSaving(false)
     }

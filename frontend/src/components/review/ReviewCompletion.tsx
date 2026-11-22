@@ -6,12 +6,11 @@ type CompletionStatus = 'NEEDS_EXPERT' | 'COMPLETED'
 
 type Props = {
   status: ReviewStatus
-  canComplete: boolean
   busy: boolean
   onStatusChange: (status: CompletionStatus) => Promise<Review>
 }
 
-export function ReviewCompletion({ status, canComplete, busy, onStatusChange }: Props) {
+export function ReviewCompletion({ status, busy, onStatusChange }: Props) {
   const editable = status === 'IN_PROGRESS'
   const [expandedByUser, setExpanded] = useState(editable)
   const expanded = expandedByUser || editable
@@ -41,7 +40,7 @@ export function ReviewCompletion({ status, canComplete, busy, onStatusChange }: 
       await onStatusChange(statusAwaitingConfirmation)
       setStatusAwaitingConfirmation(null)
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Neizdevās mainīt statusu.')
+      setError(cause instanceof Error ? cause.message : 'Neizdevās mainīt stāvokli.')
     } finally {
       setSaving(false)
     }
@@ -55,19 +54,19 @@ export function ReviewCompletion({ status, canComplete, busy, onStatusChange }: 
           aria-disabled={editable} onClick={(event) => {
             if (editable) event.preventDefault()
           }}>
-          5. Darba pabeigšana
+          6. Darba pabeigšana
         </summary>
         <p className="muted">Vai uzskatāt, ka nepieciešams eksperta apstiprinājums?</p>
         <div className="tezaurs-answer-actions">
           <button className="btn btn-sm btn-outline-secondary" type="button" disabled={!editable || isBusy}
             onClick={() => requestStatusChange('NEEDS_EXPERT')}>Jā, vajag</button>
-          <button className="btn btn-sm btn-outline-secondary" type="button" disabled={!editable || isBusy || !canComplete}
+          <button className="btn btn-sm btn-outline-secondary" type="button" disabled={!editable || isBusy}
             onClick={() => requestStatusChange('COMPLETED')}>Nē, nevajag</button>
         </div>
       </details>
       {statusAwaitingConfirmation && <ConfirmationDialog
         message={statusAwaitingConfirmation === 'NEEDS_EXPERT'
-          ? 'Izskatīšana pāries statusā “Vajag ekspertu”. Saglabātais melnraksts paliks pieejams.'
+          ? 'Izskatīšana pāries stāvoklī “Vajag ekspertu”. Saglabātais melnraksts paliks pieejams.'
           : 'Izskatīšana tiks pabeigta un atzīmēta kā “Gatavs”.'}
         busy={isBusy} error={error}
         onConfirm={confirmStatusChange} onCancel={cancelConfirmation} />}

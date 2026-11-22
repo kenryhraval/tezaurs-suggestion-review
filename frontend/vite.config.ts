@@ -9,7 +9,7 @@ export default defineConfig({
         target: 'http://localhost:8080',
         headers: {
           // Test identity used only by the development proxy.
-          Authorization: `Basic ${Buffer.from('local:development').toString('base64')}`,
+          Authorization: `Basic ${Buffer.from('Henrijs Kravals:development').toString('base64')}`,
         },
       },
     },

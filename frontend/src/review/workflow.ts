@@ -9,7 +9,6 @@ export function getReviewWorkflow(review: Review) {
   const usageIsConfirmed = review.usageDecision === 'USED'
   const needsSenseDraft = review.type === 'SENSE'
 
-  const canEditTezaursCheck = isInProgress || status === 'ALREADY_EXISTS'
   const showReviewSections = !onlyIntakeIsVisible
   const needsTezaursAnswer = review.type === 'UNKNOWN'
   const canShowNewEntryDraft = entryIsMissing && usageIsConfirmed
@@ -29,11 +28,11 @@ export function getReviewWorkflow(review: Review) {
     tezaurs: {
       visible: showReviewSections,
       defaultOpen: isInProgress && needsTezaursAnswer,
-      readOnly: !canEditTezaursCheck,
+      readOnly: !isInProgress,
     },
     usage: {
-      visible: showReviewSections && entryIsMissing,
-      defaultOpen: isInProgress && entryIsMissing && !usageIsConfirmed,
+      visible: showReviewSections && (entryIsMissing || needsSenseDraft) && status !== 'ALREADY_EXISTS',
+      defaultOpen: isInProgress && ((entryIsMissing && !usageIsConfirmed) || needsSenseDraft),
       readOnly: !isInProgress,
     },
     draft: {
@@ -41,7 +40,10 @@ export function getReviewWorkflow(review: Review) {
       defaultOpen: isInProgress,
       readOnly: !isInProgress,
       newEntry: entryIsMissing,
-      complete: review.canComplete || status === 'NEEDS_EXPERT' || status === 'COMPLETED',
+      complete: status === 'NEEDS_EXPERT' || status === 'COMPLETED',
+    },
+    research: {
+      visible: isInProgress && review.type !== 'UNKNOWN',
     },
     completion: {
       visible: status !== 'NEEDS_EXPERT' && showDraft,

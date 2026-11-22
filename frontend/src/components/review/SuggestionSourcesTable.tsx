@@ -4,7 +4,7 @@ import { ConfirmationDialog } from '../shared/ConfirmationDialog'
 
 type Props = {
   sources: ReviewSource[]
-  onDetach?: (sourceId: number) => Promise<void>
+  onDetach?: (suggestionId: number) => Promise<void>
 }
 
 function AdditionalInformation({ source }: { source: ReviewSource }) {
@@ -82,7 +82,7 @@ export function SuggestionSourcesTable({ sources, onDetach }: Props) {
       </div>
       {detaching && (
         <ConfirmationDialog
-          message={`Ieteikums “${detaching.submittedTerm}” tiks atdalīts un atgriezts sarakstā “Jauns”. Šīs izskatīšanas statuss un melnraksti paliks nemainīti un netiks kopēti līdzi.`}
+          message={`Ieteikums “${detaching.submittedTerm}” tiks atdalīts un atgriezts sarakstā “Jauns”. Šīs izskatīšanas stāvoklis un melnraksti paliks nemainīti un netiks kopēti līdzi.`}
           busy={saving}
           error={error}
           onConfirm={() => confirmDetach()}

@@ -7,3 +7,6 @@
 
 # Local documentation drafts
 /local-docs/
+
+# Local deployment credentials
+/.env
