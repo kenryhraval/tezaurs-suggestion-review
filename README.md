@@ -60,3 +60,25 @@ docker compose -f compose.production.deploy.yml up -d --pull always
 </details>
 
 API dokumentācija: `/swagger-ui.html`.
+
+## Automātiskie testi
+
+Testi atrodas vienā backend Maven projektā:
+
+- `backend/src/test/java/lv/tezaurs/tip` — vienību testi pa funkcionalitātēm, bez controller/service/entity apakšmapēm; Java pakotnes saglabātas piekļuvei pakotnes līmeņa metodēm.
+- `backend/src/l1/java/lv/tezaurs/tip` — `CucumberIT`, soļu definīcijas un testa vides konfigurācija.
+- `backend/src/l1/resources` — BDD scenāriji (`features`) un datubāzes shēma (`fixtures`).
+
+Izolētie testi (Surefire), bez Docker:
+
+```bash
+./backend/mvnw -f backend/pom.xml test
+```
+
+Visi testi un pārbaudes, ieskaitot integrācijas testus (Failsafe):
+
+```bash
+./backend/mvnw -f backend/pom.xml verify
+```
+
+BDD scenāriji palaiž Spring lietotni testa JVM ar nejaušu HTTP portu un PostgreSQL Testcontainers datubāzi; tiem nepieciešams Docker.
