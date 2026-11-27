@@ -295,9 +295,9 @@ public class SenseService {
             if (reference == null) {
                 String gloss = existing.getGloss();
                 if (gloss == null || gloss.isBlank()) gloss = "Skaidrojums nav norādīts.";
-                reference = new Sense(UUID.randomUUID(), review.getId(), review.getMatchedEntryId(),
-                        gloss, existing.getId(), orderNo++);
-                senses.add(senseRepository.save(reference));
+                reference = senseRepository.save(new Sense(UUID.randomUUID(), review.getId(),
+                        review.getMatchedEntryId(), gloss, existing.getId(), orderNo++));
+                senses.add(reference);
                 references.put(existing.getId(), reference);
             }
         }
