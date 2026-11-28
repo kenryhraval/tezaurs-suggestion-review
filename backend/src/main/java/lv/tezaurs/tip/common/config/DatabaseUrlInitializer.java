@@ -17,7 +17,7 @@ public final class DatabaseUrlInitializer
     public void initialize(ConfigurableApplicationContext applicationContext) {
         String databaseUrl = applicationContext.getEnvironment().getProperty("DB_URL");
         if (!StringUtils.hasText(databaseUrl)) {
-            return;
+            throw invalidDatabaseUrl("must be set", null);
         }
 
         DatabaseConnection connection = parse(databaseUrl);

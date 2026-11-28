@@ -5,11 +5,12 @@ services:
     image: ${BACKEND_IMAGE:-ghcr.io/kenryhraval/tezaurs-suggestion-review-backend:latest}
     restart: unless-stopped
     environment:
-      DATABASE_URL: jdbc:postgresql://postgres:5432/tezaurs_suggestions
-      DATABASE_USERNAME: tezaurs
-      DATABASE_PASSWORD: ${DATABASE_PASSWORD:?Set DATABASE_PASSWORD in .env}
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      DB_URL: ${DB_URL:?Set DB_URL in .env}
+      GEMINI_API_KEY:
+      GROQ_API_KEY:
+      MODEL_MAX_SELECTED_EXAMPLES:
+      MODEL_MAX_INPUT_CHARACTERS:
+      SUGGESTIONS_IMPORT_DELAY_MS:
     depends_on:
       postgres:
         condition: service_healthy
@@ -41,9 +42,9 @@ services:
     restart: unless-stopped
     shm_size: 256mb
     environment:
-      POSTGRES_DB: tezaurs_suggestions
-      POSTGRES_USER: tezaurs
-      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:?Set DATABASE_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in .env}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
     volumes:
       - postgres-data:/var/lib/postgresql
       - type: bind
@@ -62,7 +63,7 @@ services:
       - source: create-incubator-schema
         target: /docker-entrypoint-initdb.d/20-create-incubator.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U tezaurs -d tezaurs_suggestions"]
+      test: ["CMD-SHELL", 'pg_isready -h 127.0.0.1 -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
       start_period: 30m
       interval: 5s
       timeout: 5s

@@ -11,6 +11,18 @@ import org.springframework.core.env.MapPropertySource;
 class DatabaseUrlInitializerTest {
 
     @Test
+    void rejectsMissingDatabaseUrl() {
+        try (GenericApplicationContext context = new GenericApplicationContext()) {
+            context.getEnvironment().getPropertySources().addFirst(new MapPropertySource(
+                    "test", Map.of("DB_URL", "")));
+
+            assertThatThrownBy(() -> new DatabaseUrlInitializer().initialize(context))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("DB_URL must be set");
+        }
+    }
+
+    @Test
     void addsDatasourcePropertiesToTheApplicationEnvironment() {
         try (GenericApplicationContext context = new GenericApplicationContext()) {
             context.getEnvironment().getPropertySources().addFirst(new MapPropertySource(

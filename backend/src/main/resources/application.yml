@@ -1,10 +1,6 @@
 spring:
   application:
     name: tezaurs-tip
-  datasource:
-    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/tezaurs_suggestions}
-    username: ${DATABASE_USERNAME:tezaurs}
-    password: ${DATABASE_PASSWORD}
   flyway:
     default-schema: review
     schemas: review
@@ -16,6 +12,9 @@ spring:
     properties:
       hibernate:
         default_schema: review
+
+suggestions:
+  import-delay-ms: ${SUGGESTIONS_IMPORT_DELAY_MS:10000}
 
 model:
   default-model: gemini-flash-lite
@@ -30,8 +29,8 @@ model:
       base-url: https://api.groq.com/openai/v1
       model: openai/gpt-oss-120b
       api-key: ${GROQ_API_KEY:}
-  timeout: 90s
-  max-input-characters: 250000
+  max-selected-examples: ${MODEL_MAX_SELECTED_EXAMPLES:200}
+  max-input-characters: ${MODEL_MAX_INPUT_CHARACTERS:250000}
   prompts:
     clustering: ${SENSE_CLUSTERING_PROMPT:classpath:prompts/cluster-senses.txt}
     definitions: ${SENSE_DEFINITION_PROMPT:classpath:prompts/define-senses.txt}

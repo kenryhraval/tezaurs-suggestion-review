@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
 public class SuggestionImportJob {
     private final SuggestionService suggestionService;
 
-    @Scheduled(initialDelay = 0, fixedDelayString = "${suggestions.import-delay-ms:10000}")
+    @Scheduled(initialDelay = 0, fixedDelayString = "${suggestions.import-delay-ms}")
     public void importSuggestions() {
         int imported = suggestionService.importSuggestions();
         if (imported > 0) {
